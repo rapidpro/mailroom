@@ -14,7 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,11 +79,11 @@ func TestSessionTriggered(t *testing.T) {
 					start := models.FlowStart{}
 					err = json.Unmarshal(task.Task, &start)
 					assert.NoError(t, err)
-					assert.True(t, start.CreateContact())
-					assert.Equal(t, []models.ContactID{testdata.George.ID}, start.ContactIDs())
-					assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.GroupIDs())
-					assert.Equal(t, simpleFlow.ID(), start.FlowID())
-					assert.JSONEq(t, `{"parent_uuid":"39a9f95e-3641-4d19-95e0-ed866f27c829", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory()))
+					assert.True(t, start.CreateContact)
+					assert.Equal(t, []models.ContactID{testdata.George.ID}, start.ContactIDs)
+					assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.GroupIDs)
+					assert.Equal(t, simpleFlow.ID(), start.FlowID)
+					assert.JSONEq(t, `{"parent_uuid":"39a9f95e-3641-4d19-95e0-ed866f27c829", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory))
 					return nil
 				},
 			},
@@ -131,11 +130,11 @@ func TestQuerySessionTriggered(t *testing.T) {
 					start := models.FlowStart{}
 					err = json.Unmarshal(task.Task, &start)
 					assert.NoError(t, err)
-					assert.Equal(t, start.CreateContact(), true)
-					assert.Equal(t, 0, len(start.ContactIDs()))
-					assert.Equal(t, 0, len(start.GroupIDs()))
-					assert.Equal(t, `name ~ "Cathy"`, start.Query())
-					assert.Equal(t, start.FlowID(), favoriteFlow.ID())
+					assert.Equal(t, start.CreateContact, true)
+					assert.Len(t, start.ContactIDs, 0)
+					assert.Len(t, start.GroupIDs, 0)
+					assert.Equal(t, `name ~ "Cathy"`, string(start.Query))
+					assert.Equal(t, start.FlowID, favoriteFlow.ID())
 					return nil
 				},
 			},

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +49,7 @@ func TestDecodeAndValidateForm(t *testing.T) {
 
 func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	// make a request with valid form data
-	request, err := web.MakeMultipartRequest("POST", "http://temba.io", []web.MultiPartPart{
+	request, err := testsuite.MakeMultipartRequest("POST", "http://temba.io", []testsuite.MultiPartPart{
 		{Name: "foo", Data: "a"},
 		{Name: "foo", Data: "b"},
 		{Name: "bar", Data: "x"},
@@ -65,7 +65,7 @@ func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	assert.Equal(t, "x", form.Bar)
 
 	// make a request that's missing required data
-	request, err = web.MakeMultipartRequest("POST", "http://temba.io", []web.MultiPartPart{
+	request, err = testsuite.MakeMultipartRequest("POST", "http://temba.io", []testsuite.MultiPartPart{
 		{Name: "foo", Data: "a"},
 		{Name: "foo", Data: "b"},
 	}, nil)

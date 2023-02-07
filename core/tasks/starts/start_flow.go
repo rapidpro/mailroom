@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -24,7 +23,7 @@ const (
 )
 
 func init() {
-	tasks.RegisterType(TypeStartFlow, func() tasks.Task { return &StartFlowTask{FlowStart: &models.FlowStart{}} })
+	tasks.RegisterType(TypeStartFlow, func() tasks.Task { return &StartFlowTask{} })
 }
 
 // StartFlowBatchTask is the start flow batch task
@@ -44,7 +43,7 @@ func (t *StartFlowTask) Timeout() time.Duration {
 func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	err := CreateFlowBatches(ctx, rt, t.FlowStart)
 	if err != nil {
-		models.MarkStartFailed(ctx, rt.DB, t.FlowStart.ID())
+		models.MarkStartFailed(ctx, rt.DB, t.FlowStart.ID)
 
 		// if error is user created query error.. don't escalate error to sentry
 		isQueryError, _ := contactql.IsQueryError(err)
@@ -58,14 +57,14 @@ func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID 
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
 func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.FlowStart) error {
-	oa, err := models.GetOrgAssets(ctx, rt, start.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, start.OrgID)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
 	}
 
 	var contactIDs, createdContactIDs []models.ContactID
 
-	if start.CreateContact() {
+	if start.CreateContact {
 		// if we are meant to create a new contact, do so
 		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
@@ -78,17 +77,17 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 
 		// queries in start_session flow actions only match a single contact
 		queryLimit := -1
-		if start.Type() == models.StartTypeFlowAction {
+		if start.StartType == models.StartTypeFlowAction {
 			queryLimit = 1
 		}
 
 		contactIDs, createdContactIDs, err = search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
-			ContactIDs:      start.ContactIDs(),
-			GroupIDs:        start.GroupIDs(),
-			URNs:            start.URNs(),
-			Query:           start.Query(),
+			ContactIDs:      start.ContactIDs,
+			GroupIDs:        start.GroupIDs,
+			URNs:            start.URNs,
+			Query:           string(start.Query),
 			QueryLimit:      queryLimit,
-			ExcludeGroupIDs: start.ExcludeGroupIDs(),
+			ExcludeGroupIDs: start.ExcludeGroupIDs,
 		})
 		if err != nil {
 			return errors.Wrap(err, "error resolving start recipients")
@@ -99,14 +98,14 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 	defer rc.Close()
 
 	// mark our start as starting, last task will mark as complete
-	err = models.MarkStartStarted(ctx, rt.DB, start.ID(), len(contactIDs), createdContactIDs)
+	err = models.MarkStartStarted(ctx, rt.DB, start.ID, len(contactIDs), createdContactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error marking start as started")
 	}
 
 	// if there are no contacts to start, mark our start as complete, we are done
 	if len(contactIDs) == 0 {
-		err = models.MarkStartComplete(ctx, rt.DB, start.ID())
+		err = models.MarkStartComplete(ctx, rt.DB, start.ID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking start as complete")
 		}
@@ -119,19 +118,22 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 		q = queue.HandlerQueue
 	}
 
-	// task is different if we are an IVR flow
-	taskType := TypeStartFlowBatch
-	if start.FlowType() == models.FlowTypeVoice {
-		taskType = ivr.TypeStartIVRFlowBatch
-	}
-
 	contacts := make([]models.ContactID, 0, 100)
 	queueBatch := func(last bool) {
 		batch := start.CreateBatch(contacts, last, len(contactIDs))
-		err = queue.AddTask(rc, q, taskType, int(start.OrgID()), batch, queue.DefaultPriority)
+
+		// task is different if we are an IVR flow
+		var batchTask tasks.Task
+		if start.FlowType == models.FlowTypeVoice {
+			batchTask = &ivr.StartIVRFlowBatchTask{FlowStartBatch: batch}
+		} else {
+			batchTask = &StartFlowBatchTask{FlowStartBatch: batch}
+		}
+
+		err = tasks.Queue(rc, q, start.OrgID, batchTask, queue.DefaultPriority)
 		if err != nil {
 			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
-			logrus.WithError(err).WithField("start_id", start.ID()).Error("error while queuing start")
+			logrus.WithError(err).WithField("start_id", start.ID).Error("error while queuing start")
 		}
 		contacts = make([]models.ContactID, 0, 100)
 	}

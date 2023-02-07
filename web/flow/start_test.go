@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/mailroom/web"
 )
 
 func TestPreviewStart(t *testing.T) {
@@ -17,5 +16,5 @@ func TestPreviewStart(t *testing.T) {
 	mocks.ES.AddResponse(testdata.George.ID)
 	mocks.ES.AddResponse(testdata.Alexandria.ID)
 
-	web.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
 }
