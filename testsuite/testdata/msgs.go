@@ -71,9 +71,9 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 }
 
 func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
-	translations := make(models.BroadcastTranslations)
+	translations := make(flows.BroadcastTranslations)
 	for lang, t := range text {
-		translations[lang] = &models.BroadcastTranslation{Text: t}
+		translations[lang] = &flows.BroadcastTranslation{Text: t}
 	}
 
 	var id models.BroadcastID

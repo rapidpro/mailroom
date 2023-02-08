@@ -31,7 +31,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
-	basic := map[envs.Language]*events.BroadcastTranslation{
+	basic := flows.BroadcastTranslations{
 		eng: {
 			Text:         "hello world",
 			Attachments:  nil,
@@ -56,7 +56,7 @@ func TestBroadcastEvents(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[envs.Language]*events.BroadcastTranslation
+		Translations flows.BroadcastTranslations
 		BaseLanguage envs.Language
 		Groups       []*assets.GroupReference
 		Contacts     []*flows.ContactReference
@@ -141,7 +141,7 @@ func TestBroadcastTask(t *testing.T) {
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
-		Translations  map[envs.Language]*models.BroadcastTranslation
+		Translations  flows.BroadcastTranslations
 		TemplateState models.TemplateState
 		BaseLanguage  envs.Language
 		GroupIDs      []models.GroupID
@@ -155,7 +155,7 @@ func TestBroadcastTask(t *testing.T) {
 		MsgText       string
 	}{
 		{
-			map[envs.Language]*models.BroadcastTranslation{
+			flows.BroadcastTranslations{
 				eng: {
 					Text:         "hello world",
 					Attachments:  nil,
@@ -175,7 +175,7 @@ func TestBroadcastTask(t *testing.T) {
 			"hello world",
 		},
 		{
-			map[envs.Language]*models.BroadcastTranslation{
+			flows.BroadcastTranslations{
 				eng: {
 					Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
 					Attachments:  nil,

@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -22,7 +23,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
-	translations := models.BroadcastTranslations{envs.Language("eng"): {Text: "Hi there"}}
+	translations := flows.BroadcastTranslations{"eng": {Text: "Hi there"}}
 
 	// create a broadcast which doesn't actually exist in the DB
 	bcast := models.NewBroadcast(
@@ -83,16 +84,16 @@ func TestBroadcastTranslations(t *testing.T) {
 	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 
 	type TestStruct struct {
-		Translations models.BroadcastTranslations `json:"translations"`
+		Translations flows.BroadcastTranslations `json:"translations"`
 	}
 
 	s := &TestStruct{}
 	err := db.Get(s, `SELECT translations FROM msgs_broadcast WHERE id = $1`, bcastID)
 	require.NoError(t, err)
 
-	assert.Equal(t, models.BroadcastTranslations{"eng": &models.BroadcastTranslation{Text: "Hello"}, "spa": &models.BroadcastTranslation{Text: "Hola"}}, s.Translations)
+	assert.Equal(t, flows.BroadcastTranslations{"eng": {Text: "Hello"}, "spa": {Text: "Hola"}}, s.Translations)
 
-	s.Translations = models.BroadcastTranslations{"fra": &models.BroadcastTranslation{Text: "Bonjour"}}
+	s.Translations = flows.BroadcastTranslations{"fra": {Text: "Bonjour"}}
 
 	db.MustExec(`UPDATE msgs_broadcast SET translations = $1 WHERE id = $2`, s.Translations, bcastID)
 
