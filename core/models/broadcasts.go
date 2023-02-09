@@ -15,7 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -277,23 +276,20 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 	return msgs, nil
 }
 
+// creates an outgoing message for the given contact - can return nil if resultant message has no content and thus is a noop
 func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Contact, forceURN urns.URN) (*Msg, error) {
-	channels := oa.SessionAssets().Channels()
-
-	if c.Status() != ContactStatusActive {
-		return nil, nil
-	}
-
 	contact, err := c.FlowContact(oa)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating flow contact")
+		return nil, errors.Wrapf(err, "error creating flow contact for broadcast message")
 	}
 
+	// resolve URN + channel for this contact
 	urn := urns.NilURN
 	var channel *Channel
 
-	// we are forcing to send to a non-preferred URN, find the channel
 	if forceURN != urns.NilURN {
+		// we are forcing to send to a non-preferred URN, find the channel
+		channels := oa.SessionAssets().Channels()
 		for _, u := range contact.URNs() {
 			if u.URN().Identity() == forceURN.Identity() {
 				c := channels.GetForURN(u, assets.ChannelRoleSend)
@@ -306,38 +302,25 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 			}
 		}
 	} else {
-		// no forced URN, find the first URN we can send to
-		for _, u := range contact.URNs() {
-			c := channels.GetForURN(u, assets.ChannelRoleSend)
-			if c != nil {
-				urn = u.URN()
-				channel = oa.ChannelByUUID(c.UUID())
-				break
-			}
+		for _, dest := range contact.ResolveDestinations(false) {
+			urn = dest.URN.URN()
+			channel = oa.ChannelByUUID(dest.Channel.UUID())
+			break
 		}
 	}
 
-	// no urn and channel? move on
-	if channel == nil {
-		return nil, nil
-	}
-
 	trans, lang := b.Translations.ForContact(oa.Env(), contact, b.BaseLanguage)
-
 	if trans == nil {
-		logrus.WithField("base_language", b.BaseLanguage).Error("unable to find translation for broadcast")
-		return nil, nil
-	}
-
-	template := ""
-	if b.TemplateState == TemplateStateUnevaluated {
-		template = trans.Text
+		// in theory shoud never happen because we shouldn't save a broadcast like this
+		return nil, errors.New("broadcast has no translation in base language")
 	}
 
 	text := trans.Text
+	attachments := trans.Attachments
+	quickReplies := trans.QuickReplies
+	locale := envs.NewLocale(lang, envs.NilCountry)
 
-	// if we have a template, evaluate it
-	if template != "" {
+	if b.TemplateState == TemplateStateUnevaluated {
 		// build up the minimum viable context for templates
 		templateCtx := types.NewXObject(map[string]types.XValue{
 			"contact": flows.Context(oa.Env(), contact),
@@ -345,12 +328,17 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 			"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
 			"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
 		})
-		text, _ = excellent.EvaluateTemplate(oa.Env(), templateCtx, template, nil)
+		text, _ = excellent.EvaluateTemplate(oa.Env(), templateCtx, text, nil)
 	}
 
-	// don't do anything if we have no content
-	if text == "" && len(trans.Attachments) == 0 && len(trans.QuickReplies) == 0 {
+	// don't create a message if we have no content
+	if text == "" && len(attachments) == 0 && len(trans.QuickReplies) == 0 {
 		return nil, nil
+	}
+
+	var channelRef *assets.ChannelReference
+	if channel != nil {
+		channelRef = channel.ChannelReference()
 	}
 
 	unsendableReason := flows.NilUnsendableReason
@@ -361,7 +349,7 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 	}
 
 	// create our outgoing message
-	out := flows.NewMsgOut(urn, channel.ChannelReference(), text, trans.Attachments, trans.QuickReplies, nil, flows.NilMsgTopic, envs.NewLocale(lang, envs.NilCountry), unsendableReason)
+	out := flows.NewMsgOut(urn, channelRef, text, attachments, quickReplies, nil, flows.NilMsgTopic, locale, unsendableReason)
 	msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating outgoing message")
