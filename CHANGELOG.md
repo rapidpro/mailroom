@@ -1,3 +1,7 @@
+v8.1.17 (2023-02-09)
+-------------------------
+ * Update how we create messages from broadcasts and resolve translations
+
 v8.1.16 (2023-02-07)
 -------------------------
  * Update to latest goflow
