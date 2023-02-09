@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBroadcastEvents(t *testing.T) {
@@ -28,10 +29,10 @@ func TestBroadcastEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	eng := envs.Language("eng")
-	basic := map[envs.Language]*events.BroadcastTranslation{
+	basic := flows.BroadcastTranslations{
 		eng: {
 			Text:         "hello world",
 			Attachments:  nil,
@@ -56,7 +57,7 @@ func TestBroadcastEvents(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[envs.Language]*events.BroadcastTranslation
+		Translations flows.BroadcastTranslations
 		BaseLanguage envs.Language
 		Groups       []*assets.GroupReference
 		Contacts     []*flows.ContactReference
@@ -67,8 +68,8 @@ func TestBroadcastEvents(t *testing.T) {
 		MsgText      string
 	}{
 		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
+		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 122, "hello world"},
+		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
 		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
 		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
 		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
@@ -141,7 +142,7 @@ func TestBroadcastTask(t *testing.T) {
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
-		Translations  map[envs.Language]*models.BroadcastTranslation
+		Translations  flows.BroadcastTranslations
 		TemplateState models.TemplateState
 		BaseLanguage  envs.Language
 		GroupIDs      []models.GroupID
@@ -155,7 +156,7 @@ func TestBroadcastTask(t *testing.T) {
 		MsgText       string
 	}{
 		{
-			map[envs.Language]*models.BroadcastTranslation{
+			flows.BroadcastTranslations{
 				eng: {
 					Text:         "hello world",
 					Attachments:  nil,
@@ -175,7 +176,7 @@ func TestBroadcastTask(t *testing.T) {
 			"hello world",
 		},
 		{
-			map[envs.Language]*models.BroadcastTranslation{
+			flows.BroadcastTranslations{
 				eng: {
 					Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
 					Attachments:  nil,
