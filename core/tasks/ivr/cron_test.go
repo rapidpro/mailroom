@@ -1,18 +1,19 @@
 package ivr_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	ivrtasks "github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRetries(t *testing.T) {
@@ -32,21 +33,14 @@ func TestRetries(t *testing.T) {
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID})
 
-	// call our master starter
-	err := starts.CreateFlowBatches(ctx, rt, start)
-	assert.NoError(t, err)
-
-	// should have one task in our ivr queue
-	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
-	assert.NoError(t, err)
-	batch := &models.FlowStartBatch{}
-	err = json.Unmarshal(task.Task, batch)
-	assert.NoError(t, err)
+	err := tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
+	require.NoError(t, err)
 
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
-	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
-	assert.NoError(t, err)
+
+	testsuite.FlushTasks(t, rt)
+
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 

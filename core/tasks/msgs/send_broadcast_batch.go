@@ -35,7 +35,7 @@ func (t *SendBroadcastBatchTask) Timeout() time.Duration {
 func (t *SendBroadcastBatchTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	// always set our broadcast as sent if it is our last
 	defer func() {
-		if t.BroadcastBatch.IsLast {
+		if t.BroadcastBatch.IsLast && t.BroadcastBatch.BroadcastID != models.NilBroadcastID {
 			err := models.MarkBroadcastSent(ctx, rt.DB, t.BroadcastBatch.BroadcastID)
 			if err != nil {
 				logrus.WithError(err).Error("error marking broadcast as sent")

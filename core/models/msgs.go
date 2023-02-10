@@ -774,18 +774,16 @@ func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID
 	return nil
 }
 
-// MarkBroadcastSent marks the passed in broadcast as sent
+// MarkBroadcastSent marks the given broadcast as sent
 func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
-	// noop if it is a nil id
-	if id == NilBroadcastID {
-		return nil
-	}
-
 	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
-	if err != nil {
-		return errors.Wrapf(err, "error setting broadcast with id %d as sent", id)
-	}
-	return nil
+	return errors.Wrapf(err, "error marking broadcast #%d as sent", id)
+}
+
+// MarkBroadcastFailed marks the given broadcast as failed
+func MarkBroadcastFailed(ctx context.Context, db Queryer, id BroadcastID) error {
+	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
+	return errors.Wrapf(err, "error marking broadcast #%d as failed", id)
 }
 
 // NilID implementations

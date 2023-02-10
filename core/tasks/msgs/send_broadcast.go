@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -40,34 +41,46 @@ func (t *SendBroadcastTask) Timeout() time.Duration {
 
 // Perform handles sending the broadcast by creating batches of broadcast sends for all the unique contacts
 func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	oa, err := models.GetOrgAssets(ctx, rt, t.Broadcast.OrgID)
+	if err := createBroadcastBatches(ctx, rt, t.Broadcast); err != nil {
+		if t.Broadcast.ID != models.NilBroadcastID {
+			models.MarkBroadcastFailed(ctx, rt.DB, t.Broadcast.ID)
+		}
+
+		// if error is user created query error.. don't escalate error to sentry
+		isQueryError, _ := contactql.IsQueryError(err)
+		if !isQueryError {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	// we are building a set of contact ids, start with the explicit ones
-	contactIDs := make(map[models.ContactID]bool)
-	for _, id := range t.Broadcast.ContactIDs {
-		contactIDs[id] = true
-	}
-
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, t.Broadcast.GroupIDs)
+	contactIDs, _, err := search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+		ContactIDs:      bcast.ContactIDs,
+		GroupIDs:        bcast.GroupIDs,
+		URNs:            bcast.URNs,
+		Query:           string(bcast.Query),
+		QueryLimit:      -1,
+		ExcludeGroupIDs: nil,
+	})
 	if err != nil {
-		return errors.Wrap(err, "error resolving groups to contact ids")
+		return errors.Wrap(err, "error resolving broadcast recipients")
 	}
 
-	for _, id := range groupContactIDs {
-		contactIDs[id] = true
-	}
-
-	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, t.Broadcast.URNs)
-	if err != nil {
-		return errors.Wrap(err, "error resolving URNs to contact ids")
-	}
-
-	for _, id := range urnMap {
-		contactIDs[id] = true
+	// if there are no contacts to send to, mark our broadcast as sent, we are done
+	if len(contactIDs) == 0 && bcast.ID != models.NilBroadcastID {
+		err = models.MarkBroadcastSent(ctx, rt.DB, bcast.ID)
+		if err != nil {
+			return errors.Wrapf(err, "error marking broadcast as sent")
+		}
+		return nil
 	}
 
 	// two or fewer contacts? queue to our handler queue for sending
@@ -80,12 +93,12 @@ func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, or
 	defer rc.Close()
 
 	// create tasks for batches of contacts
-	idBatches := models.ChunkSlice(maps.Keys(contactIDs), 100)
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
 	for i, idBatch := range idBatches {
 		isLast := (i == len(idBatches)-1)
 
-		batch := t.Broadcast.CreateBatch(idBatch, isLast)
-		err = tasks.Queue(rc, q, t.Broadcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, queue.DefaultPriority)
+		batch := bcast.CreateBatch(idBatch, isLast)
+		err = tasks.Queue(rc, q, bcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, queue.DefaultPriority)
 		if err != nil {
 			if i == 0 {
 				return errors.Wrap(err, "error queuing broadcast batch")

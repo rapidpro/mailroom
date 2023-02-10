@@ -12,12 +12,11 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
-	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/services/ivr/twiml"
 	"github.com/nyaruka/mailroom/services/ivr/vonage"
@@ -99,19 +98,10 @@ func TestTwilioIVR(t *testing.T) {
 	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 	require.NoError(t, err)
 
-	// call our master starter
-	err = starts.CreateFlowBatches(ctx, rt, start)
+	err = tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
 	require.NoError(t, err)
 
-	// start our task
-	task, err := queue.PopNextTask(rc, queue.BatchQueue)
-	require.NoError(t, err)
-	batch := &models.FlowStartBatch{}
-	jsonx.MustUnmarshal(task.Task, batch)
-
-	// request our calls to start
-	err = ivr_tasks.HandleFlowStartBatch(ctx, rt, batch)
-	require.NoError(t, err)
+	testsuite.FlushTasks(t, rt)
 
 	// check our 3 contacts have 3 wired calls
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
@@ -400,26 +390,17 @@ func TestVonageIVR(t *testing.T) {
 	vonage.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
-	extra := json.RawMessage(`{"ref_id":"123"}`)
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
-		WithExtra(extra)
-	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+		WithExtra(json.RawMessage(`{"ref_id":"123"}`))
 
-	// call our master starter
-	err := starts.CreateFlowBatches(ctx, rt, start)
-	assert.NoError(t, err)
+	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	require.NoError(t, err)
 
-	// start our task
-	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
-	assert.NoError(t, err)
-	batch := &models.FlowStartBatch{}
-	err = json.Unmarshal(task.Task, batch)
-	assert.NoError(t, err)
+	err = tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
+	require.NoError(t, err)
 
-	// request our call to start
-	err = ivr_tasks.HandleFlowStartBatch(ctx, rt, batch)
-	assert.NoError(t, err)
+	testsuite.FlushTasks(t, rt)
 
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.CallStatusWired, "Call1").Returns(1)

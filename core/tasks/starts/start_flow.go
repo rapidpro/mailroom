@@ -41,8 +41,7 @@ func (t *StartFlowTask) Timeout() time.Duration {
 }
 
 func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	err := CreateFlowBatches(ctx, rt, t.FlowStart)
-	if err != nil {
+	if err := createFlowStartBatches(ctx, rt, t.FlowStart); err != nil {
 		models.MarkStartFailed(ctx, rt.DB, t.FlowStart.ID)
 
 		// if error is user created query error.. don't escalate error to sentry
@@ -55,8 +54,8 @@ func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID 
 	return nil
 }
 
-// CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
-func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.FlowStart) error {
+// creates batches of flow starts for all the unique contacts
+func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *models.FlowStart) error {
 	oa, err := models.GetOrgAssets(ctx, rt, start.OrgID)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
@@ -94,9 +93,6 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 		}
 	}
 
-	rc := rt.RP.Get()
-	defer rc.Close()
-
 	// mark our start as starting, last task will mark as complete
 	err = models.MarkStartStarted(ctx, rt.DB, start.ID, len(contactIDs), createdContactIDs)
 	if err != nil {
@@ -118,9 +114,15 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 		q = queue.HandlerQueue
 	}
 
-	contacts := make([]models.ContactID, 0, 100)
-	queueBatch := func(last bool) {
-		batch := start.CreateBatch(contacts, last, len(contactIDs))
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	// create tasks for batches of contacts
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
+	for i, idBatch := range idBatches {
+		isLast := (i == len(idBatches)-1)
+
+		batch := start.CreateBatch(idBatch, isLast, len(contactIDs))
 
 		// task is different if we are an IVR flow
 		var batchTask tasks.Task
@@ -132,23 +134,12 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 
 		err = tasks.Queue(rc, q, start.OrgID, batchTask, queue.DefaultPriority)
 		if err != nil {
-			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
-			logrus.WithError(err).WithField("start_id", start.ID).Error("error while queuing start")
+			if i == 0 {
+				return errors.Wrap(err, "error queuing flow start batch")
+			}
+			// if we've already queued other batches.. we don't want to error and have the task be retried
+			logrus.WithError(err).Error("error queuing flow start batch")
 		}
-		contacts = make([]models.ContactID, 0, 100)
-	}
-
-	// build up batches of contacts to start
-	for _, c := range contactIDs {
-		if len(contacts) == startBatchSize {
-			queueBatch(false)
-		}
-		contacts = append(contacts, c)
-	}
-
-	// queue our last batch
-	if len(contacts) > 0 {
-		queueBatch(true)
 	}
 
 	return nil
