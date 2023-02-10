@@ -850,7 +850,7 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 	}
 
 	// split into batches and exit each batch in a transaction
-	for _, idBatch := range chunkSlice(sessionIDs, 100) {
+	for _, idBatch := range ChunkSlice(sessionIDs, 100) {
 		tx, err := db.BeginTxx(ctx, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error starting transaction to exit sessions")

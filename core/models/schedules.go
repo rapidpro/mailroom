@@ -214,16 +214,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			b.base_language,
 			s.org_id,
 			(SELECT ARRAY_AGG(bc.contact_id) FROM (SELECT bc.contact_id FROM msgs_broadcast_contacts bc WHERE bc.broadcast_id = b.id) bc) as contact_ids,
-			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT bg.contactgroup_id FROM msgs_broadcast_groups bg WHERE bg.broadcast_id = b.id) bg) as group_ids,
-			(SELECT ARRAY_AGG(bu.urn) FROM (
-				SELECT
-					cu.identity || '?id=' || cu.id as urn
-				FROM
-					msgs_broadcast_urns bus JOIN
-					contacts_contacturn cu ON cu.id = bus.contacturn_id
-				WHERE
-					bus.broadcast_id = b.id
-			) bu) as urns
+			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT bg.contactgroup_id FROM msgs_broadcast_groups bg WHERE bg.broadcast_id = b.id) bg) as group_ids
 		FROM
 			msgs_broadcast b
 		WHERE

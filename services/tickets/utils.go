@@ -19,7 +19,6 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 )
 
@@ -101,7 +100,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(oa.OrgID(), translations, models.TemplateStateEvaluated, "und", nil, nil, nil, "", ticket.ID(), models.NilUserID)
-	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
+	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()}, false)
 	msgs, err := batch.CreateMessages(ctx, rt, oa)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating message batch")
