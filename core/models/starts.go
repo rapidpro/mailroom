@@ -47,15 +47,6 @@ const (
 	StartStatusFailed   = StartStatus("F")
 )
 
-// MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
-	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
-	if err != nil {
-		return errors.Wrapf(err, "error setting start as complete")
-	}
-	return nil
-}
-
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
 func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int, createdContactIDs []ContactID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
@@ -83,13 +74,16 @@ func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactC
 	return nil
 }
 
+// MarkStartComplete sets the status for the passed in flow start
+func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
+	return errors.Wrapf(err, "error marking flow start as complete")
+}
+
 // MarkStartFailed sets the status for the passed in flow start to F
 func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
-	if err != nil {
-		return errors.Wrapf(err, "error setting start as failed")
-	}
-	return nil
+	return errors.Wrapf(err, "error setting flow start as failed")
 }
 
 // FlowStartBatch represents a single flow batch that needs to be started
