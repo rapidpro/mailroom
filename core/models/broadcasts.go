@@ -110,28 +110,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
 	}
 
-	// finally our URNs
-	urns := make([]*broadcastURN, 0, len(child.URNs))
-	for _, urn := range child.URNs {
-		urnID := GetURNID(urn)
-		if urnID == NilURNID {
-			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
-		}
-		urns = append(urns, &broadcastURN{BroadcastID: child.ID, URNID: urnID})
-	}
-
-	// insert our urns
-	err = BulkQuery(ctx, "inserting broadcast urns", db, sqlInsertBroadcastURNs, urns)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
-	}
-
 	return child, nil
-}
-
-type broadcastURN struct {
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	URNID       URNID       `db:"contacturn_id"`
 }
 
 type broadcastContact struct {
@@ -152,7 +131,6 @@ RETURNING id`
 
 const sqlInsertBroadcastContacts = `INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES(:broadcast_id, :contact_id)`
 const sqlInsertBroadcastGroups = `INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES(:broadcast_id, :contactgroup_id)`
-const sqlInsertBroadcastURNs = `INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES(:broadcast_id, :contacturn_id)`
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
@@ -174,7 +152,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 	return NewBroadcast(oa.OrgID(), event.Translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilTicketID, NilUserID), nil
 }
 
-func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
+func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastBatch {
 	return &BroadcastBatch{
 		BroadcastID:   b.ID,
 		OrgID:         b.OrgID,
@@ -184,6 +162,7 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 		CreatedByID:   b.CreatedByID,
 		TicketID:      b.TicketID,
 		ContactIDs:    contactIDs,
+		IsLast:        isLast,
 	}
 }
 
@@ -194,39 +173,15 @@ type BroadcastBatch struct {
 	Translations  flows.BroadcastTranslations `json:"translations"`
 	BaseLanguage  envs.Language               `json:"base_language"`
 	TemplateState TemplateState               `json:"template_state"`
-	URNs          map[ContactID]urns.URN      `json:"urns,omitempty"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
-	IsLast        bool                        `json:"is_last"`
 	CreatedByID   UserID                      `json:"created_by_id"`
 	TicketID      TicketID                    `json:"ticket_id"`
+	IsLast        bool                        `json:"is_last"`
 }
 
 func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets) ([]*Msg, error) {
-	repeatedContacts := make(map[ContactID]bool)
-	broadcastURNs := b.URNs
-
-	// build our list of contact ids
-	contactIDs := b.ContactIDs
-
-	// build a map of the contacts that are present both in our URN list and our contact id list
-	if broadcastURNs != nil {
-		for _, id := range contactIDs {
-			_, found := broadcastURNs[id]
-			if found {
-				repeatedContacts[id] = true
-			}
-		}
-
-		// if we have URN we need to send to, add those contacts as well if not already repeated
-		for id := range broadcastURNs {
-			if !repeatedContacts[id] {
-				contactIDs = append(contactIDs, id)
-			}
-		}
-	}
-
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	contacts, err := LoadContacts(ctx, rt.DB, oa, b.ContactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
@@ -236,27 +191,12 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 
 	// run through all our contacts to create our messages
 	for _, c := range contacts {
-		// use the preferred URN if present
-		urn := broadcastURNs[c.ID()]
-		msg, err := b.createMessage(rt, oa, c, urn)
+		msg, err := b.createMessage(rt, oa, c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating broadcast message")
 		}
 		if msg != nil {
 			msgs = append(msgs, msg)
-		}
-
-		// if this is a contact that will receive two messages, calculate that one as well
-		if repeatedContacts[c.ID()] {
-			m2, err := b.createMessage(rt, oa, c, urns.NilURN)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error creating broadcast message")
-			}
-
-			// add this message if it isn't a duplicate
-			if m2 != nil && m2.URN() != msg.URN() {
-				msgs = append(msgs, m2)
-			}
 		}
 	}
 
@@ -277,7 +217,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 }
 
 // creates an outgoing message for the given contact - can return nil if resultant message has no content and thus is a noop
-func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Contact, forceURN urns.URN) (*Msg, error) {
+func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Contact) (*Msg, error) {
 	contact, err := c.FlowContact(oa)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact for broadcast message")
@@ -286,27 +226,10 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 	// resolve URN + channel for this contact
 	urn := urns.NilURN
 	var channel *Channel
-
-	if forceURN != urns.NilURN {
-		// we are forcing to send to a non-preferred URN, find the channel
-		channels := oa.SessionAssets().Channels()
-		for _, u := range contact.URNs() {
-			if u.URN().Identity() == forceURN.Identity() {
-				c := channels.GetForURN(u, assets.ChannelRoleSend)
-				if c == nil {
-					return nil, nil
-				}
-				urn = u.URN()
-				channel = oa.ChannelByUUID(c.UUID())
-				break
-			}
-		}
-	} else {
-		for _, dest := range contact.ResolveDestinations(false) {
-			urn = dest.URN.URN()
-			channel = oa.ChannelByUUID(dest.Channel.UUID())
-			break
-		}
+	for _, dest := range contact.ResolveDestinations(false) {
+		urn = dest.URN.URN()
+		channel = oa.ChannelByUUID(dest.Channel.UUID())
+		break
 	}
 
 	trans, lang := b.Translations.ForContact(oa.Env(), contact, b.BaseLanguage)

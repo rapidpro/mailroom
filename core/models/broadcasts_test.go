@@ -50,7 +50,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
 
-	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID})
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, false)
 
 	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID)
 	assert.Equal(t, testdata.Org1.ID, batch.OrgID)
@@ -189,7 +189,6 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 			Translations:  tc.translations,
 			BaseLanguage:  tc.baseLanguage,
 			TemplateState: tc.templateState,
-			URNs:          map[models.ContactID]urns.URN{},
 			ContactIDs:    []models.ContactID{testdata.Cathy.ID},
 		}
 

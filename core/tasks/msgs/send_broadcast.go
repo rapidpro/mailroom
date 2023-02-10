@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -40,6 +40,11 @@ func (t *SendBroadcastTask) Timeout() time.Duration {
 
 // Perform handles sending the broadcast by creating batches of broadcast sends for all the unique contacts
 func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	oa, err := models.GetOrgAssets(ctx, rt, t.Broadcast.OrgID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting org assets")
+	}
+
 	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range t.Broadcast.ContactIDs {
@@ -47,79 +52,48 @@ func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, or
 	}
 
 	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, t.Broadcast.GroupIDs)
-	for _, id := range groupContactIDs {
-		contactIDs[id] = true
+	if err != nil {
+		return errors.Wrap(err, "error resolving groups to contact ids")
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt, t.Broadcast.OrgID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting org assets")
+	for _, id := range groupContactIDs {
+		contactIDs[id] = true
 	}
 
 	// get the contact ids for our URNs
 	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, t.Broadcast.URNs)
 	if err != nil {
-		return errors.Wrapf(err, "error getting contact ids for urns")
+		return errors.Wrap(err, "error resolving URNs to contact ids")
 	}
 
-	urnContacts := make(map[models.ContactID]urns.URN)
-	repeatedContacts := make(map[models.ContactID]urns.URN)
-
-	q := queue.BatchQueue
+	for _, id := range urnMap {
+		contactIDs[id] = true
+	}
 
 	// two or fewer contacts? queue to our handler queue for sending
+	q := queue.BatchQueue
 	if len(contactIDs) <= 2 {
 		q = queue.HandlerQueue
-	}
-
-	// we want to remove contacts that are also present in URN sends, these will be a special case in our last batch
-	for u, id := range urnMap {
-		if contactIDs[id] {
-			repeatedContacts[id] = u
-			delete(contactIDs, id)
-		}
-		urnContacts[id] = u
 	}
 
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	contacts := make([]models.ContactID, 0, 100)
+	// create tasks for batches of contacts
+	idBatches := models.ChunkSlice(maps.Keys(contactIDs), 100)
+	for i, idBatch := range idBatches {
+		isLast := (i == len(idBatches)-1)
 
-	// utility functions for queueing the current set of contacts
-	queueBatch := func(isLast bool) {
-		// if this is our last batch include those contacts that overlap with our urns
-		if isLast {
-			for id := range repeatedContacts {
-				contacts = append(contacts, id)
-			}
-		}
-
-		batch := t.Broadcast.CreateBatch(contacts)
-
-		// also set our URNs
-		if isLast {
-			batch.IsLast = true
-			batch.URNs = urnContacts
-		}
-
+		batch := t.Broadcast.CreateBatch(idBatch, isLast)
 		err = tasks.Queue(rc, q, t.Broadcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, queue.DefaultPriority)
 		if err != nil {
-			logrus.WithError(err).Error("error while queuing broadcast batch")
+			if i == 0 {
+				return errors.Wrap(err, "error queuing broadcast batch")
+			}
+			// if we've already queued other batches.. we don't want to error and have the task be retried
+			logrus.WithError(err).Error("error queuing broadcast batch")
 		}
-		contacts = make([]models.ContactID, 0, 100)
 	}
-
-	// build up batches of contacts to start
-	for c := range contactIDs {
-		if len(contacts) == startBatchSize {
-			queueBatch(false)
-		}
-		contacts = append(contacts, c)
-	}
-
-	// queue our last batch
-	queueBatch(true)
 
 	return nil
 }

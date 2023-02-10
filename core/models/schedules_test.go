@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -14,6 +13,8 @@ import (
 
 func TestGetExpired(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	// add a schedule and tie a broadcast to it
 	var s1 models.ScheduleID
@@ -25,12 +26,9 @@ func TestGetExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	b1 := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+	testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
-
-	// add a URN
-	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
 
 	// add another and tie a trigger to it
 	var s2 models.ScheduleID
@@ -96,7 +94,6 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
-	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs)
 }
 
 func TestNextFire(t *testing.T) {

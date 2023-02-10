@@ -66,7 +66,7 @@ func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string,
 func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string, batchSize int, structs []interface{}) error {
 	start := time.Now()
 
-	batches := chunkSlice(structs, batchSize)
+	batches := ChunkSlice(structs, batchSize)
 	for i, batch := range batches {
 		err := dbutil.BulkQuery(ctx, tx, sql, batch)
 		if err != nil {
@@ -79,7 +79,7 @@ func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string,
 	return nil
 }
 
-func chunkSlice[T any](slice []T, size int) [][]T {
+func ChunkSlice[T any](slice []T, size int) [][]T {
 	chunks := make([][]T, 0, len(slice)/size+1)
 
 	for i := 0; i < len(slice); i += size {

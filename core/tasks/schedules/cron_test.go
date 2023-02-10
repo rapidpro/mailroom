@@ -17,7 +17,7 @@ func TestCheckSchedules(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// add a schedule and tie a broadcast to it
 	var s1 models.ScheduleID
@@ -32,9 +32,6 @@ func TestCheckSchedules(t *testing.T) {
 	b1 := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
-
-	// add a URN
-	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
 
 	// add another and tie a trigger to it
 	var s2 models.ScheduleID
@@ -88,8 +85,7 @@ func TestCheckSchedules(t *testing.T) {
 		AND status = 'Q' 
 		AND base_language = 'eng'`, testdata.Org1.ID, b1).Returns(1)
 
-	// with the right count of groups, contacts, urns
-	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`).Returns(1)
+	// with the right count of contacts and groups
 	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 2`).Returns(2)
 	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 2`).Returns(1)
 
