@@ -6,11 +6,11 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -45,29 +45,25 @@ func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, or
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	// we are building a set of contact ids, start with the explicit ones
-	contactIDs := make(map[models.ContactID]bool)
-	for _, id := range t.Broadcast.ContactIDs {
-		contactIDs[id] = true
-	}
-
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, t.Broadcast.GroupIDs)
+	contactIDs, _, err := search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+		ContactIDs:      t.Broadcast.ContactIDs,
+		GroupIDs:        t.Broadcast.GroupIDs,
+		URNs:            t.Broadcast.URNs,
+		Query:           string(t.Broadcast.Query),
+		QueryLimit:      -1,
+		ExcludeGroupIDs: nil,
+	})
 	if err != nil {
-		return errors.Wrap(err, "error resolving groups to contact ids")
+		return errors.Wrap(err, "error resolving broadcast recipients")
 	}
 
-	for _, id := range groupContactIDs {
-		contactIDs[id] = true
-	}
-
-	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, t.Broadcast.URNs)
-	if err != nil {
-		return errors.Wrap(err, "error resolving URNs to contact ids")
-	}
-
-	for _, id := range urnMap {
-		contactIDs[id] = true
+	// if there are no contacts to send to, mark our broadcast as sent, we are done
+	if len(contactIDs) == 0 {
+		err = models.MarkBroadcastSent(ctx, rt.DB, t.Broadcast.ID)
+		if err != nil {
+			return errors.Wrapf(err, "error marking broadcast as sent")
+		}
+		return nil
 	}
 
 	// two or fewer contacts? queue to our handler queue for sending
@@ -80,7 +76,7 @@ func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, or
 	defer rc.Close()
 
 	// create tasks for batches of contacts
-	idBatches := models.ChunkSlice(maps.Keys(contactIDs), 100)
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
 	for i, idBatch := range idBatches {
 		isLast := (i == len(idBatches)-1)
 

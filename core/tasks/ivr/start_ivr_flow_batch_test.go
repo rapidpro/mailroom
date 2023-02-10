@@ -10,16 +10,18 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIVR(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	_, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -35,37 +37,36 @@ func TestIVR(t *testing.T) {
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID})
 
-	// call our master starter
-	err := starts.CreateFlowBatches(ctx, rt, start)
-	assert.NoError(t, err)
-
 	service.callError = errors.Errorf("unable to create call")
 
-	// should have one IVR batch start task
-	taskCounts := testsuite.FlushTasks(t, rt)
-	assert.Equal(t, 1, taskCounts["start_ivr_flow_batch"])
+	err := tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
+	require.NoError(t, err)
+
+	testsuite.FlushTasks(t, rt)
+
+	// should have one call in a failed state
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
 
-	// re-create the batch and try again
+	// re-queue the start and try again
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 
-	err = starts.CreateFlowBatches(ctx, rt, start)
-	assert.NoError(t, err)
+	err = tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
+	require.NoError(t, err)
 
-	taskCounts = testsuite.FlushTasks(t, rt)
-	assert.Equal(t, 1, taskCounts["start_ivr_flow_batch"])
+	testsuite.FlushTasks(t, rt)
+
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 
-	err = starts.CreateFlowBatches(ctx, rt, start)
-	assert.NoError(t, err)
+	err = tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
+	require.NoError(t, err)
 
-	taskCounts = testsuite.FlushTasks(t, rt)
-	assert.Equal(t, 1, taskCounts["start_ivr_flow_batch"])
+	testsuite.FlushTasks(t, rt)
+
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 }
 
