@@ -16,7 +16,7 @@ import (
 )
 
 func TestBuildStartQuery(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2022, 4, 20, 15, 30, 45, 0, time.UTC)))
 	defer dates.SetNowSource(dates.DefaultNowSource)

@@ -23,8 +23,8 @@ import (
 )
 
 func TestResponseForSprint(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -45,10 +45,10 @@ func TestResponseForSprint(t *testing.T) {
 	resumeURL := "http://temba.io/resume?session=1"
 
 	// deactivate our twilio channel
-	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// update callback domain and roles for channel
-	db.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// set our UUID generator
 	uuids.SetGenerator(uuids.NewSeededGenerator(0))
@@ -64,7 +64,7 @@ func TestResponseForSprint(t *testing.T) {
 
 	provider := p.(*service)
 
-	conn, err := models.InsertCall(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Bob.ID, testdata.Bob.URNID, models.CallDirectionOut, models.CallStatusInProgress, "EX123")
+	conn, err := models.InsertCall(ctx, rt.DB, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Bob.ID, testdata.Bob.URNID, models.CallDirectionOut, models.CallStatusInProgress, "EX123")
 	require.NoError(t, err)
 
 	indentMarshal = false
@@ -128,7 +128,7 @@ func TestResponseForSprint(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		response, err := provider.responseForSprint(ctx, rp, channel, conn, resumeURL, tc.events)
+		response, err := provider.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, tc.events)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, tc.expected, response, "%d: unexpected response", i)
 	}
@@ -143,7 +143,7 @@ func TestResponseForSprint(t *testing.T) {
 }
 
 func TestRedactValues(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	oa := testdata.Org1.Load(rt)
 	ch := oa.ChannelByUUID(testdata.VonageChannel.UUID)

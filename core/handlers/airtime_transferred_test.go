@@ -267,7 +267,7 @@ var transactionRejectedResponse = `{
 }`
 
 func TestAirtimeTransferred(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -289,7 +289,7 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 	}))
 
-	db.MustExec(`UPDATE orgs_org SET config = '{"dtone_key": "key123", "dtone_secret": "sesame"}'::jsonb WHERE id = $1`, testdata.Org1.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET config = '{"dtone_key": "key123", "dtone_secret": "sesame"}'::jsonb WHERE id = $1`, testdata.Org1.ID)
 
 	tcs := []handlers.TestCase{
 		{

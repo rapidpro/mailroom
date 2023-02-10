@@ -22,7 +22,7 @@ import (
 )
 
 func TestContactSearch(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	wg := &sync.WaitGroup{}
@@ -225,7 +225,7 @@ func TestContactSearch(t *testing.T) {
 }
 
 func TestParseQuery(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 

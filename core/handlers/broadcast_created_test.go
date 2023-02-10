@@ -18,7 +18,7 @@ import (
 )
 
 func TestBroadcastCreated(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 

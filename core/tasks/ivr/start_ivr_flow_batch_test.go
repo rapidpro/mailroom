@@ -21,8 +21,8 @@ import (
 )
 
 func TestIVR(t *testing.T) {
-	_, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	_, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -31,7 +31,7 @@ func TestIVR(t *testing.T) {
 	ivr.RegisterServiceType(models.ChannelType("ZZ"), NewMockProvider)
 
 	// update our twilio channel to be of type 'ZZ' and set max_concurrent_events to 1
-	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
@@ -45,7 +45,7 @@ func TestIVR(t *testing.T) {
 	testsuite.FlushTasks(t, rt)
 
 	// should have one call in a failed state
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
 
 	// re-queue the start and try again
 	service.callError = nil
@@ -56,7 +56,7 @@ func TestIVR(t *testing.T) {
 
 	testsuite.FlushTasks(t, rt)
 
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
 	service.callError = nil
@@ -67,7 +67,7 @@ func TestIVR(t *testing.T) {
 
 	testsuite.FlushTasks(t, rt)
 
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 }
 
 var service = &MockService{}

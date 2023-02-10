@@ -22,8 +22,8 @@ import (
 )
 
 func TestSurveyor(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -34,7 +34,7 @@ func TestSurveyor(t *testing.T) {
 	defer server.Stop()
 
 	// insert an auth token for user 1 for org 1
-	db.MustExec(`INSERT INTO api_apitoken(is_active, key, created, org_id, role_id, user_id) VALUES(TRUE, 'sesame', NOW(), 1, 5, 1)`)
+	rt.DB.MustExec(`INSERT INTO api_apitoken(is_active, key, created, org_id, role_id, user_id) VALUES(TRUE, 'sesame', NOW(), 1, 5, 1)`)
 
 	type Assertion struct {
 		Query string
@@ -136,7 +136,7 @@ func TestSurveyor(t *testing.T) {
 
 		// if we have assertions, check them
 		for ii, assertion := range tc.Assertions {
-			rows, err := db.NamedQuery(assertion.Query, args)
+			rows, err := rt.DB.NamedQuery(assertion.Query, args)
 			assert.NoError(t, err, "%d:%d error with named query", i, ii)
 
 			count := 0

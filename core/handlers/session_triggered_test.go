@@ -18,7 +18,7 @@ import (
 )
 
 func TestSessionTriggered(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -94,7 +94,7 @@ func TestSessionTriggered(t *testing.T) {
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	ctx, rt, _, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -121,7 +121,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			},
 			Assertions: []handlers.Assertion{
 				func(t *testing.T, rt *runtime.Runtime) error {
-					rc := rp.Get()
+					rc := rt.RP.Get()
 					defer rc.Close()
 
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)

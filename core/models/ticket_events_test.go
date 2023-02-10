@@ -14,12 +14,12 @@ import (
 )
 
 func TestTicketEvents(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", time.Now(), nil)
-	modelTicket := ticket.Load(db)
+	ticket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", time.Now(), nil)
+	modelTicket := ticket.Load(rt)
 
 	e1 := models.NewTicketOpenedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID)
 	assert.Equal(t, testdata.Org1.ID, e1.OrgID())
@@ -53,10 +53,10 @@ func TestTicketEvents(t *testing.T) {
 	assert.Equal(t, testdata.SupportTopic.ID, e6.TopicID())
 	assert.Equal(t, testdata.Agent.ID, e6.CreatedByID())
 
-	err := models.InsertTicketEvents(ctx, db, []*models.TicketEvent{e1, e2, e3, e4, e5})
+	err := models.InsertTicketEvents(ctx, rt.DB, []*models.TicketEvent{e1, e2, e3, e4, e5})
 	require.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent`).Returns(5)
-	assertdb.Query(t, db, `SELECT assignee_id, note FROM tickets_ticketevent WHERE id = $1`, e2.ID()).
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent`).Returns(5)
+	assertdb.Query(t, rt.DB, `SELECT assignee_id, note FROM tickets_ticketevent WHERE id = $1`, e2.ID()).
 		Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID), "note": "please handle"})
 }

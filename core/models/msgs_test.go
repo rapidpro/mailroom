@@ -27,12 +27,12 @@ import (
 )
 
 func TestNewOutgoingFlowMsg(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	blake := testdata.InsertContact(db, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
-	blakeURNID := testdata.InsertContactURN(db, testdata.Org1, blake, "tel:++250700000007", 1)
+	blake := testdata.InsertContact(rt.DB, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
+	blakeURNID := testdata.InsertContactURN(rt.DB, testdata.Org1, blake, "tel:++250700000007", 1)
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -159,7 +159,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 	for _, tc := range tcs {
 		desc := fmt.Sprintf("text='%s'", tc.Text)
-		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, testdata.Org1.ID)
+		rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, testdata.Org1.ID)
 
 		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 		require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			expectedAttachments = []utils.Attachment{}
 		}
 
-		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
+		err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
 		assert.NoError(t, err)
 		assert.Equal(t, oa.OrgID(), msg.OrgID())
 		assert.Equal(t, tc.Text, msg.Text())
@@ -210,10 +210,10 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(4)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(4)
 
 	// ensure org is unsuspended
-	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
+	rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
 	models.FlushCache()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
@@ -248,11 +248,11 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 }
 
 func TestMarshalMsg(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -280,7 +280,7 @@ func TestMarshalMsg(t *testing.T) {
 
 	cathy := session.Contact()
 
-	err = models.InsertMessages(ctx, db, []*models.Msg{msg1})
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg1})
 	require.NoError(t, err)
 
 	marshaled, err := json.Marshal(msg1)
@@ -337,12 +337,12 @@ func TestMarshalMsg(t *testing.T) {
 		envs.NilLocale,
 		flows.NilUnsendableReason,
 	)
-	in1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
+	in1 := testdata.InsertIncomingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
 	session.SetIncomingMsg(models.MsgID(in1.ID()), null.String("EX123"))
 	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
-	err = models.InsertMessages(ctx, db, []*models.Msg{msg2})
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
 	require.NoError(t, err)
 
 	marshaled, err = json.Marshal(msg2)
@@ -375,12 +375,12 @@ func TestMarshalMsg(t *testing.T) {
 	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
 
 	// try a broadcast message which won't have session and flow fields set
-	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastID := testdata.InsertBroadcast(rt.DB, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), bcastID)
 	require.NoError(t, err)
 
-	err = models.InsertMessages(ctx, db, []*models.Msg{msg2})
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
 	require.NoError(t, err)
 
 	marshaled, err = json.Marshal(msg3)
@@ -411,19 +411,19 @@ func TestMarshalMsg(t *testing.T) {
 }
 
 func TestGetMessagesByID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
-	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent, false)
-	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 2", nil, models.MsgStatusSent, false)
-	msgOut3 := testdata.InsertOutgoingMsg(db, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "out 3", nil, models.MsgStatusSent, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi 3", nil, models.MsgStatusSent, false)
+	msgIn1 := testdata.InsertIncomingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
+	msgOut1 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent, false)
+	msgOut2 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 2", nil, models.MsgStatusSent, false)
+	msgOut3 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "out 3", nil, models.MsgStatusSent, false)
+	testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi 3", nil, models.MsgStatusSent, false)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
-	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
+	msgs, err := models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionOut, ids)
 
 	// should only return the outgoing messages for this org
 	require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestGetMessagesByID(t *testing.T) {
 	assert.Equal(t, []utils.Attachment{"image/jpeg:hi.jpg"}, msgs[0].Attachments())
 	assert.Equal(t, "out 2", msgs[1].Text())
 
-	msgs, err = models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionIn, ids)
+	msgs, err = models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionIn, ids)
 
 	// should only return the incoming message for this org
 	require.NoError(t, err)
@@ -441,42 +441,42 @@ func TestGetMessagesByID(t *testing.T) {
 }
 
 func TestResendMessages(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	out1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
-	out2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusFailed, false)
+	out1 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	out2 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusFailed, false)
 
 	// failed message with no channel
-	out3 := testdata.InsertOutgoingMsg(db, testdata.Org1, nil, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	out3 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, nil, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
 
 	// failed message with no URN
-	out4 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
-	db.MustExec(`UPDATE msgs_msg SET contact_urn_id = NULL, failed_reason = 'D' WHERE id = $1`, out4.ID())
+	out4 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	rt.DB.MustExec(`UPDATE msgs_msg SET contact_urn_id = NULL, failed_reason = 'D' WHERE id = $1`, out4.ID())
 
 	// failed message with URN which we no longer have a channel for
-	out5 := testdata.InsertOutgoingMsg(db, testdata.Org1, nil, testdata.George, "hi", nil, models.MsgStatusFailed, false)
-	db.MustExec(`UPDATE msgs_msg SET failed_reason = 'E' WHERE id = $1`, out5.ID())
-	db.MustExec(`UPDATE contacts_contacturn SET scheme = 'viber', path = '1234', identity = 'viber:1234' WHERE id = $1`, testdata.George.URNID)
+	out5 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, nil, testdata.George, "hi", nil, models.MsgStatusFailed, false)
+	rt.DB.MustExec(`UPDATE msgs_msg SET failed_reason = 'E' WHERE id = $1`, out5.ID())
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET scheme = 'viber', path = '1234', identity = 'viber:1234' WHERE id = $1`, testdata.George.URNID)
 
 	// other failed message not included in set to resend
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
 
 	// give Bob's URN an affinity for the Vonage channel
-	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
 
 	ids := []models.MsgID{models.MsgID(out1.ID()), models.MsgID(out2.ID()), models.MsgID(out3.ID()), models.MsgID(out4.ID()), models.MsgID(out5.ID())}
-	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
+	msgs, err := models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionOut, ids)
 	require.NoError(t, err)
 
 	now := dates.Now()
 
 	// resend both msgs
-	resent, err := models.ResendMessages(ctx, db, rp, oa, msgs)
+	resent, err := models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
 	require.NoError(t, err)
 
 	assert.Len(t, resent, 3) // only #1, #2 and #3 can be resent
@@ -489,22 +489,22 @@ func TestResendMessages(t *testing.T) {
 	assert.True(t, resent[2].IsResend())
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[2].ChannelID()) // channel added
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)
 
-	assertdb.Query(t, db, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out4.ID()).Columns(map[string]interface{}{"status": "F", "failed_reason": "D"})
-	assertdb.Query(t, db, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out5.ID()).Columns(map[string]interface{}{"status": "F", "failed_reason": "D"})
+	assertdb.Query(t, rt.DB, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out4.ID()).Columns(map[string]any{"status": "F", "failed_reason": "D"})
+	assertdb.Query(t, rt.DB, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out5.ID()).Columns(map[string]any{"status": "F", "failed_reason": "D"})
 }
 
 func TestFailMessages(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	out1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusPending, false)
-	out2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusErrored, false)
-	out3 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
-	out4 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusQueued, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.George, "hi", nil, models.MsgStatusQueued, false)
+	out1 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusPending, false)
+	out2 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusErrored, false)
+	out3 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	out4 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusQueued, false)
+	testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.George, "hi", nil, models.MsgStatusQueued, false)
 
 	ids := []models.MsgID{models.MsgID(out1.ID()), models.MsgID(out2.ID()), models.MsgID(out3.ID()), models.MsgID(out4.ID())}
 	println(ids)
@@ -512,20 +512,20 @@ func TestFailMessages(t *testing.T) {
 	now := dates.Now()
 
 	// fail the msgs
-	err := models.FailChannelMessages(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
+	err := models.FailChannelMessages(ctx, rt.DB, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
 	require.NoError(t, err)
 
 	//assert.Len(t, failedMsgs, 3)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND failed_reason = 'R' AND modified_on > $1`, now).Returns(4)
-	assertdb.Query(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"status": "F"})
-	assertdb.Query(t, db, `SELECT failed_reason FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"failed_reason": nil})
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND failed_reason = 'R' AND modified_on > $1`, now).Returns(4)
+	assertdb.Query(t, rt.DB, `SELECT status FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"status": "F"})
+	assertdb.Query(t, rt.DB, `SELECT failed_reason FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"failed_reason": nil})
 
 }
 
 func TestGetMsgRepetitions(t *testing.T) {
-	_, rt, db, rp := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 	defer dates.SetNowSource(dates.DefaultNowSource)
@@ -533,13 +533,13 @@ func TestGetMsgRepetitions(t *testing.T) {
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 13, 3, 234567, time.UTC)))
 
 	oa := testdata.Org1.Load(rt)
-	_, cathy := testdata.Cathy.Load(db, oa)
+	_, cathy := testdata.Cathy.Load(rt.DB, oa)
 
 	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 
 	assertRepetitions := func(m *flows.MsgOut, expected int) {
-		count, err := models.GetMsgRepetitions(rp, cathy, m)
+		count, err := models.GetMsgRepetitions(rt.RP, cathy, m)
 		require.NoError(t, err)
 		assert.Equal(t, expected, count)
 	}
@@ -548,26 +548,26 @@ func TestGetMsgRepetitions(t *testing.T) {
 	for i := 0; i < 99; i++ {
 		assertRepetitions(msg1, i+1)
 	}
-	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
 
 	for i := 0; i < 50; i++ {
 		assertRepetitions(msg1, 99)
 	}
-	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
 
 	for i := 0; i < 19; i++ {
 		assertRepetitions(msg2, i+1)
 	}
-	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
+	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
 
 	for i := 0; i < 50; i++ {
 		assertRepetitions(msg2, 20+i)
 	}
-	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
+	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
 }
 
 func TestNormalizeAttachment(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	rt.Config.AttachmentDomain = "foo.bar.com"
 	defer func() { rt.Config.AttachmentDomain = "" }()
@@ -589,58 +589,58 @@ func TestNormalizeAttachment(t *testing.T) {
 }
 
 func TestMarkMessages(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	flowMsg1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hello", nil, models.MsgStatusQueued, false)
-	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg1.ID())})
+	flowMsg1 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hello", nil, models.MsgStatusQueued, false)
+	msgs, err := models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg1.ID())})
 	require.NoError(t, err)
 	msg1 := msgs[0]
 
-	flowMsg2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hola", nil, models.MsgStatusQueued, false)
-	msgs, err = models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg2.ID())})
+	flowMsg2 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hola", nil, models.MsgStatusQueued, false)
+	msgs, err = models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg2.ID())})
 	require.NoError(t, err)
 	msg2 := msgs[0]
 
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Howdy", nil, models.MsgStatusQueued, false)
+	testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Howdy", nil, models.MsgStatusQueued, false)
 
-	models.MarkMessagesForRequeuing(ctx, db, []*models.Msg{msg1, msg2})
+	models.MarkMessagesForRequeuing(ctx, rt.DB, []*models.Msg{msg1, msg2})
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
 
 	// try running on database with BIGINT message ids
-	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" AS bigint;`)
-	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" RESTART WITH 3000000000;`)
+	rt.DB.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" AS bigint;`)
+	rt.DB.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" RESTART WITH 3000000000;`)
 
-	flowMsg4 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Big messages!", nil, models.MsgStatusQueued, false)
-	msgs, err = models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg4.ID())})
+	flowMsg4 := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Big messages!", nil, models.MsgStatusQueued, false)
+	msgs, err = models.GetMessagesByID(ctx, rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg4.ID())})
 	require.NoError(t, err)
 	msg4 := msgs[0]
 
 	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
 
-	err = models.MarkMessagesForRequeuing(ctx, db, []*models.Msg{msg4})
+	err = models.MarkMessagesForRequeuing(ctx, rt.DB, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(1)
 
-	err = models.MarkMessagesQueued(ctx, db, []*models.Msg{msg4})
+	err = models.MarkMessagesQueued(ctx, rt.DB, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
 }
 
 func TestNewOutgoingIVR(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)
-	conn, err := models.InsertCall(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.CallDirectionOut, models.CallStatusInProgress, "")
+	conn, err := models.InsertCall(ctx, rt.DB, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.CallDirectionOut, models.CallStatusInProgress, "")
 	require.NoError(t, err)
 
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
@@ -655,10 +655,10 @@ func TestNewOutgoingIVR(t *testing.T) {
 	assert.Equal(t, createdOn, dbMsg.CreatedOn())
 	assert.Equal(t, &createdOn, dbMsg.SentOn())
 
-	err = models.InsertMessages(ctx, db, []*models.Msg{dbMsg})
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{dbMsg})
 	require.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
+	assertdb.Query(t, rt.DB, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
 }
 
 func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow) *models.Session {

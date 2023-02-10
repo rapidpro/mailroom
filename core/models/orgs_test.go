@@ -17,11 +17,11 @@ import (
 )
 
 func TestOrgs(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 	defer tx.Rollback()
 
@@ -57,14 +57,14 @@ func TestOrgs(t *testing.T) {
 }
 
 func TestStoreAttachment(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetStorage)
 
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := models.LoadOrg(ctx, rt.Config, db, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(context.Background(), rt, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)

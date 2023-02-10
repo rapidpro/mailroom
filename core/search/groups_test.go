@@ -14,7 +14,7 @@ import (
 )
 
 func TestSmartGroups(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 	defer testsuite.Reset(testsuite.ResetAll)
 

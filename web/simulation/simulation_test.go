@@ -197,7 +197,7 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -214,13 +214,13 @@ func TestServer(t *testing.T) {
 	var session json.RawMessage
 
 	// add a trigger for our campaign flow with 'trigger'
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
 
 	// and a trigger which will trigger an IVR flow
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
 	// also add a catch all
-	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.CampaignFlow, nil, nil)
+	testdata.InsertCatchallTrigger(rt.DB, testdata.Org1, testdata.CampaignFlow, nil, nil)
 
 	tcs := []struct {
 		URL              string

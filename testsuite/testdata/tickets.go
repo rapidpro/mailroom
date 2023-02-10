@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
-
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/runtime"
 )
 
 type Topic struct {
@@ -28,8 +28,8 @@ type Team struct {
 	UUID models.TeamUUID
 }
 
-func (k *Ticket) Load(db *sqlx.DB) *models.Ticket {
-	tickets, err := models.LoadTickets(context.Background(), db, []models.TicketID{k.ID})
+func (k *Ticket) Load(rt *runtime.Runtime) *models.Ticket {
+	tickets, err := models.LoadTickets(context.Background(), rt.DB, []models.TicketID{k.ID})
 	must(err, len(tickets) == 1)
 	return tickets[0]
 }
@@ -40,13 +40,13 @@ type Ticketer struct {
 }
 
 // InsertOpenTicket inserts an open ticket
-func InsertOpenTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {
-	return insertTicket(db, org, contact, ticketer, models.TicketStatusOpen, topic, body, externalID, openedOn, assignee)
+func InsertOpenTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {
+	return insertTicket(rt.DB, org, contact, ticketer, models.TicketStatusOpen, topic, body, externalID, openedOn, assignee)
 }
 
 // InsertClosedTicket inserts a closed ticket
-func InsertClosedTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, assignee *User) *Ticket {
-	return insertTicket(db, org, contact, ticketer, models.TicketStatusClosed, topic, body, externalID, dates.Now(), assignee)
+func InsertClosedTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, assignee *User) *Ticket {
+	return insertTicket(rt.DB, org, contact, ticketer, models.TicketStatusClosed, topic, body, externalID, dates.Now(), assignee)
 }
 
 func insertTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, status models.TicketStatus, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {

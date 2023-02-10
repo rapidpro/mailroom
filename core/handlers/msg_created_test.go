@@ -19,7 +19,7 @@ import (
 )
 
 func TestMsgCreated(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -27,16 +27,16 @@ func TestMsgCreated(t *testing.T) {
 	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
-	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
+	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
 
 	// delete all URNs for bob
-	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
+	rt.DB.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
 
 	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
-	db.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, testdata.Alexandria.ID)
-	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	rt.DB.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
 
-	msg1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
+	msg1 := testdata.InsertIncomingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
 	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
@@ -96,7 +96,7 @@ func TestMsgCreated(t *testing.T) {
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// Cathy should have 1 batch of queued messages at high priority
@@ -111,20 +111,20 @@ func TestMsgCreated(t *testing.T) {
 }
 
 func TestNewURN(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// switch our twitter channel to telegram
 	telegramUUID := testdata.TwitterChannel.UUID
 	telegramID := testdata.TwitterChannel.ID
-	db.MustExec(
+	rt.DB.MustExec(
 		`UPDATE channels_channel SET channel_type = 'TG', name = 'Telegram', schemes = ARRAY['telegram'] WHERE uuid = $1`,
 		telegramUUID,
 	)
 
 	// give George a URN that Bob will steal
-	testdata.InsertContactURN(db, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
+	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
 
 	tcs := []handlers.TestCase{
 		{

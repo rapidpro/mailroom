@@ -7,7 +7,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/export.json", nil)
 	testsuite.RunWebTests(t, ctx, rt, "testdata/import.json", nil)

@@ -22,12 +22,12 @@ import (
 )
 
 func TestGetContactDisplay(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	contact, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
+	contact, err := models.LoadContact(ctx, rt.DB, oa, testdata.Cathy.ID)
 	require.NoError(t, err)
 
 	flowContact, err := contact.FlowContact(oa)
@@ -47,16 +47,16 @@ func TestGetContactDisplay(t *testing.T) {
 }
 
 func TestFromTicketUUID(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some tickets
-	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my shoes?", "", time.Now(), nil)
+	ticket1 := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
+	ticket2 := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my shoes?", "", time.Now(), nil)
 
 	// break mailgun configuration
-	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
+	rt.DB.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
 
 	models.FlushCache()
 
@@ -82,12 +82,12 @@ func TestFromTicketUUID(t *testing.T) {
 }
 
 func TestFromTicketerUUID(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// break mailgun configuration
-	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
+	rt.DB.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
 
 	// err if no ticketer with UUID
 	_, _, err := tickets.FromTicketerUUID(ctx, rt, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
@@ -110,7 +110,7 @@ func TestFromTicketerUUID(t *testing.T) {
 }
 
 func TestSendReply(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -123,8 +123,8 @@ func TestSendReply(t *testing.T) {
 	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
 	// create a ticket
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
-	modelTicket := ticket.Load(db)
+	ticket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
+	modelTicket := ticket.Load(rt)
 
 	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestSendReply(t *testing.T) {
 }
 
 func TestCloseTicket(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -176,11 +176,11 @@ func TestCloseTicket(t *testing.T) {
 			"contact-display": "Cathy",
 		},
 	)
-	err := models.InsertTickets(ctx, db, oa, []*models.Ticket{ticket1})
+	err := models.InsertTickets(ctx, rt.DB, oa, []*models.Ticket{ticket1})
 	require.NoError(t, err)
 
 	// create a close ticket trigger
-	testdata.InsertTicketClosedTrigger(db, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
 
 	logger := &models.HTTPLogger{}
 

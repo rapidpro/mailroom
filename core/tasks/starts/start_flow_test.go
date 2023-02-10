@@ -16,7 +16,7 @@ import (
 )
 
 func TestStartTasks(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	rc := rt.RP.Get()

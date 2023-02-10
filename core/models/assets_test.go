@@ -15,7 +15,7 @@ import (
 )
 
 func TestAssets(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer models.FlushCache()
 
@@ -60,7 +60,7 @@ func TestAssets(t *testing.T) {
 }
 
 func TestCloneForSimulation(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(0)
 

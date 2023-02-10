@@ -13,7 +13,7 @@ import (
 )
 
 func TestResolveRecipients(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	group1 := testdata.InsertContactGroup(rt.DB, testdata.Org1, "a85acec9-3895-4ffd-87c1-c69a25781a85", "Group 1", "", testdata.George, testdata.Alexandria)

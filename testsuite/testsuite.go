@@ -17,13 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-/*var tableHashes = map[string]string{
-	"channels_channel": "3587399bad341401f1880431c0bc772a",
-	"contacts_contact": "0382ef6e58e260c0c76dcc84550e6793",
-	"orgs_org":         "0f650bf7b9fb77ffa3ff0992be98da53",
-	"tickets_ticketer": "6487a4aed61e16c3aa0d6cf117f58de3",
-}*/
-
 var _db *sqlx.DB
 
 const AttachmentStorageDir = "_test_attachments_storage"
@@ -63,7 +56,24 @@ type Mocks struct {
 }
 
 // Runtime returns the various runtime things a test might need
-func Runtime() (context.Context, *runtime.Runtime, *Mocks, func()) {
+func Runtime() (context.Context, *runtime.Runtime) {
+	db := getDB()
+	rt := &runtime.Runtime{
+		DB:                db,
+		ReadonlyDB:        db,
+		RP:                getRP(),
+		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
+		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
+		Config:            runtime.NewDefaultConfig(),
+	}
+
+	logrus.SetLevel(logrus.DebugLevel)
+
+	return context.Background(), rt
+}
+
+// RuntimeWithSearch returns the various runtime things a test might need
+func RuntimeWithSearch() (context.Context, *runtime.Runtime, *Mocks, func()) {
 	mockES := NewMockElasticServer()
 	close := func() { mockES.Close() }
 
@@ -81,33 +91,6 @@ func Runtime() (context.Context, *runtime.Runtime, *Mocks, func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	return context.Background(), rt, &Mocks{ES: mockES}, close
-}
-
-// Get returns the various runtime things a test might need (probably deprecate this in favor of Runtime above)
-func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
-	db := getDB()
-	rp := getRP()
-	rt := &runtime.Runtime{
-		DB:                db,
-		ReadonlyDB:        db,
-		RP:                rp,
-		ES:                nil,
-		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
-		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
-		Config:            runtime.NewDefaultConfig(),
-	}
-
-	logrus.SetLevel(logrus.DebugLevel)
-
-	/*for name, expected := range tableHashes {
-		var actual string
-	    must(db.Get(&actual, fmt.Sprintf(`SELECT md5(array_to_string(array_agg(t.* order by id), '|', '')) FROM %s t`, name)))
-		if actual != expected {
-			panic(fmt.Sprintf("table has mismatch for %s, expected: %s, got %s", name, expected, actual))
-		}
-	}*/
-
-	return context.Background(), rt, db, rp
 }
 
 // returns an open test database pool

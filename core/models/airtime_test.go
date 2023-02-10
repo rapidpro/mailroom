@@ -15,9 +15,9 @@ import (
 )
 
 func TestAirtimeTransfers(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	defer db.MustExec(`DELETE FROM airtime_airtimetransfer`)
+	defer rt.DB.MustExec(`DELETE FROM airtime_airtimetransfer`)
 
 	// insert a transfer
 	transfer := models.NewAirtimeTransfer(
@@ -31,10 +31,10 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.RequireFromString(`1000`),
 		time.Now(),
 	)
-	err := models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
+	err := models.InsertAirtimeTransfers(ctx, rt.DB, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	assertdb.Query(t, db, `SELECT org_id, status from airtime_airtimetransfer`).Columns(map[string]interface{}{"org_id": int64(1), "status": "S"})
+	assertdb.Query(t, rt.DB, `SELECT org_id, status from airtime_airtimetransfer`).Columns(map[string]interface{}{"org_id": int64(1), "status": "S"})
 
 	// insert a failed transfer with nil sender, empty currency
 	transfer = models.NewAirtimeTransfer(
@@ -48,8 +48,8 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.Zero,
 		time.Now(),
 	)
-	err = models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
+	err = models.InsertAirtimeTransfers(ctx, rt.DB, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusFailed).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusFailed).Returns(1)
 }
