@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,8 +31,8 @@ func TestQueueEventFires(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
-	org2Campaign := testdata.InsertCampaign(rt.DB, testdata.Org2, "Org 2", testdata.DoctorsGroup)
-	org2CampaignEvent := testdata.InsertCampaignFlowEvent(rt.DB, org2Campaign, testdata.Org2Favorites, testdata.AgeField, 1, "D")
+	org2Campaign := testdata.InsertCampaign(rt, testdata.Org2, "Org 2", testdata.DoctorsGroup)
+	org2CampaignEvent := testdata.InsertCampaignFlowEvent(rt, org2Campaign, testdata.Org2Favorites, testdata.AgeField, 1, "D")
 
 	// try with zero fires
 	err := campaigns.QueueEventFires(ctx, rt)
@@ -43,11 +42,11 @@ func TestQueueEventFires(t *testing.T) {
 	assertFireTasks(t, rt, testdata.Org2, [][]models.FireID{})
 
 	// create event fires due now for 2 contacts and in the future for another contact
-	fire1ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
-	fire2ID := testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
-	fire3ID := testdata.InsertEventFire(rt.DB, testdata.Org2Contact, org2CampaignEvent, time.Now().Add(-time.Minute))
-	fire4ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, time.Now().Add(-time.Minute))
-	testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent1, time.Now().Add(time.Hour*24)) // in future
+	fire1ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	fire2ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	fire3ID := testdata.InsertEventFire(rt, testdata.Org2Contact, org2CampaignEvent, time.Now().Add(-time.Minute))
+	fire4ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent2, time.Now().Add(-time.Minute))
+	testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent1, time.Now().Add(time.Hour*24)) // in future
 
 	// schedule our campaign to be started
 	err = campaigns.QueueEventFires(ctx, rt)
@@ -69,8 +68,8 @@ func TestQueueEventFires(t *testing.T) {
 
 	// add 110 scheduled event fires to test batch limits
 	for i := 0; i < 110; i++ {
-		contact := testdata.InsertContact(rt.DB, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), envs.NilLanguage, models.ContactStatusActive)
-		testdata.InsertEventFire(rt.DB, contact, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+		contact := testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), envs.NilLanguage, models.ContactStatusActive)
+		testdata.InsertEventFire(rt, contact, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 	}
 
 	err = campaigns.QueueEventFires(ctx, rt)
@@ -101,8 +100,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create due fires for Cathy and George
-	f1ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
-	f2ID := testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	f1ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	f2ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 
 	// queue the event task
 	err := campaigns.QueueEventFires(ctx, rt)
@@ -129,8 +128,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
 
 	// create due fires for George and Bob for a different event that skips
-	f3ID := testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
-	f4ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
+	f3ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
+	f4ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
 
 	// queue the event task
 	err = campaigns.QueueEventFires(ctx, rt)
@@ -166,8 +165,8 @@ func TestIVRCampaigns(t *testing.T) {
 	// turn a campaign event into an IVR flow event
 	rt.DB.MustExec(`UPDATE campaigns_campaignevent SET flow_id = $1 WHERE id = $2`, testdata.IVRFlow.ID, testdata.RemindersEvent1.ID)
 
-	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
-	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 
 	// schedule our campaign to be started
 	err := campaigns.QueueEventFires(ctx, rt)

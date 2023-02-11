@@ -27,7 +27,7 @@ func TestMsgCreated(t *testing.T) {
 	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
-	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
 
 	// delete all URNs for bob
 	rt.DB.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
@@ -36,7 +36,7 @@ func TestMsgCreated(t *testing.T) {
 	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, testdata.Alexandria.ID)
 	rt.DB.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
 
-	msg1 := testdata.InsertIncomingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
+	msg1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
 	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
@@ -124,7 +124,7 @@ func TestNewURN(t *testing.T) {
 	)
 
 	// give George a URN that Bob will steal
-	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
 
 	tcs := []handlers.TestCase{
 		{

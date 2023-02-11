@@ -17,7 +17,7 @@ func TestContactURNsChanged(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a URN to george that cathy will steal
-	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.George, urns.URN("tel:+12065551212"), 100)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("tel:+12065551212"), 100)
 
 	tcs := []handlers.TestCase{
 		{

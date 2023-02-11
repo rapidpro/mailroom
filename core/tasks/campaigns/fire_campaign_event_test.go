@@ -22,13 +22,13 @@ func TestFireCampaignEvents(t *testing.T) {
 
 	// create event fires for event #3 (Pick A Number, start mode SKIP)
 	now := time.Now()
-	fire1ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent3, now)
-	fire2ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent3, now)
-	fire3ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent3, now)
+	fire1ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent3, now)
+	fire2ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent3, now)
+	fire3ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent3, now)
 
 	// create waiting sessions for Cathy and Alexandria
-	testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilCallID, time.Now(), time.Now(), false, nil)
-	testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilCallID, time.Now(), time.Now(), false, nil)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
 
 	fires := []*models.EventFire{
 		{
@@ -74,9 +74,9 @@ func TestFireCampaignEvents(t *testing.T) {
 
 	// create event fires for event #2 (message, start mode PASSIVE)
 	now = time.Now()
-	fire4ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent2, now)
-	fire5ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent2, now)
-	fire6ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
+	fire4ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent2, now)
+	fire5ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent2, now)
+	fire6ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent2, now)
 
 	fires = []*models.EventFire{
 		{
@@ -120,9 +120,9 @@ func TestFireCampaignEvents(t *testing.T) {
 
 	// create event fires for event #1 (flow, start mode INTERRUPT)
 	now = time.Now()
-	fire7ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, now)
-	fire8ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent1, now)
-	fire9ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent1, now)
+	fire7ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, now)
+	fire8ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent1, now)
+	fire9ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent1, now)
 
 	fires = []*models.EventFire{
 		{

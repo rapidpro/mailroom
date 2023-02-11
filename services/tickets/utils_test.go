@@ -180,7 +180,7 @@ func TestCloseTicket(t *testing.T) {
 	require.NoError(t, err)
 
 	// create a close ticket trigger
-	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(rt, testdata.Org1, testdata.Favorites)
 
 	logger := &models.HTTPLogger{}
 

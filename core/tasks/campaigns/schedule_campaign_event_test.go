@@ -19,7 +19,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add bob, george and alexandria to doctors group which campaign is based on
-	testdata.DoctorsGroup.Add(rt.DB, testdata.Bob, testdata.George, testdata.Alexandria)
+	testdata.DoctorsGroup.Add(rt, testdata.Bob, testdata.George, testdata.Alexandria)
 
 	// give bob and george values for joined in the future
 	rt.DB.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-01-01T00:00:00Z"}}' WHERE id = $1`, testdata.Bob.ID)
@@ -68,7 +68,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	rt.DB.MustExec(`UPDATE contacts_contact SET created_on = '2035-01-01T00:00:00Z' WHERE id = $1 OR id = $2`, testdata.Cathy.ID, testdata.Alexandria.ID)
 
 	// create new campaign event based on created_on + 5 minutes
-	event3 := testdata.InsertCampaignFlowEvent(rt.DB, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 5, "M")
+	event3 := testdata.InsertCampaignFlowEvent(rt, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 5, "M")
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3.ID}
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
@@ -80,7 +80,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	})
 
 	// create new campaign event based on last_seen_on + 1 day
-	event4 := testdata.InsertCampaignFlowEvent(rt.DB, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 1, "D")
+	event4 := testdata.InsertCampaignFlowEvent(rt, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 1, "D")
 
 	// bump last_seen_on for bob
 	rt.DB.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, testdata.Bob.ID)

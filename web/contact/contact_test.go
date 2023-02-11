@@ -36,7 +36,7 @@ func TestModifyContacts(t *testing.T) {
 	rt.DB.MustExec(`UPDATE contacts_contactgroup SET query = 'age > 18' WHERE id = $1`, testdata.DoctorsGroup.ID)
 
 	// insert an event on our campaign that is based on created on
-	testdata.InsertCampaignFlowEvent(rt.DB, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
+	testdata.InsertCampaignFlowEvent(rt, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
 
 	// for simpler tests we clear out cathy's fields and groups to start
 	rt.DB.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, testdata.Cathy.ID)
@@ -70,11 +70,11 @@ func TestInterruptContact(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	// give Cathy an completed and a waiting session
-	testdata.InsertFlowSession(rt.DB, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
-	testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
+	testdata.InsertFlowSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
 
 	// give Bob a waiting session
-	testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.PickANumber, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.PickANumber, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/interrupt.json", nil)
 }

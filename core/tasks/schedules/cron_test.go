@@ -29,7 +29,7 @@ func TestCheckSchedules(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	b1 := testdata.InsertBroadcast(rt.DB, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+	b1 := testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
 

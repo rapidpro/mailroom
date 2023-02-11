@@ -42,7 +42,7 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	env := envs.NewBuilder().Build()
-	_, contact := testdata.Cathy.Load(rt.DB, oa)
+	_, contact := testdata.Cathy.Load(rt, oa)
 
 	ticket, err := svc.Open(env, contact, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)

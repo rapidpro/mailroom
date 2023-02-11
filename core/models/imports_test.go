@@ -38,10 +38,10 @@ func TestContactImports(t *testing.T) {
 	rt.DB.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
 
 	// add contact in other org to make sure we can't update it
-	testdata.InsertContact(rt.DB, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa", models.ContactStatusActive)
+	testdata.InsertContact(rt, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa", models.ContactStatusActive)
 
 	// add dynamic group to test imported contacts are added to it
-	testdata.InsertContactGroup(rt.DB, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
+	testdata.InsertContactGroup(rt, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
 	// give our org a country by setting country on a channel
 	rt.DB.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
@@ -66,8 +66,8 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(rt.DB, testdata.Org1, testdata.Admin)
-		batchID := testdata.InsertContactImportBatch(rt.DB, importID, tc.Specs)
+		importID := testdata.InsertContactImport(rt, testdata.Org1, testdata.Admin)
+		batchID := testdata.InsertContactImportBatch(rt, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, rt.DB, batchID)
 		require.NoError(t, err)
@@ -149,12 +149,12 @@ func TestLoadContactImport(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	importID := testdata.InsertContactImport(rt.DB, testdata.Org1, testdata.Admin)
-	batch1ID := testdata.InsertContactImportBatch(rt.DB, importID, []byte(`[
+	importID := testdata.InsertContactImport(rt, testdata.Org1, testdata.Admin)
+	batch1ID := testdata.InsertContactImportBatch(rt, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
 	]`))
-	testdata.InsertContactImportBatch(rt.DB, importID, []byte(`[
+	testdata.InsertContactImportBatch(rt, importID, []byte(`[
 		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
 	]`))
 

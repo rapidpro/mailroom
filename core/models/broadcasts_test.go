@@ -82,7 +82,7 @@ func TestBroadcastTranslations(t *testing.T) {
 		rt.DB.MustExec(`DELETE FROM msgs_broadcast`)
 	}()
 
-	bcastID := testdata.InsertBroadcast(rt.DB, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 
 	type TestStruct struct {
 		Translations flows.BroadcastTranslations `json:"translations"`
@@ -113,7 +113,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// we need a broadcast id to insert messages but the content here is ignored
-	bcastID := testdata.InsertBroadcast(rt.DB, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
 
 	tcs := []struct {
 		contactLanguage      envs.Language

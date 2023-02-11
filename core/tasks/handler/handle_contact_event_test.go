@@ -29,11 +29,11 @@ func TestMsgEvents(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
-	testdata.InsertKeywordTrigger(rt.DB, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertCatchallTrigger(rt.DB, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(rt, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
@@ -59,7 +59,7 @@ func TestMsgEvents(t *testing.T) {
 	models.FlushCache()
 
 	// insert a dummy message into the database that will get the updates from handling each message event which pretends to be it
-	dbMsg := testdata.InsertIncomingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
+	dbMsg := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
 
 	tcs := []struct {
 		preHook       func()
@@ -437,11 +437,11 @@ func TestChannelEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add some channel event triggers
-	testdata.InsertNewConversationTrigger(rt.DB, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
-	testdata.InsertReferralTrigger(rt.DB, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
+	testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
+	testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(rt.DB, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -508,7 +508,7 @@ func TestTicketEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a ticket closed trigger
-	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(rt, testdata.Org1, testdata.Favorites)
 
 	ticket := testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
 	modelTicket := ticket.Load(rt)
@@ -535,8 +535,8 @@ func TestStopEvent(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// schedule an event for cathy and george
-	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now())
-	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now())
 
 	// and george to doctors group, cathy is already part of it
 	rt.DB.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
@@ -579,8 +579,8 @@ func TestTimedEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some keyword triggers
-	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(rt.DB, testdata.Org1, testdata.PickANumber, "pick", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.PickANumber, "pick", models.MatchOnly, nil, nil)
 
 	tcs := []struct {
 		EventType string

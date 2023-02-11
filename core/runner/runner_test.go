@@ -31,7 +31,7 @@ func TestBatchStart(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
-	testdata.InsertFlowStart(rt.DB, testdata.Org1, testdata.SingleMessage, nil)
+	testdata.InsertFlowStart(rt, testdata.Org1, testdata.SingleMessage, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
@@ -109,7 +109,7 @@ func TestResume(t *testing.T) {
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	modelContact, flowContact := testdata.Cathy.Load(rt.DB, oa)
+	modelContact, flowContact := testdata.Cathy.Load(rt, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), flowContact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, nil, true)
@@ -176,7 +176,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	rt.DB.MustExec(`ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 5000000000;`)
 
 	// create a flow which has a send_broadcast action which will mean handlers grabbing redis connections
-	flow := testdata.InsertFlow(rt.DB, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
+	flow := testdata.InsertFlow(rt, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
 
 	oa := testdata.Org1.Load(rt)
 
@@ -187,7 +187,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	// create a lot of contacts...
 	contacts := make([]*testdata.Contact, 100)
 	for i := range contacts {
-		contacts[i] = testdata.InsertContact(rt.DB, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage, models.ContactStatusActive)
+		contacts[i] = testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage, models.ContactStatusActive)
 	}
 
 	options := &runner.StartOptions{

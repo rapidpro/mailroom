@@ -11,8 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/runtime"
 )
 
 type Label struct {
@@ -21,10 +20,10 @@ type Label struct {
 }
 
 // InsertIncomingMsg inserts an incoming message
-func InsertIncomingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, status models.MsgStatus) *flows.MsgIn {
+func InsertIncomingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, status models.MsgStatus) *flows.MsgIn {
 	msgUUID := flows.MsgUUID(uuids.New())
 	var id flows.MsgID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO msgs_msg(uuid, text, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id, channel_id)
 	  	 VALUES($1, $2, NOW(), 'I', $3, 'V', 1, 0, NOW(), $4, $5, $6, $7) RETURNING id`, msgUUID, text, status, contact.ID, contact.URNID, org.ID, channel.ID,
 	))
@@ -35,16 +34,16 @@ func InsertIncomingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 }
 
 // InsertOutgoingMsg inserts an outgoing message
-func InsertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *flows.MsgOut {
-	return insertOutgoingMsg(db, org, channel, contact, text, attachments, envs.Locale(`eng-US`), status, highPriority, 0, nil)
+func InsertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *flows.MsgOut {
+	return insertOutgoingMsg(rt, org, channel, contact, text, attachments, envs.Locale(`eng-US`), status, highPriority, 0, nil)
 }
 
 // InsertErroredOutgoingMsg inserts an ERRORED(E) outgoing message
-func InsertErroredOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *flows.MsgOut {
-	return insertOutgoingMsg(db, org, channel, contact, text, nil, envs.NilLocale, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
+func InsertErroredOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *flows.MsgOut {
+	return insertOutgoingMsg(rt, org, channel, contact, text, nil, envs.NilLocale, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
 }
 
-func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale envs.Locale, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *flows.MsgOut {
+func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale envs.Locale, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *flows.MsgOut {
 	var channelRef *assets.ChannelReference
 	var channelID models.ChannelID
 	if channel != nil {
@@ -61,7 +60,7 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 	}
 
 	var id flows.MsgID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO msgs_msg(uuid, text, attachments, locale, created_on, direction, status, visibility, contact_id, contact_urn_id, org_id, channel_id, sent_on, msg_count, error_count, next_attempt, high_priority)
 	  	 VALUES($1, $2, $3, $4, NOW(), 'O', $5, 'V', $6, $7, $8, $9, $10, 1, $11, $12, $13) RETURNING id`,
 		msg.UUID(), text, pq.Array(attachments), locale, status, contact.ID, contact.URNID, org.ID, channelID, sentOn, errorCount, nextAttempt, highPriority,
@@ -70,23 +69,23 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 	return msg
 }
 
-func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
+func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
 	translations := make(flows.BroadcastTranslations)
 	for lang, t := range text {
 		translations[lang] = &flows.BroadcastTranslation{Text: t}
 	}
 
 	var id models.BroadcastID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO msgs_broadcast(org_id, base_language, translations, schedule_id, status, send_all, created_on, modified_on, created_by_id, modified_by_id, is_active)
 		VALUES($1, $2, $3, $4, 'P', TRUE, NOW(), NOW(), 1, 1, TRUE) RETURNING id`, org.ID, baseLanguage, translations, schedID,
 	))
 
 	for _, contact := range contacts {
-		db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2)`, id, contact.ID)
+		rt.DB.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2)`, id, contact.ID)
 	}
 	for _, group := range groups {
-		db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, id, group.ID)
+		rt.DB.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, id, group.ID)
 	}
 
 	return id

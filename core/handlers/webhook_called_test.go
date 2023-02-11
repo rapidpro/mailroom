@@ -129,13 +129,13 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	flowDef, err := os.ReadFile("testdata/webhook_flow.json")
 	require.NoError(t, err)
 
-	testdata.InsertFlow(rt.DB, testdata.Org1, flowDef)
+	testdata.InsertFlow(rt, testdata.Org1, flowDef)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	env := envs.NewBuilder().Build()
-	_, cathy := testdata.Cathy.Load(rt.DB, oa)
+	_, cathy := testdata.Cathy.Load(rt, oa)
 
 	// webhook service with a 2 second delay
 	svc := &failingWebhookService{delay: 2 * time.Second}

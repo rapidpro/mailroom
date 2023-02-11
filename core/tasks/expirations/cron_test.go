@@ -25,30 +25,30 @@ func TestExpirations(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create a blocked contact
-	blake := testdata.InsertContact(rt.DB, testdata.Org1, "9eef59ef-21b3-4f51-a296-937529a30e38", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
+	blake := testdata.InsertContact(rt, testdata.Org1, "9eef59ef-21b3-4f51-a296-937529a30e38", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
 
 	// create single run session for Cathy, no parent to resume
-	s1ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
-	r1ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
+	s1ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
+	r1ID := testdata.InsertFlowRun(rt, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
 
 	// create parent/child session for George, can resume
-	s2ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
-	r2ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusActive)
-	r3ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
+	s2ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
+	r2ID := testdata.InsertFlowRun(rt, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusActive)
+	r3ID := testdata.InsertFlowRun(rt, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	// create session for Bob with expiration in future
-	s3ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
-	r4ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting)
+	s3ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
+	r4ID := testdata.InsertFlowRun(rt, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting)
 
 	// create an IVR session for Alexandria
-	call := testdata.InsertCall(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
-	s4ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, call, time.Now(), time.Now(), false, nil)
-	r5ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting)
+	call := testdata.InsertCall(rt, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
+	s4ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, call, time.Now(), time.Now(), false, nil)
+	r5ID := testdata.InsertFlowRun(rt, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting)
 
 	// create a parent/child session for the blocked contact
-	s5ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, blake, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
-	r6ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusActive)
-	r7ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
+	s5ID := testdata.InsertWaitingSession(rt, testdata.Org1, blake, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
+	r6ID := testdata.InsertFlowRun(rt, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusActive)
+	r7ID := testdata.InsertFlowRun(rt, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
 
 	time.Sleep(5 * time.Millisecond)
 
@@ -111,18 +111,18 @@ func TestExpireVoiceSessions(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create voice session for Cathy
-	conn1ID := testdata.InsertCall(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	s1ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, conn1ID, time.Now(), time.Now(), false, nil)
-	r1ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
+	conn1ID := testdata.InsertCall(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	s1ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, conn1ID, time.Now(), time.Now(), false, nil)
+	r1ID := testdata.InsertFlowRun(rt, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
 
 	// create voice session for Bob with expiration in future
-	conn2ID := testdata.InsertCall(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
-	s2ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.IVRFlow, conn2ID, time.Now(), time.Now().Add(time.Hour), false, nil)
-	r2ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s2ID, testdata.Bob, testdata.IVRFlow, models.RunStatusWaiting)
+	conn2ID := testdata.InsertCall(rt, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	s2ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.IVRFlow, conn2ID, time.Now(), time.Now().Add(time.Hour), false, nil)
+	r2ID := testdata.InsertFlowRun(rt, testdata.Org1, s2ID, testdata.Bob, testdata.IVRFlow, models.RunStatusWaiting)
 
 	// create a messaging session for Alexandria
-	s3ID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
-	r3ID := testdata.InsertFlowRun(rt.DB, testdata.Org1, s3ID, testdata.Alexandria, testdata.Favorites, models.RunStatusWaiting)
+	s3ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
+	r3ID := testdata.InsertFlowRun(rt, testdata.Org1, s3ID, testdata.Alexandria, testdata.Favorites, models.RunStatusWaiting)
 
 	time.Sleep(5 * time.Millisecond)
 

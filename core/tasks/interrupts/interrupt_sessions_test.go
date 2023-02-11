@@ -19,10 +19,10 @@ func TestInterrupts(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.CallID) models.SessionID {
-		sessionID := testdata.InsertWaitingSession(rt.DB, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
+		sessionID := testdata.InsertWaitingSession(rt, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
 
 		// give session one waiting run too
-		testdata.InsertFlowRun(rt.DB, org, sessionID, contact, flow, models.RunStatusWaiting)
+		testdata.InsertFlowRun(rt, org, sessionID, contact, flow, models.RunStatusWaiting)
 		return sessionID
 	}
 
@@ -63,7 +63,7 @@ func TestInterrupts(t *testing.T) {
 		rt.DB.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio call
-		twilioCallID := testdata.InsertCall(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
+		twilioCallID := testdata.InsertCall(rt, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 
 		sessionIDs := make([]models.SessionID, 5)
 

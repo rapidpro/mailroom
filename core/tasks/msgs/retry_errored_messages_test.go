@@ -26,16 +26,16 @@ func TestRetryErroredMessages(t *testing.T) {
 	testsuite.AssertCourierQueues(t, map[string][]int{})
 
 	// a non-errored outgoing message (should be ignored)
-	testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", nil, models.MsgStatusDelivered, false)
+	testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", nil, models.MsgStatusDelivered, false)
 
 	// an errored message with a next-attempt in the future (should be ignored)
-	testdata.InsertErroredOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 2, time.Now().Add(time.Hour), false)
+	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 2, time.Now().Add(time.Hour), false)
 
 	// errored messages with a next-attempt in the past
-	testdata.InsertErroredOutgoingMsg(rt.DB, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour), false)
-	testdata.InsertErroredOutgoingMsg(rt.DB, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
-	msg5 := testdata.InsertErroredOutgoingMsg(rt.DB, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
-	testdata.InsertErroredOutgoingMsg(rt.DB, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
+	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour), false)
+	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
+	msg5 := testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
+	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
 	rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P' WHERE id = $1`, msg5.ID())
 
