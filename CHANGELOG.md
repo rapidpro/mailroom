@@ -1,3 +1,9 @@
+v8.1.18 (2023-02-13)
+-------------------------
+ * Update to latest goflow
+ * Support contact query based broadcasts by consolidating broadcast and flow start task code
+ * Remove support for sending broadcasts to specific URNs
+
 v8.1.17 (2023-02-09)
 -------------------------
  * Update how we create messages from broadcasts and resolve translations
