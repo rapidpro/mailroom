@@ -77,8 +77,8 @@ func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage envs.Language, 
 
 	var id models.BroadcastID
 	must(rt.DB.Get(&id,
-		`INSERT INTO msgs_broadcast(org_id, base_language, translations, schedule_id, status, send_all, created_on, modified_on, created_by_id, modified_by_id, is_active)
-		VALUES($1, $2, $3, $4, 'P', TRUE, NOW(), NOW(), 1, 1, TRUE) RETURNING id`, org.ID, baseLanguage, translations, schedID,
+		`INSERT INTO msgs_broadcast(org_id, base_language, translations, schedule_id, status, created_on, modified_on, created_by_id, modified_by_id, is_active)
+		VALUES($1, $2, $3, $4, 'P', NOW(), NOW(), 1, 1, TRUE) RETURNING id`, org.ID, baseLanguage, translations, schedID,
 	))
 
 	for _, contact := range contacts {
