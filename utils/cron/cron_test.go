@@ -14,7 +14,7 @@ import (
 )
 
 func TestCron(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 

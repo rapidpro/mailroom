@@ -26,12 +26,12 @@ import (
 )
 
 func TestBatchStart(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
-	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
+	testdata.InsertFlowStart(rt, testdata.Org1, testdata.SingleMessage, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
@@ -74,18 +74,18 @@ func TestBatchStart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
-		assertdb.Query(t, db,
+		assertdb.Query(t, rt.DB,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
 			AND status = 'C' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
 			Returns(tc.Count, "%d: unexpected number of sessions", i)
 
-		assertdb.Query(t, db,
+		assertdb.Query(t, rt.DB,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 			AND responded = FALSE AND org_id = 1 AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
 
-		assertdb.Query(t, db,
+		assertdb.Query(t, rt.DB,
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
 			AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'F' AND channel_id = $3`,
 			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
@@ -96,7 +96,7 @@ func TestBatchStart(t *testing.T) {
 }
 
 func TestResume(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
@@ -109,22 +109,22 @@ func TestResume(t *testing.T) {
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	modelContact, flowContact := testdata.Cathy.Load(db, oa)
+	modelContact, flowContact := testdata.Cathy.Load(rt, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), flowContact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
-	assertdb.Query(t, db,
+	assertdb.Query(t, rt.DB,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
 		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
 
-	assertdb.Query(t, db,
+	assertdb.Query(t, rt.DB,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
 		 AND status = 'W' AND responded = FALSE AND org_id = 1`, modelContact.ID(), flow.ID()).Returns(1)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, modelContact.ID()).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, modelContact.ID()).Returns(1)
 
 	tcs := []struct {
 		Message       string
@@ -149,7 +149,7 @@ func TestResume(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
-		assertdb.Query(t, db,
+		assertdb.Query(t, rt.DB,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1
 			 AND status = $2 AND responded = TRUE AND org_id = 1 AND call_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
@@ -158,25 +158,25 @@ func TestResume(t *testing.T) {
 		 AND status = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
 		 AND json_array_length(path::json) = $4 AND session_id IS NOT NULL`
 
-		assertdb.Query(t, db, runQuery, modelContact.ID(), flow.ID(), tc.RunStatus, tc.PathLength).
+		assertdb.Query(t, rt.DB, runQuery, modelContact.ID(), flow.ID(), tc.RunStatus, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, modelContact.ID(), tc.Substring).
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, modelContact.ID(), tc.Substring).
 			Returns(1, "%d: didn't find expected message", i)
 	}
 }
 
 func TestStartFlowConcurrency(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// check everything works with big ids
-	db.MustExec(`ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 5000000000;`)
-	db.MustExec(`ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 5000000000;`)
+	rt.DB.MustExec(`ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 5000000000;`)
+	rt.DB.MustExec(`ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 5000000000;`)
 
 	// create a flow which has a send_broadcast action which will mean handlers grabbing redis connections
-	flow := testdata.InsertFlow(db, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
+	flow := testdata.InsertFlow(rt, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
 
 	oa := testdata.Org1.Load(rt)
 
@@ -187,7 +187,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	// create a lot of contacts...
 	contacts := make([]*testdata.Contact, 100)
 	for i := range contacts {
-		contacts[i] = testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage, models.ContactStatusActive)
+		contacts[i] = testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage, models.ContactStatusActive)
 	}
 
 	options := &runner.StartOptions{
@@ -208,6 +208,6 @@ func TestStartFlowConcurrency(t *testing.T) {
 		assert.Equal(t, 1, len(sessions))
 	})
 
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun`).Returns(len(contacts))
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession`).Returns(len(contacts))
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun`).Returns(len(contacts))
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession`).Returns(len(contacts))
 }

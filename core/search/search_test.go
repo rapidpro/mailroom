@@ -14,7 +14,7 @@ import (
 )
 
 func TestGetContactIDsForQueryPage(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	mocks.ES.AddResponse(testdata.George.ID)
@@ -190,7 +190,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 }
 
 func TestGetContactIDsForQuery(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	mocks.ES.AddResponse(testdata.George.ID)

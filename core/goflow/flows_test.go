@@ -20,7 +20,7 @@ func TestSpecVersion(t *testing.T) {
 }
 
 func TestReadFlow(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	// try to read empty definition
 	flow, err := goflow.ReadFlow(rt.Config, []byte(`{}`))
@@ -53,7 +53,7 @@ func TestCloneDefinition(t *testing.T) {
 }
 
 func TestMigrateDefinition(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	// 13.0 > 13.1
 	migrated, err := goflow.MigrateDefinition(rt.Config, []byte(`{"uuid": "502c3ee4-3249-4dee-8e71-c62070667d52", "name": "New", "spec_version": "13.0.0", "type": "messaging", "language": "base", "nodes": []}`), semver.MustParse("13.1.0"))

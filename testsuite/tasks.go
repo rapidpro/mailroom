@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func CurrentTasks(t *testing.T, rp *redis.Pool) map[models.OrgID][]*queue.Task {
-	rc := rp.Get()
+func CurrentTasks(t *testing.T, rt *runtime.Runtime) map[models.OrgID][]*queue.Task {
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// get all active org queues

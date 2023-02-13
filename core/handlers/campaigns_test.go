@@ -13,7 +13,7 @@ import (
 )
 
 func TestCampaigns(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -21,17 +21,17 @@ func TestCampaigns(t *testing.T) {
 	joined := assets.NewFieldReference("joined", "Joined")
 
 	// insert an event on our campaign that is based on created_on
-	testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
+	testdata.InsertCampaignFlowEvent(rt, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
 
 	// insert an event on our campaign that is based on last_seen_on
-	testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 2, "D")
+	testdata.InsertCampaignFlowEvent(rt, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 2, "D")
 
 	// init their values
-	db.MustExec(
+	rt.DB.MustExec(
 		`update contacts_contact set fields = fields - '8c1c1256-78d6-4a5b-9f1c-1761d5728251'
 		WHERE id = $1`, testdata.Cathy.ID)
 
-	db.MustExec(
+	rt.DB.MustExec(
 		`update contacts_contact set fields = fields ||
 		'{"8c1c1256-78d6-4a5b-9f1c-1761d5728251": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
 		WHERE id = $1`, testdata.Bob.ID)

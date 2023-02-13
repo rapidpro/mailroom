@@ -17,12 +17,12 @@ import (
 )
 
 func TestNonPersistentBroadcasts(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
-	modelTicket := ticket.Load(db)
+	ticket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
+	modelTicket := ticket.Load(rt)
 
 	translations := flows.BroadcastTranslations{"eng": {Text: "Hi there"}}
 
@@ -68,44 +68,44 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	assert.Equal(t, 2, len(msgs))
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
 
 	// test ticket was updated
-	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 }
 
 func TestBroadcastTranslations(t *testing.T) {
-	_, _, db, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	defer func() {
-		db.MustExec(`DELETE FROM msgs_broadcast_contacts`)
-		db.MustExec(`DELETE FROM msgs_broadcast`)
+		rt.DB.MustExec(`DELETE FROM msgs_broadcast_contacts`)
+		rt.DB.MustExec(`DELETE FROM msgs_broadcast`)
 	}()
 
-	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 
 	type TestStruct struct {
 		Translations flows.BroadcastTranslations `json:"translations"`
 	}
 
 	s := &TestStruct{}
-	err := db.Get(s, `SELECT translations FROM msgs_broadcast WHERE id = $1`, bcastID)
+	err := rt.DB.Get(s, `SELECT translations FROM msgs_broadcast WHERE id = $1`, bcastID)
 	require.NoError(t, err)
 
 	assert.Equal(t, flows.BroadcastTranslations{"eng": {Text: "Hello"}, "spa": {Text: "Hola"}}, s.Translations)
 
 	s.Translations = flows.BroadcastTranslations{"fra": {Text: "Bonjour"}}
 
-	db.MustExec(`UPDATE msgs_broadcast SET translations = $1 WHERE id = $2`, s.Translations, bcastID)
+	rt.DB.MustExec(`UPDATE msgs_broadcast SET translations = $1 WHERE id = $2`, s.Translations, bcastID)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE translations -> 'fra' ->> 'text' = 'Bonjour'`, 1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_broadcast WHERE translations -> 'fra' ->> 'text' = 'Bonjour'`, 1)
 }
 
 func TestBroadcastBatchCreateMessage(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer func() {
-		db.MustExec(`UPDATE contacts_contact SET language = NULL WHERE id = $1`, testdata.Cathy.ID)
+		rt.DB.MustExec(`UPDATE contacts_contact SET language = NULL WHERE id = $1`, testdata.Cathy.ID)
 		testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 	}()
 
@@ -113,7 +113,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// we need a broadcast id to insert messages but the content here is ignored
-	bcastID := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
 
 	tcs := []struct {
 		contactLanguage      envs.Language
@@ -192,7 +192,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 			ContactIDs:    []models.ContactID{testdata.Cathy.ID},
 		}
 
-		db.MustExec(`UPDATE contacts_contact SET language = $2 WHERE id = $1`, testdata.Cathy.ID, tc.contactLanguage)
+		rt.DB.MustExec(`UPDATE contacts_contact SET language = $2 WHERE id = $1`, testdata.Cathy.ID, tc.contactLanguage)
 
 		msgs, err := batch.CreateMessages(ctx, rt, oa)
 		if tc.expectedError != "" {

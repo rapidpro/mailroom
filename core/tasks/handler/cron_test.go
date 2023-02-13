@@ -17,8 +17,8 @@ import (
 )
 
 func TestRetryMsgs(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -38,7 +38,7 @@ func TestRetryMsgs(t *testing.T) {
 	}
 
 	for _, msg := range testMsgs {
-		db.MustExec(
+		rt.DB.MustExec(
 			`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
 						   VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
 			uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
@@ -54,7 +54,7 @@ func TestRetryMsgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// message should be handled now
-	assertdb.Query(t, db, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`).Returns(1)
 
 	// only one message was queued
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)

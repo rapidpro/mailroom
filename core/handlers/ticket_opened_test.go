@@ -20,7 +20,7 @@ import (
 )
 
 func TestTicketOpened(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -48,7 +48,7 @@ func TestTicketOpened(t *testing.T) {
 
 	// an existing ticket
 	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", testdata.DefaultTopic.ID, "Who?", models.NilUserID, nil)
-	err := models.InsertTickets(ctx, db, oa, []*models.Ticket{cathyTicket})
+	err := models.InsertTickets(ctx, rt.DB, oa, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
 	tcs := []handlers.TestCase{

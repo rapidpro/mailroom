@@ -19,9 +19,11 @@ import (
 )
 
 func TestStarts(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	startID := testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, []*testdata.Contact{testdata.Cathy, testdata.Bob})
+	defer testsuite.Reset(testsuite.ResetData)
+
+	startID := testdata.InsertFlowStart(rt, testdata.Org1, testdata.SingleMessage, []*testdata.Contact{testdata.Cathy, testdata.Bob})
 
 	startJSON := []byte(fmt.Sprintf(`{
 		"start_id": %d,
@@ -62,11 +64,11 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory)
 	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra)
 
-	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{testdata.George.ID})
+	err = models.MarkStartStarted(ctx, rt.DB, startID, 2, []models.ContactID{testdata.George.ID})
 	require.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(3)
 
 	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 3)
 	assert.Equal(t, startID, batch.StartID)
@@ -90,10 +92,10 @@ func TestStarts(t *testing.T) {
 	_, err = models.ReadSessionHistory([]byte(`{`))
 	assert.EqualError(t, err, "unexpected end of JSON input")
 
-	err = models.MarkStartComplete(ctx, db, startID)
+	err = models.MarkStartComplete(ctx, rt.DB, startID)
 	require.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'C'`, startID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'C'`, startID).Returns(1)
 }
 
 func TestStartsBuilding(t *testing.T) {

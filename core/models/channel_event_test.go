@@ -13,15 +13,15 @@ import (
 )
 
 func TestChannelEvents(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	defer db.MustExec(`DELETE FROM channels_channelevent`)
+	defer rt.DB.MustExec(`DELETE FROM channels_channelevent`)
 
 	start := time.Now()
 
 	// no extra
 	e := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, nil, false)
-	err := e.Insert(ctx, db)
+	err := e.Insert(ctx, rt.DB)
 	assert.NoError(t, err)
 	assert.NotZero(t, e.ID())
 	assert.Equal(t, map[string]interface{}{}, e.Extra())
@@ -29,7 +29,7 @@ func TestChannelEvents(t *testing.T) {
 
 	// with extra
 	e2 := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, map[string]interface{}{"referral_id": "foobar"}, false)
-	err = e2.Insert(ctx, db)
+	err = e2.Insert(ctx, rt.DB)
 	assert.NoError(t, err)
 	assert.NotZero(t, e2.ID())
 	assert.Equal(t, map[string]interface{}{"referral_id": "foobar"}, e2.Extra())

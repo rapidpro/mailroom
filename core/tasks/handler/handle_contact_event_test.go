@@ -18,49 +18,48 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMsgEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
-	testdata.InsertKeywordTrigger(db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(rt, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
+			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
+			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
 		},
 	}
 	closedTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil),
+			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil),
 		},
 		testdata.Bob: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
+			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
 		},
 	}
 
-	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z'`)
+	rt.DB.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z'`)
 
 	// clear all of Alexandria's URNs
-	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
 
 	models.FlushCache()
 
 	// insert a dummy message into the database that will get the updates from handling each message event which pretends to be it
-	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
+	dbMsg := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
 
 	tcs := []struct {
 		preHook       func()
@@ -237,7 +236,7 @@ func TestMsgEvents(t *testing.T) {
 		// 15: stopped contact should be unstopped
 		{
 			preHook: func() {
-				db.MustExec(`UPDATE contacts_contact SET status = 'S' WHERE id = $1`, testdata.George.ID)
+				rt.DB.MustExec(`UPDATE contacts_contact SET status = 'S' WHERE id = $1`, testdata.George.ID)
 			},
 			org:           testdata.Org1,
 			channel:       testdata.TwitterChannel,
@@ -273,7 +272,7 @@ func TestMsgEvents(t *testing.T) {
 		// 18:
 		{
 			preHook: func() {
-				db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
+				rt.DB.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
 			},
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -287,7 +286,7 @@ func TestMsgEvents(t *testing.T) {
 		// 19: start Fred back in our favorites flow to test retries
 		{
 			preHook: func() {
-				db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
+				rt.DB.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
 			},
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -318,7 +317,7 @@ func TestMsgEvents(t *testing.T) {
 		models.FlushCache()
 
 		// reset our dummy db message into an unhandled state
-		db.MustExec(`UPDATE msgs_msg SET status = 'P', msg_type = NULL WHERE id = $1`, dbMsg.ID())
+		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', msg_type = NULL WHERE id = $1`, dbMsg.ID())
 
 		// run our setup hook if we have one
 		if tc.preHook != nil {
@@ -342,30 +341,30 @@ func TestMsgEvents(t *testing.T) {
 		}
 
 		// check that message is marked as handled with expected type
-		assertdb.Query(t, db, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
 			Columns(map[string]interface{}{"status": "H", "msg_type": string(tc.expectedType), "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
 		if tc.expectedReply != "" {
-			assertdb.Query(t, db, `SELECT text, status FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
+			assertdb.Query(t, rt.DB, `SELECT text, status FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
 				Columns(map[string]interface{}{"text": tc.expectedReply, "status": "Q"}, "%d: response mismatch", i)
 		}
 
 		// check any open tickets for this contact where updated
 		numOpenTickets := len(openTickets[tc.contact])
-		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.contact.ID, last).
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.contact.ID, last).
 			Returns(numOpenTickets, "%d: updated open ticket mismatch", i)
 
 		// check any closed tickets are unchanged
 		numClosedTickets := len(closedTickets[tc.contact])
-		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.contact.ID).
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.contact.ID).
 			Returns(numClosedTickets, "%d: unchanged closed ticket mismatch", i)
 
 		last = time.Now()
 	}
 
 	// should have one remaining IVR task to handle for Bob
-	orgTasks := testsuite.CurrentTasks(t, rp)
+	orgTasks := testsuite.CurrentTasks(t, rt)
 	assert.Equal(t, 1, len(orgTasks[testdata.Org1.ID]))
 
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
@@ -380,11 +379,11 @@ func TestMsgEvents(t *testing.T) {
 	})
 
 	// Fred's sessions should not have a timeout because courier will set them
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1`, testdata.Org2Contact.ID).Returns(6)
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowsession where contact_id = $1`, testdata.Org2Contact.ID).Returns(6)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
-	db.MustExec(`UPDATE flows_flowrun SET status = 'C', exited_on = NOW() WHERE contact_id = $1`, testdata.Org2Contact.ID)
+	rt.DB.MustExec(`UPDATE flows_flowrun SET status = 'C', exited_on = NOW() WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
@@ -402,7 +401,7 @@ func TestMsgEvents(t *testing.T) {
 	assert.Nil(t, task)
 
 	// mark Fred's flow as inactive
-	db.MustExec(`UPDATE flows_flow SET is_active = FALSE where id = $1`, testdata.Org2Favorites.ID)
+	rt.DB.MustExec(`UPDATE flows_flow SET is_active = FALSE where id = $1`, testdata.Org2Favorites.ID)
 	models.FlushCache()
 
 	// try to resume now
@@ -414,11 +413,11 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
-	assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
+	assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
 	previous := time.Now()
 
 	// and should have failed previous session
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
@@ -427,22 +426,22 @@ func TestMsgEvents(t *testing.T) {
 	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
 }
 
 func TestChannelEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add some channel event triggers
-	testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
-	testdata.InsertReferralTrigger(db, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
+	testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
+	testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -488,13 +487,13 @@ func TestChannelEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		if tc.Response != "" {
-			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
+			assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
 				Returns(tc.Response, "%d: response mismatch", i)
 		}
 
 		if tc.UpdateLastSeen {
 			var lastSeen time.Time
-			err = db.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
+			err = rt.DB.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
 			assert.NoError(t, err)
 			assert.True(t, lastSeen.Equal(start) || lastSeen.After(start), "%d: expected last seen to be updated", i)
 		}
@@ -502,17 +501,17 @@ func TestChannelEvents(t *testing.T) {
 }
 
 func TestTicketEvents(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a ticket closed trigger
-	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(rt, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
-	modelTicket := ticket.Load(db)
+	ticket := testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
+	modelTicket := ticket.Load(rt)
 
 	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID)
 
@@ -529,18 +528,18 @@ func TestTicketEvents(t *testing.T) {
 }
 
 func TestStopEvent(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// schedule an event for cathy and george
-	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now())
-	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now())
 
 	// and george to doctors group, cathy is already part of it
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
+	rt.DB.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
 
 	event := &handler.StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
 	eventJSON, err := json.Marshal(event)
@@ -561,27 +560,27 @@ func TestStopEvent(t *testing.T) {
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
-	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
-	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
 
 	// that cathy is stopped
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
 
 	// and has no upcoming events
-	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
-	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestTimedEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some keyword triggers
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.PickANumber, "pick", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.PickANumber, "pick", models.MatchOnly, nil, nil)
 
 	tcs := []struct {
 		EventType string
@@ -661,8 +660,8 @@ func TestTimedEvents(t *testing.T) {
 			if tc.Message == "bad" {
 				expiration = time.Now()
 			} else if tc.Message == "child" {
-				db.Get(&expiration, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status != 'W'`, sessionID)
-				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND status NOT IN ('A', 'W')`, sessionID)
+				rt.DB.Get(&expiration, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status != 'W'`, sessionID)
+				rt.DB.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND status NOT IN ('A', 'W')`, sessionID)
 			} else {
 				expiration = time.Now().Add(time.Hour * 24)
 			}
@@ -673,7 +672,7 @@ func TestTimedEvents(t *testing.T) {
 			timeoutOn := time.Now().Round(time.Millisecond) // so that there's no difference between this and what we read from the db
 
 			// usually courier will set timeout_on after sending the last message
-			db.MustExec(`UPDATE flows_flowsession SET timeout_on = $2 WHERE id = $1`, sessionID, timeoutOn)
+			rt.DB.MustExec(`UPDATE flows_flowsession SET timeout_on = $2 WHERE id = $1`, sessionID, timeoutOn)
 
 			task = handler.NewTimeoutTask(tc.Org.ID, tc.Contact.ID, sessionID, timeoutOn)
 		}
@@ -688,26 +687,26 @@ func TestTimedEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		if tc.Response != "" {
-			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
+			assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
 				Returns(tc.Response, "%d: response: mismatch", i)
 		}
 
-		err = db.Get(&sessionID, `SELECT id FROM flows_flowsession WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
+		err = rt.DB.Get(&sessionID, `SELECT id FROM flows_flowsession WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
-		err = db.Get(&runID, `SELECT id FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
+		err = rt.DB.Get(&runID, `SELECT id FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
 		last = time.Now()
 	}
 
 	// should only have a single waiting session/run with no timeout
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
-	assertdb.Query(t, db, `SELECT timeout_on FROM flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(nil)
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT timeout_on FROM flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(nil)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
 
 	// test the case of a run and session no longer being the most recent but somehow still active, expiration should still work
-	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and status = 'I' order by created_on asc limit 1`, testdata.Cathy.ID)
+	r, err := rt.DB.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and status = 'I' order by created_on asc limit 1`, testdata.Cathy.ID)
 	assert.NoError(t, err)
 	defer r.Close()
 	r.Next()
@@ -716,12 +715,12 @@ func TestTimedEvents(t *testing.T) {
 	expiration := time.Now()
 
 	// set both to be active (this requires us to disable the status change triggers)
-	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_status_change`)
-	db.MustExec(`ALTER TABLE flows_flowsession DISABLE TRIGGER temba_flowsession_status_change`)
-	db.MustExec(`UPDATE flows_flowrun SET status = 'W' WHERE id = $1`, runID)
-	db.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = $2 WHERE id = $1`, sessionID, expiration)
-	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_status_change`)
-	db.MustExec(`ALTER TABLE flows_flowsession ENABLE TRIGGER temba_flowsession_status_change`)
+	rt.DB.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_status_change`)
+	rt.DB.MustExec(`ALTER TABLE flows_flowsession DISABLE TRIGGER temba_flowsession_status_change`)
+	rt.DB.MustExec(`UPDATE flows_flowrun SET status = 'W' WHERE id = $1`, runID)
+	rt.DB.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = $2 WHERE id = $1`, sessionID, expiration)
+	rt.DB.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_status_change`)
+	rt.DB.MustExec(`ALTER TABLE flows_flowsession ENABLE TRIGGER temba_flowsession_status_change`)
 
 	// try to expire the run
 	task := handler.NewExpirationTask(testdata.Org1.ID, testdata.Cathy.ID, sessionID, expiration)

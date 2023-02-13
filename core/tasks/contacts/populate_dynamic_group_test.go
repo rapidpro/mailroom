@@ -13,13 +13,13 @@ import (
 )
 
 func TestPopulateTask(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	mocks.ES.AddResponse(testdata.Cathy.ID)
 
-	group := testdata.InsertContactGroup(rt.DB, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
+	group := testdata.InsertContactGroup(rt, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
 	start := dates.Now()
 
 	task := &contacts.PopulateDynamicGroupTask{

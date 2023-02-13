@@ -16,7 +16,7 @@ import (
 )
 
 func TestStartTasks(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
 	defer close()
 
 	rc := rt.RP.Get()
@@ -26,8 +26,8 @@ func TestStartTasks(t *testing.T) {
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	rt.DB.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
-	sID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
-	testdata.InsertFlowRun(rt.DB, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
+	sID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
+	testdata.InsertFlowRun(rt, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	tcs := []struct {
 		label                    string
