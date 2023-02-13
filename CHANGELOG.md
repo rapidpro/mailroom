@@ -1,3 +1,7 @@
+v8.1.19 (2023-02-13)
+-------------------------
+ * Stop writing Broadcast.send_all
+
 v8.1.18 (2023-02-13)
 -------------------------
  * Update to latest goflow
