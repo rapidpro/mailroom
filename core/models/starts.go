@@ -47,45 +47,6 @@ const (
 	StartStatusFailed   = StartStatus("F")
 )
 
-// MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int, createdContactIDs []ContactID) error {
-	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
-	if err != nil {
-		return errors.Wrapf(err, "error setting start as started")
-	}
-
-	// if we created contacts, add them to the start for logging
-	if len(createdContactIDs) > 0 {
-		type startContact struct {
-			StartID   StartID   `db:"flowstart_id"`
-			ContactID ContactID `db:"contact_id"`
-		}
-
-		args := make([]*startContact, len(createdContactIDs))
-		for i, id := range createdContactIDs {
-			args[i] = &startContact{StartID: startID, ContactID: id}
-		}
-		return BulkQuery(
-			ctx, "adding created contacts to flow start", db,
-			`INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:flowstart_id, :contact_id) ON CONFLICT DO NOTHING`,
-			args,
-		)
-	}
-	return nil
-}
-
-// MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
-	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
-	return errors.Wrapf(err, "error marking flow start as complete")
-}
-
-// MarkStartFailed sets the status for the passed in flow start to F
-func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
-	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
-	return errors.Wrapf(err, "error setting flow start as failed")
-}
-
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
 	StartID     StartID     `json:"start_id"`
@@ -133,6 +94,19 @@ type FlowStart struct {
 	Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
 	ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
 	SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
+}
+
+// NewFlowStart creates a new flow start objects for the passed in parameters
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID) *FlowStart {
+	return &FlowStart{
+		UUID:                uuids.New(),
+		OrgID:               orgID,
+		StartType:           startType,
+		FlowType:            flowType,
+		FlowID:              flowID,
+		RestartParticipants: true,
+		IncludeActive:       true,
+	}
 }
 
 func (s *FlowStart) WithGroupIDs(groupIDs []GroupID) *FlowStart {
@@ -192,6 +166,24 @@ func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
 	return s
 }
 
+// MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
+func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
+	return errors.Wrapf(err, "error setting start as started")
+}
+
+// MarkStartComplete sets the status for the passed in flow start
+func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
+	return errors.Wrapf(err, "error marking flow start as complete")
+}
+
+// MarkStartFailed sets the status for the passed in flow start to F
+func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
+	return errors.Wrapf(err, "error setting flow start as failed")
+}
+
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
 func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
@@ -202,26 +194,13 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*
 	return start, nil
 }
 
-// NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID) *FlowStart {
-	return &FlowStart{
-		UUID:                uuids.New(),
-		OrgID:               orgID,
-		StartType:           startType,
-		FlowType:            flowType,
-		FlowID:              flowID,
-		RestartParticipants: true,
-		IncludeActive:       true,
-	}
-}
-
 type startContact struct {
-	StartID   StartID   `db:"start_id"`
+	StartID   StartID   `db:"flowstart_id"`
 	ContactID ContactID `db:"contact_id"`
 }
 
 type startGroup struct {
-	StartID StartID `db:"start_id"`
+	StartID StartID `db:"flowstart_id"`
 	GroupID GroupID `db:"contactgroup_id"`
 }
 
@@ -273,10 +252,10 @@ RETURNING
 `
 
 const sqlInsertStartContact = `
-INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:start_id, :contact_id)`
+INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:flowstart_id, :contact_id)`
 
 const sqlInsertStartGroup = `
-INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:start_id, :contactgroup_id)`
+INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:flowstart_id, :contactgroup_id)`
 
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {

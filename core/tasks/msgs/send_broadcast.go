@@ -62,7 +62,7 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	contactIDs, _, err := search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+	contactIDs, err := search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
 		ContactIDs:      bcast.ContactIDs,
 		GroupIDs:        bcast.GroupIDs,
 		URNs:            bcast.URNs,
@@ -75,10 +75,12 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 	}
 
 	// if there are no contacts to send to, mark our broadcast as sent, we are done
-	if len(contactIDs) == 0 && bcast.ID != models.NilBroadcastID {
-		err = models.MarkBroadcastSent(ctx, rt.DB, bcast.ID)
-		if err != nil {
-			return errors.Wrapf(err, "error marking broadcast as sent")
+	if len(contactIDs) == 0 {
+		if bcast.ID != models.NilBroadcastID {
+			err = models.MarkBroadcastSent(ctx, rt.DB, bcast.ID)
+			if err != nil {
+				return errors.Wrapf(err, "error marking broadcast as sent")
+			}
 		}
 		return nil
 	}

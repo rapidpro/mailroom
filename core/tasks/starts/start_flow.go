@@ -61,7 +61,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 		return errors.Wrap(err, "error loading org assets")
 	}
 
-	var contactIDs, createdContactIDs []models.ContactID
+	var contactIDs []models.ContactID
 
 	if start.CreateContact {
 		// if we are meant to create a new contact, do so
@@ -70,7 +70,6 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 			return errors.Wrapf(err, "error creating new contact")
 		}
 		contactIDs = []models.ContactID{contact.ID()}
-		createdContactIDs = []models.ContactID{contact.ID()}
 	} else {
 		// otherwise resolve recipients across contacts, groups, urns etc
 
@@ -80,7 +79,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 			queryLimit = 1
 		}
 
-		contactIDs, createdContactIDs, err = search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+		contactIDs, err = search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
 			ContactIDs:      start.ContactIDs,
 			GroupIDs:        start.GroupIDs,
 			URNs:            start.URNs,
@@ -94,7 +93,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 	}
 
 	// mark our start as starting, last task will mark as complete
-	err = models.MarkStartStarted(ctx, rt.DB, start.ID, len(contactIDs), createdContactIDs)
+	err = models.MarkStartStarted(ctx, rt.DB, start.ID, len(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error marking start as started")
 	}
