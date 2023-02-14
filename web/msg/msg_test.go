@@ -9,7 +9,15 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
-func TestServer(t *testing.T) {
+func TestSend(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/send.json", nil)
+}
+
+func TestResend(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)

@@ -606,9 +606,9 @@ msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
 		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
 RETURNING 
-	id as id, 
-	now() as modified_on,
-	now() as queued_on
+	id AS id, 
+	modified_on AS modified_on,
+	queued_on AS queued_on
 `
 
 // UpdateMessage updates a message after handling

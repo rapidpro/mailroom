@@ -1,0 +1,69 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/msg/send",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "invalid org_id",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "org_id": 1234,
+            "user_id": 12,
+            "contact_id": 4,
+            "text": "hello"
+        },
+        "status": 500,
+        "response": {
+            "error": "unable to load org assets: error loading environment for org 1234: no org with id: 1234"
+        }
+    },
+    {
+        "label": "invalid contact_id",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_id": 123456789,
+            "text": "hello"
+        },
+        "status": 500,
+        "response": {
+            "error": "error loading contact: no such contact #123456789 in org #1"
+        }
+    },
+    {
+        "label": "simple text only message",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_id": 10000,
+            "text": "hello"
+        },
+        "status": 200,
+        "response": {
+            "id": 1,
+            "contact": {
+                "name": "Cathy",
+                "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "channel": {
+                "name": "Twilio",
+                "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+            },
+            "urn": "tel:+16055741111?id=10000&priority=1000",
+            "text": "hello",
+            "attachments": [],
+            "status": "Q",
+            "created_on": "2018-07-06T12:30:00.123456789Z"
+        }
+    }
+]
