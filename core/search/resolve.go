@@ -21,9 +21,8 @@ type Recipients struct {
 }
 
 // ResolveRecipients resolves a set of contacts, groups, urns etc into a set of unique contacts
-func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, recipients *Recipients) ([]models.ContactID, []models.ContactID, error) {
+func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, recipients *Recipients) ([]models.ContactID, error) {
 	allIDs := make(map[models.ContactID]bool) // ids of all contacts we're including
-	createdIDs := make([]models.ContactID, 0) // ids of new contacts we've created
 
 	// we are building a set of contact ids, start with the explicit ones
 	for _, id := range recipients.ContactIDs {
@@ -34,12 +33,9 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	if len(recipients.URNs) > 0 {
 		urnContactIDs, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, recipients.URNs)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "error getting contact ids from urns")
+			return nil, errors.Wrap(err, "error getting contact ids from urns")
 		}
 		for _, id := range urnContactIDs {
-			if !allIDs[id] {
-				createdIDs = append(createdIDs, id)
-			}
 			allIDs[id] = true
 		}
 	}
@@ -48,7 +44,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	if len(recipients.GroupIDs) > 0 {
 		rows, err := rt.DB.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(recipients.GroupIDs))
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "error querying contacts from inclusion groups")
+			return nil, errors.Wrap(err, "error querying contacts from inclusion groups")
 		}
 		defer rows.Close()
 
@@ -56,7 +52,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 		for rows.Next() {
 			err := rows.Scan(&contactID)
 			if err != nil {
-				return nil, nil, errors.Wrap(err, "error scanning contact id")
+				return nil, errors.Wrap(err, "error scanning contact id")
 			}
 			allIDs[contactID] = true
 		}
@@ -66,7 +62,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	if recipients.Query != "" {
 		matches, err := GetContactIDsForQuery(ctx, rt.ES, oa, recipients.Query, recipients.QueryLimit)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "error performing contact search")
+			return nil, errors.Wrap(err, "error performing contact search")
 		}
 
 		for _, contactID := range matches {
@@ -78,7 +74,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	if len(recipients.ExcludeGroupIDs) > 0 {
 		rows, err := rt.DB.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(recipients.ExcludeGroupIDs))
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "error querying contacts from exclusion groups")
+			return nil, errors.Wrap(err, "error querying contacts from exclusion groups")
 		}
 		defer rows.Close()
 
@@ -86,11 +82,11 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 		for rows.Next() {
 			err := rows.Scan(&excludeID)
 			if err != nil {
-				return nil, nil, errors.Wrap(err, "error scanning contact id")
+				return nil, errors.Wrap(err, "error scanning contact id")
 			}
 			delete(allIDs, excludeID)
 		}
 	}
 
-	return maps.Keys(allIDs), createdIDs, nil
+	return maps.Keys(allIDs), nil
 }

@@ -28,14 +28,12 @@ func TestResolveRecipients(t *testing.T) {
 	require.NoError(t, err)
 
 	tcs := []struct {
-		recipients         *search.Recipients
-		expectedIDs        []models.ContactID
-		expectedCreatedIDs []models.ContactID
+		recipients  *search.Recipients
+		expectedIDs []models.ContactID
 	}{
 		{
-			recipients:         &search.Recipients{},
-			expectedIDs:        []models.ContactID{},
-			expectedCreatedIDs: []models.ContactID{},
+			recipients:  &search.Recipients{},
+			expectedIDs: []models.ContactID{},
 		},
 		{
 			recipients: &search.Recipients{
@@ -43,39 +41,34 @@ func TestResolveRecipients(t *testing.T) {
 				GroupIDs:   []models.GroupID{group1.ID},
 				Query:      `name = "Cathy" OR name = "Bob"`,
 			},
-			expectedIDs:        []models.ContactID{testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID, testdata.Cathy.ID},
-			expectedCreatedIDs: []models.ContactID{},
+			expectedIDs: []models.ContactID{testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID, testdata.Cathy.ID},
 		},
 		{
 			recipients: &search.Recipients{
 				ContactIDs:      []models.ContactID{testdata.George.ID, testdata.Bob.ID},
 				ExcludeGroupIDs: []models.GroupID{group2.ID},
 			},
-			expectedIDs:        []models.ContactID{testdata.Bob.ID},
-			expectedCreatedIDs: []models.ContactID{},
+			expectedIDs: []models.ContactID{testdata.Bob.ID},
 		},
 		{
 			recipients: &search.Recipients{
 				ContactIDs: []models.ContactID{testdata.Bob.ID},
 				URNs:       []urns.URN{"tel:+1234567890", "tel:+1234567891"},
 			},
-			expectedIDs:        []models.ContactID{testdata.Bob.ID, 30000, 30001},
-			expectedCreatedIDs: []models.ContactID{30000, 30001},
+			expectedIDs: []models.ContactID{testdata.Bob.ID, 30000, 30001},
 		},
 		{
 			recipients: &search.Recipients{
 				Query:      `name = "Cathy" OR name = "Bob"`,
 				QueryLimit: 1,
 			},
-			expectedIDs:        []models.ContactID{testdata.Cathy.ID},
-			expectedCreatedIDs: []models.ContactID{},
+			expectedIDs: []models.ContactID{testdata.Cathy.ID},
 		},
 	}
 
 	for i, tc := range tcs {
-		actualIDs, actualCreatedIDs, err := search.ResolveRecipients(ctx, rt, oa, tc.recipients)
+		actualIDs, err := search.ResolveRecipients(ctx, rt, oa, tc.recipients)
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, tc.expectedIDs, actualIDs, "contact ids mismatch in %d", i)
-		assert.ElementsMatch(t, tc.expectedCreatedIDs, actualCreatedIDs, "created contact ids mismatch in %d", i)
 	}
 }

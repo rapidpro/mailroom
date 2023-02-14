@@ -64,6 +64,52 @@ func NewBroadcast(orgID OrgID, translations flows.BroadcastTranslations,
 	}
 }
 
+// NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
+func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
+	// resolve our contact references
+	contactIDs, err := GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error resolving contact references")
+	}
+
+	// and our groups
+	groupIDs := make([]GroupID, 0, len(event.Groups))
+	for i := range event.Groups {
+		group := oa.GroupByUUID(event.Groups[i].UUID)
+		if group != nil {
+			groupIDs = append(groupIDs, group.ID())
+		}
+	}
+
+	return NewBroadcast(oa.OrgID(), event.Translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilTicketID, NilUserID), nil
+}
+
+func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastBatch {
+	return &BroadcastBatch{
+		BroadcastID:   b.ID,
+		OrgID:         b.OrgID,
+		BaseLanguage:  b.BaseLanguage,
+		Translations:  b.Translations,
+		TemplateState: b.TemplateState,
+		CreatedByID:   b.CreatedByID,
+		TicketID:      b.TicketID,
+		ContactIDs:    contactIDs,
+		IsLast:        isLast,
+	}
+}
+
+// MarkBroadcastSent marks the given broadcast as sent
+func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
+	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
+	return errors.Wrapf(err, "error marking broadcast #%d as sent", id)
+}
+
+// MarkBroadcastFailed marks the given broadcast as failed
+func MarkBroadcastFailed(ctx context.Context, db Queryer, id BroadcastID) error {
+	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
+	return errors.Wrapf(err, "error marking broadcast #%d as failed", id)
+}
+
 // InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
 func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
 	child := NewBroadcast(
@@ -131,40 +177,6 @@ RETURNING id`
 
 const sqlInsertBroadcastContacts = `INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES(:broadcast_id, :contact_id)`
 const sqlInsertBroadcastGroups = `INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES(:broadcast_id, :contactgroup_id)`
-
-// NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
-func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
-	// resolve our contact references
-	contactIDs, err := GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error resolving contact references")
-	}
-
-	// and our groups
-	groupIDs := make([]GroupID, 0, len(event.Groups))
-	for i := range event.Groups {
-		group := oa.GroupByUUID(event.Groups[i].UUID)
-		if group != nil {
-			groupIDs = append(groupIDs, group.ID())
-		}
-	}
-
-	return NewBroadcast(oa.OrgID(), event.Translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilTicketID, NilUserID), nil
-}
-
-func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastBatch {
-	return &BroadcastBatch{
-		BroadcastID:   b.ID,
-		OrgID:         b.OrgID,
-		BaseLanguage:  b.BaseLanguage,
-		Translations:  b.Translations,
-		TemplateState: b.TemplateState,
-		CreatedByID:   b.CreatedByID,
-		TicketID:      b.TicketID,
-		ContactIDs:    contactIDs,
-		IsLast:        isLast,
-	}
-}
 
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {

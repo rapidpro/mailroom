@@ -64,11 +64,11 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory)
 	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra)
 
-	err = models.MarkStartStarted(ctx, rt.DB, startID, 2, []models.ContactID{testdata.George.ID})
+	err = models.MarkStartStarted(ctx, rt.DB, startID, 2)
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(2)
 
 	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 3)
 	assert.Equal(t, startID, batch.StartID)
