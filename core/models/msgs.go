@@ -321,6 +321,11 @@ func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, co
 	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
 }
 
+// NewOutgoingChatMsg creates an outgoing message from chat
+func NewOutgoingChatMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID)
+}
+
 func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
@@ -772,6 +777,29 @@ func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID
 		}
 	}
 	return nil
+}
+
+func NewMsgOut(oa *OrgAssets, c *flows.Contact, text string, atts []utils.Attachment, qrs []string, locale envs.Locale) (*flows.MsgOut, *Channel) {
+	// resolve URN + channel for this contact
+	urn := urns.NilURN
+	var channel *Channel
+	var channelRef *assets.ChannelReference
+	for _, dest := range c.ResolveDestinations(false) {
+		urn = dest.URN.URN()
+		channel = oa.ChannelByUUID(dest.Channel.UUID())
+		channelRef = dest.Channel.Reference()
+		break
+	}
+
+	// is this message sendable?
+	unsendableReason := flows.NilUnsendableReason
+	if c.Status() != flows.ContactStatusActive {
+		unsendableReason = flows.UnsendableReasonContactStatus
+	} else if urn == urns.NilURN || channel == nil {
+		unsendableReason = flows.UnsendableReasonNoDestination
+	}
+
+	return flows.NewMsgOut(urn, channelRef, text, atts, qrs, nil, flows.NilMsgTopic, locale, unsendableReason), channel
 }
 
 // NilID implementations
