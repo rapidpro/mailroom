@@ -22,7 +22,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/mailgun"
 
-	web.RegisterRoute(http.MethodPost, base+"/receive", web.JSONRequestResponse(web.WithHTTPLogs(handleReceive)))
+	web.RegisterRoute(http.MethodPost, base+"/receive", web.MarshaledResponse(web.WithHTTPLogs(handleReceive)))
 }
 
 type receiveRequest struct {

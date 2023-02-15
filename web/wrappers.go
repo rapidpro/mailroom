@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
+type MarshaledHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
 
-func JSONRequestResponse(handler JSONHandler) Handler {
+func MarshaledResponse(handler MarshaledHandler) Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 		w.Header().Set("Content-type", "application/json")
 
@@ -32,6 +32,14 @@ func JSONRequestResponse(handler JSONHandler) Handler {
 	}
 }
 
+var sqlLookupAPIToken = `
+SELECT user_id, org_id
+  FROM api_apitoken t
+  JOIN orgs_org o ON t.org_id = o.id
+  JOIN auth_group g ON t.role_id = g.id
+  JOIN auth_user u ON t.user_id = u.id
+ WHERE key = $1 AND g.name IN ('Administrators', 'Editors', 'Surveyors') AND t.is_active AND o.is_active AND u.is_active`
+
 // RequireUserToken wraps a handler to require passing of an API token via the authorization header
 func RequireUserToken(handler Handler) Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
@@ -41,26 +49,10 @@ func RequireUserToken(handler Handler) Handler {
 			return WriteMarshalled(w, http.StatusUnauthorized, NewErrorResponse(errors.New("missing authorization token")))
 		}
 
-		// pull out the actual token
-		token = token[6:]
+		token = token[6:] // pull out the actual token
 
 		// try to look it up
-		rows, err := rt.DB.QueryContext(ctx, `
-		SELECT 
-			user_id, 
-			org_id
-		FROM
-			api_apitoken t
-			JOIN orgs_org o ON t.org_id = o.id
-			JOIN auth_group g ON t.role_id = g.id
-			JOIN auth_user u ON t.user_id = u.id
-		WHERE
-			key = $1 AND
-			g.name IN ('Administrators', 'Editors', 'Surveyors') AND
-			t.is_active = TRUE AND
-			o.is_active = TRUE AND
-			u.is_active = TRUE
-		`, token)
+		rows, err := rt.DB.QueryContext(ctx, sqlLookupAPIToken, token)
 		if err != nil {
 			return errors.Wrap(err, "error querying API token")
 		}
@@ -104,7 +96,7 @@ func RequireAuthToken(handler Handler) Handler {
 type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error)
 
 // WithHTTPLogs wraps a handler to create a handler which can record and save HTTP logs
-func WithHTTPLogs(handler LoggingJSONHandler) JSONHandler {
+func WithHTTPLogs(handler LoggingJSONHandler) MarshaledHandler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 		logger := &models.HTTPLogger{}
 

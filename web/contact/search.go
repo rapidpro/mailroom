@@ -15,8 +15,8 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.JSONRequestResponse(handleSearch)))
-	web.RegisterRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(web.JSONRequestResponse(handleParseQuery)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.MarshaledResponse(handleSearch)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(web.MarshaledResponse(handleParseQuery)))
 }
 
 // Searches the contacts for an org

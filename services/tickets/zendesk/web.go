@@ -23,9 +23,9 @@ import (
 func init() {
 	base := "/mr/tickets/types/zendesk"
 
-	web.RegisterRoute(http.MethodPost, base+"/channelback", web.JSONRequestResponse(handleChannelback))
-	web.RegisterRoute(http.MethodPost, base+"/event_callback", web.JSONRequestResponse(web.WithHTTPLogs(handleEventCallback)))
-	web.RegisterRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.JSONRequestResponse(web.WithHTTPLogs(handleTicketerTarget)))
+	web.RegisterRoute(http.MethodPost, base+"/channelback", web.MarshaledResponse(handleChannelback))
+	web.RegisterRoute(http.MethodPost, base+"/event_callback", web.MarshaledResponse(web.WithHTTPLogs(handleEventCallback)))
+	web.RegisterRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.MarshaledResponse(web.WithHTTPLogs(handleTicketerTarget)))
 }
 
 type integrationMetadata struct {

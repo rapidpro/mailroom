@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.JSONRequestResponse(web.WithHTTPLogs(handleReopen))))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.MarshaledResponse(web.WithHTTPLogs(handleReopen))))
 }
 
 // Reopens any closed tickets with the given ids

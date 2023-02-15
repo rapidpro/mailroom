@@ -18,10 +18,10 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(web.JSONRequestResponse(handleMigrate)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/inspect", web.RequireAuthToken(web.JSONRequestResponse(handleInspect)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(web.JSONRequestResponse(handleClone)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/change_language", web.RequireAuthToken(web.JSONRequestResponse(handleChangeLanguage)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(web.MarshaledResponse(handleMigrate)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/inspect", web.RequireAuthToken(web.MarshaledResponse(handleInspect)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(web.MarshaledResponse(handleClone)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/change_language", web.RequireAuthToken(web.MarshaledResponse(handleChangeLanguage)))
 }
 
 // Migrates a flow to the latest flow specification

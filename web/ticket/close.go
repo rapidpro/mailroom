@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.JSONRequestResponse(web.WithHTTPLogs(handleClose))))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.MarshaledResponse(web.WithHTTPLogs(handleClose))))
 }
 
 // Closes any open tickets with the given ids. If force=true then even if tickets can't be closed on external service,
