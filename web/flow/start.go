@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/flow/preview_start", web.RequireAuthToken(web.JSONRequestResponse(handlePreviewStart)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/preview_start", web.RequireAuthToken(web.JSONPayload(handlePreviewStart)))
 }
 
 // Generates a preview of which contacts will be started in the given flow.
@@ -70,31 +70,26 @@ type previewStartResponse struct {
 	Metadata  *contactql.Inspection `json:"metadata,omitempty"`
 }
 
-func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &previewStartRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewStartRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	flow, err := oa.FlowByID(request.FlowID)
+	flow, err := oa.FlowByID(r.FlowID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load flow")
 	}
 
-	groups := make([]*models.Group, 0, len(request.Include.GroupUUIDs))
-	for _, groupUUID := range request.Include.GroupUUIDs {
+	groups := make([]*models.Group, 0, len(r.Include.GroupUUIDs))
+	for _, groupUUID := range r.Include.GroupUUIDs {
 		g := oa.GroupByUUID(groupUUID)
 		if g != nil {
 			groups = append(groups, g)
 		}
 	}
 
-	query, err := search.BuildStartQuery(oa, flow, groups, request.Include.ContactUUIDs, request.Include.URNs, request.Include.Query, request.Exclude)
+	query, err := search.BuildStartQuery(oa, flow, groups, r.Include.ContactUUIDs, r.Include.URNs, r.Include.Query, r.Exclude)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
@@ -106,7 +101,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		return &previewStartResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
+	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, r.SampleSize)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error querying preview")
 	}

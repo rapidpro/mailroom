@@ -18,10 +18,10 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(web.JSONRequestResponse(handleMigrate)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/inspect", web.RequireAuthToken(web.JSONRequestResponse(handleInspect)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(web.JSONRequestResponse(handleClone)))
-	web.RegisterRoute(http.MethodPost, "/mr/flow/change_language", web.RequireAuthToken(web.JSONRequestResponse(handleChangeLanguage)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(web.JSONPayload(handleMigrate)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/inspect", web.RequireAuthToken(web.JSONPayload(handleInspect)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(web.JSONPayload(handleClone)))
+	web.RegisterRoute(http.MethodPost, "/mr/flow/change_language", web.RequireAuthToken(web.JSONPayload(handleChangeLanguage)))
 }
 
 // Migrates a flow to the latest flow specification
@@ -35,14 +35,9 @@ type migrateRequest struct {
 	ToVersion *semver.Version `json:"to_version"`
 }
 
-func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &migrateRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
+func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *migrateRequest) (any, int, error) {
 	// do a JSON to JSON migration of the definition
-	migrated, err := goflow.MigrateDefinition(rt.Config, request.Flow, request.ToVersion)
+	migrated, err := goflow.MigrateDefinition(rt.Config, r.Flow, r.ToVersion)
 	if err != nil {
 		return errors.Wrapf(err, "unable to migrate flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -69,21 +64,16 @@ type inspectRequest struct {
 	OrgID models.OrgID    `json:"org_id"`
 }
 
-func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &inspectRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
+func handleInspect(ctx context.Context, rt *runtime.Runtime, r *inspectRequest) (any, int, error) {
+	flow, err := goflow.ReadFlow(rt.Config, r.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	var sa flows.SessionAssets
 	// if we have an org ID, create session assets to look for missing dependencies
-	if request.OrgID != models.NilOrgID {
-		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
+	if r.OrgID != models.NilOrgID {
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, r.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -107,14 +97,9 @@ type cloneRequest struct {
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
 }
 
-func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &cloneRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
+func handleClone(ctx context.Context, rt *runtime.Runtime, r *cloneRequest) (any, int, error) {
 	// try to clone the flow definition
-	cloneJSON, err := goflow.CloneDefinition(request.Flow, request.DependencyMapping)
+	cloneJSON, err := goflow.CloneDefinition(r.Flow, r.DependencyMapping)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -139,18 +124,13 @@ type changeLanguageRequest struct {
 	Flow     json.RawMessage `json:"flow"     validate:"required"`
 }
 
-func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &changeLanguageRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
+func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *changeLanguageRequest) (any, int, error) {
+	flow, err := goflow.ReadFlow(rt.Config, r.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
-	copy, err := flow.ChangeLanguage(request.Language)
+	copy, err := flow.ChangeLanguage(r.Language)
 	if err != nil {
 		return errors.Wrapf(err, "unable to change flow language"), http.StatusUnprocessableEntity, nil
 	}

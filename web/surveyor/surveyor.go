@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(web.JSONRequestResponse(handleSubmit)))
+	web.RegisterRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(web.MarshaledResponse(handleSubmit)))
 }
 
 // Represents a surveyor submission
