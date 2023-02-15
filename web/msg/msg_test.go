@@ -9,7 +9,17 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
-func TestServer(t *testing.T) {
+func TestSend(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/send.json", nil)
+
+	testsuite.AssertCourierQueues(t, map[string][]int{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1, 1}})
+}
+
+func TestResend(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)

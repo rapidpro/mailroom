@@ -245,7 +245,7 @@ func LoadContact(ctx context.Context, db Queryer, oa *OrgAssets, id ContactID) (
 		return nil, err
 	}
 	if len(contacts) == 0 {
-		return nil, nil
+		return nil, errors.Errorf("no such contact #%d in org #%d", id, oa.OrgID())
 	}
 	return contacts[0], nil
 }

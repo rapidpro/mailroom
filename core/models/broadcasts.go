@@ -6,7 +6,6 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
 	"github.com/nyaruka/goflow/excellent/types"
@@ -195,7 +194,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 	// load all our contacts
 	contacts, err := LoadContacts(ctx, rt.DB, oa, b.ContactIDs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
+		return nil, errors.Wrap(err, "error loading contacts for broadcast")
 	}
 
 	// for each contact, build our message
@@ -205,7 +204,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 	for _, c := range contacts {
 		msg, err := b.createMessage(rt, oa, c)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error creating broadcast message")
+			return nil, errors.Wrap(err, "error creating broadcast message")
 		}
 		if msg != nil {
 			msgs = append(msgs, msg)
@@ -215,12 +214,12 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 	// insert them in a single request
 	err = InsertMessages(ctx, rt.DB, msgs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting broadcast messages")
+		return nil, errors.Wrap(err, "error inserting broadcast messages")
 	}
 
 	// if the broadcast was a ticket reply, update the ticket
 	if b.TicketID != NilTicketID {
-		if err := b.updateTicket(ctx, rt.DB, oa); err != nil {
+		if err := RecordTicketReply(ctx, rt.DB, oa, b.TicketID, b.CreatedByID); err != nil {
 			return nil, err
 		}
 	}
@@ -232,16 +231,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Contact) (*Msg, error) {
 	contact, err := c.FlowContact(oa)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating flow contact for broadcast message")
-	}
-
-	// resolve URN + channel for this contact
-	urn := urns.NilURN
-	var channel *Channel
-	for _, dest := range contact.ResolveDestinations(false) {
-		urn = dest.URN.URN()
-		channel = oa.ChannelByUUID(dest.Channel.UUID())
-		break
+		return nil, errors.Wrap(err, "error creating flow contact for broadcast message")
 	}
 
 	trans, lang := b.Translations.ForContact(oa.Env(), contact, b.BaseLanguage)
@@ -271,21 +261,10 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 		return nil, nil
 	}
 
-	var channelRef *assets.ChannelReference
-	if channel != nil {
-		channelRef = channel.ChannelReference()
-	}
-
-	unsendableReason := flows.NilUnsendableReason
-	if contact.Status() != flows.ContactStatusActive {
-		unsendableReason = flows.UnsendableReasonContactStatus
-	} else if urn == urns.NilURN || channel == nil {
-		unsendableReason = flows.UnsendableReasonNoDestination
-	}
-
 	// create our outgoing message
-	out := flows.NewMsgOut(urn, channelRef, text, attachments, quickReplies, nil, flows.NilMsgTopic, locale, unsendableReason)
-	msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
+	out, ch := NewMsgOut(oa, contact, text, attachments, quickReplies, locale)
+
+	msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), ch, contact, out, time.Now(), b.BroadcastID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating outgoing message")
 	}
@@ -293,8 +272,8 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 	return msg, nil
 }
 
-func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	firstReplyTime, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
+func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID TicketID, userID UserID) error {
+	firstReplyTime, err := TicketRecordReplied(ctx, db, ticketID, dates.Now())
 	if err != nil {
 		return err
 	}
@@ -302,8 +281,8 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 	// record reply counts for org, user and team
 	replyCounts := map[string]int{scopeOrg(oa): 1}
 
-	if b.CreatedByID != NilUserID {
-		user := oa.UserByID(b.CreatedByID)
+	if userID != NilUserID {
+		user := oa.UserByID(userID)
 		if user != nil {
 			replyCounts[scopeUser(oa, user)] = 1
 			if user.Team() != nil {
