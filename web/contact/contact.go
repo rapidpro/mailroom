@@ -16,10 +16,10 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(handleInterrupt))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(web.JSONRequestResponse(handleCreate)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(web.JSONRequestResponse(handleModify)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(web.JSONRequestResponse(handleResolve)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(web.JSONRequestResponse(handleInterrupt)))
 }
 
 // Request to create a new contact.
@@ -42,7 +42,7 @@ type createRequest struct {
 }
 
 // handles a request to create the given contact
-func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &createRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -51,7 +51,7 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// grab our org
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
@@ -67,10 +67,10 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
 	_, err = models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
+		return nil, 0, errors.Wrap(err, "error modifying new contact")
 	}
 
-	return map[string]interface{}{"contact": contact}, http.StatusOK, nil
+	return map[string]any{"contact": contact}, http.StatusOK, nil
 }
 
 // Request that a set of contacts is modified.
@@ -117,7 +117,7 @@ type modifyResult struct {
 }
 
 // handles a request to apply the passed in actions
-func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &modifyRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -126,19 +126,19 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// grab our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// read the modifiers from the request
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, 0, err
 	}
 
 	// load our contacts
 	contacts, err := models.LoadContacts(ctx, rt.DB, oa, request.ContactIDs)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load contact")
+		return nil, 0, errors.Wrapf(err, "unable to load contact")
 	}
 
 	// convert to map of flow contacts to modifiers
@@ -146,7 +146,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	for _, contact := range contacts {
 		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
-			return nil, http.StatusBadRequest, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
+			return nil, 0, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
 
 		modifiersByContact[flowContact] = mods
@@ -154,7 +154,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, 0, err
 	}
 
 	// create our results
@@ -183,7 +183,7 @@ type resolveRequest struct {
 }
 
 // handles a request to resolve a contact
-func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &resolveRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -192,7 +192,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	// grab our org
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
@@ -202,12 +202,12 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	urn = urn.Normalize(string(oa.Env().DefaultCountry()))
 
 	if err := urn.Validate(); err != nil {
-		return errors.Wrapf(err, "URN failed validation"), http.StatusBadRequest, nil
+		return errors.Wrap(err, "URN failed validation"), http.StatusBadRequest, nil
 	}
 
 	_, contact, created, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, request.ChannelID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
+		return nil, 0, errors.Wrapf(err, "error getting or creating contact")
 	}
 
 	// find the URN on the contact
@@ -218,7 +218,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"contact": contact,
 		"urn": map[string]interface{}{
 			"id":       models.GetURNInt(urn, "id"),
@@ -242,7 +242,7 @@ type interruptRequest struct {
 }
 
 // handles a request to interrupt a contact
-func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &interruptRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -250,8 +250,8 @@ func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *http.Request) 
 
 	count, err := models.InterruptSessionsForContacts(ctx, rt.DB, []models.ContactID{request.ContactID})
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to interrupt contact")
+		return nil, 0, errors.Wrapf(err, "unable to interrupt contact")
 	}
 
-	return map[string]interface{}{"sessions": count}, http.StatusOK, nil
+	return map[string]any{"sessions": count}, http.StatusOK, nil
 }

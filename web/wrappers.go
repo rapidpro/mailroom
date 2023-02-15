@@ -8,16 +8,37 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 )
 
-// RequireUserToken wraps a JSON handler to require passing of an API token via the authorization header
-func RequireUserToken(handler JSONHandler) JSONHandler {
-	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
+
+func JSONRequestResponse(handler JSONHandler) Handler {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
+		w.Header().Set("Content-type", "application/json")
+
+		value, status, err := handler(ctx, rt, r)
+		if err != nil {
+			return err
+		}
+
+		// handler returned an error to use as the response
+		asError, isError := value.(error)
+		if isError {
+			value = NewErrorResponse(asError)
+		}
+
+		return WriteMarshalled(w, status, value)
+	}
+}
+
+// RequireUserToken wraps a handler to require passing of an API token via the authorization header
+func RequireUserToken(handler Handler) Handler {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 		token := r.Header.Get("authorization")
+
 		if !strings.HasPrefix(token, "Token ") {
-			return errors.New("missing authorization header"), http.StatusUnauthorized, nil
+			return WriteMarshalled(w, http.StatusUnauthorized, NewErrorResponse(errors.New("missing authorization token")))
 		}
 
 		// pull out the actual token
@@ -41,53 +62,56 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 			u.is_active = TRUE
 		`, token)
 		if err != nil {
-			return errors.Wrapf(err, "error looking up authorization header"), http.StatusUnauthorized, nil
+			return errors.Wrap(err, "error querying API token")
 		}
+
 		defer rows.Close()
 
 		if !rows.Next() {
-			return errors.Errorf("invalid authorization header"), http.StatusUnauthorized, nil
+			return WriteMarshalled(w, http.StatusUnauthorized, NewErrorResponse(errors.New("invalid authorization token")))
 		}
 
 		var userID int64
 		var orgID models.OrgID
 		err = rows.Scan(&userID, &orgID)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "error scanning auth row")
+			return errors.Wrap(err, "error scanning auth row")
 		}
 
-		// we are authenticated set our user id ang org id on our context and call our sub handler
+		// we are authenticated set our user id ang org id on our context and continue
 		ctx = context.WithValue(ctx, UserIDKey, userID)
 		ctx = context.WithValue(ctx, OrgIDKey, orgID)
-		return handler(ctx, rt, r)
+
+		return handler(ctx, rt, r, w)
 	}
 }
 
 // RequireAuthToken wraps a handler to require that our request to have our global authorization header
-func RequireAuthToken(handler JSONHandler) JSONHandler {
-	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func RequireAuthToken(handler Handler) Handler {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 		auth := r.Header.Get("authorization")
+
 		if rt.Config.AuthToken != "" && fmt.Sprintf("Token %s", rt.Config.AuthToken) != auth {
-			return fmt.Errorf("invalid or missing authorization header, denying"), http.StatusUnauthorized, nil
+			return WriteMarshalled(w, http.StatusUnauthorized, NewErrorResponse(errors.New("invalid or missing authorization header")))
 		}
 
 		// we are authenticated, call our chain
-		return handler(ctx, rt, r)
+		return handler(ctx, rt, r, w)
 	}
 }
 
 // LoggingJSONHandler is a JSON web handler which logs HTTP logs
-type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
+type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error)
 
 // WithHTTPLogs wraps a handler to create a handler which can record and save HTTP logs
 func WithHTTPLogs(handler LoggingJSONHandler) JSONHandler {
-	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 		logger := &models.HTTPLogger{}
 
 		response, status, err := handler(ctx, rt, r, logger)
 
 		if err := logger.Insert(ctx, rt.DB); err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
+			return nil, 0, errors.Wrap(err, "error writing HTTP logs")
 		}
 
 		return response, status, err

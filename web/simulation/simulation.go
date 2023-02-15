@@ -25,8 +25,8 @@ var testChannel = assets.NewChannelReference("440099cf-200c-4d45-a8e7-4a564f4a0e
 var testURN = urns.URN("tel:+12065551212")
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
+	web.RegisterRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(web.JSONRequestResponse(handleStart)))
+	web.RegisterRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(web.JSONRequestResponse(handleResume)))
 }
 
 type flowDefinition struct {
@@ -117,7 +117,7 @@ func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.O
 }
 
 // handles a request to /start
-func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &startRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
@@ -145,16 +145,16 @@ func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
-func triggerFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
+func triggerFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, trigger flows.Trigger) (any, int, error) {
 	// start our flow session
 	session, sprint, err := goflow.Simulator(rt.Config).NewSession(oa.SessionAssets(), trigger)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
+		return nil, 0, errors.Wrapf(err, "error starting session")
 	}
 
 	err = handleSimulationEvents(ctx, rt.DB, oa, sprint.Events())
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
+		return nil, 0, errors.Wrapf(err, "error handling simulation events")
 	}
 
 	return newSimulationResponse(session, sprint), http.StatusOK, nil
@@ -179,7 +179,7 @@ type resumeRequest struct {
 	Resume  json.RawMessage `json:"resume" validate:"required"`
 }
 
-func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &resumeRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return nil, http.StatusBadRequest, err
@@ -228,7 +228,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 			if flow == nil || (!flow.IgnoreTriggers() && trigger.TriggerType() == models.KeywordTriggerType) {
 				triggeredFlow, err := oa.FlowByID(trigger.FlowID())
 				if err != nil && err != models.ErrNotFound {
-					return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load triggered flow")
+					return nil, 0, errors.Wrapf(err, "unable to load triggered flow")
 				}
 
 				if triggeredFlow != nil {
@@ -257,12 +257,12 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// resume our session
 	sprint, err := session.Resume(resume)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, 0, err
 	}
 
 	err = handleSimulationEvents(ctx, rt.DB, oa, sprint.Events())
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
+		return nil, 0, errors.Wrapf(err, "error handling simulation events")
 	}
 
 	return newSimulationResponse(session, sprint), http.StatusOK, nil

@@ -19,8 +19,8 @@ import (
 var excludeProperties = []string{"arguments"}
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/po/export", handleExport)
-	web.RegisterJSONRoute(http.MethodPost, "/mr/po/import", handleImport)
+	web.RegisterRoute(http.MethodPost, "/mr/po/export", web.RequireAuthToken(handleExport))
+	web.RegisterRoute(http.MethodPost, "/mr/po/import", web.RequireAuthToken(web.JSONRequestResponse(handleImport)))
 }
 
 // Exports a PO file from the given set of flows.
@@ -73,7 +73,7 @@ type importForm struct {
 	Language envs.Language   `form:"language" validate:"required"`
 }
 
-func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	form := &importForm{}
 	if err := web.DecodeAndValidateForm(form, r); err != nil {
 		return err, http.StatusBadRequest, nil

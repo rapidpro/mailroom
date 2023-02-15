@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.WithHTTPLogs(handleClose)))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.JSONRequestResponse(web.WithHTTPLogs(handleClose))))
 }
 
 // Closes any open tickets with the given ids. If force=true then even if tickets can't be closed on external service,
@@ -24,7 +24,7 @@ func init() {
 //	  "ticket_ids": [1234, 2345],
 //	  "force": false
 //	}
-func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	request := &bulkTicketRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -33,17 +33,17 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 	// grab our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
 	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
+		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
 	evts, err := models.CloseTickets(ctx, rt, oa, request.UserID, tickets, true, request.Force, l)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
+		return nil, 0, errors.Wrap(err, "error closing tickets")
 	}
 
 	rc := rt.RP.Get()
@@ -52,7 +52,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 	for t, e := range evts {
 		err = handler.QueueTicketEvent(rc, t.ContactID(), e)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queueing ticket event for ticket %d", t.ID())
+			return nil, 0, errors.Wrapf(err, "error queueing ticket event for ticket %d", t.ID())
 		}
 	}
 

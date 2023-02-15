@@ -16,7 +16,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -24,9 +23,9 @@ import (
 func init() {
 	base := "/mr/tickets/types/zendesk"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterRoute(http.MethodPost, base+"/channelback", web.JSONRequestResponse(handleChannelback))
+	web.RegisterRoute(http.MethodPost, base+"/event_callback", web.JSONRequestResponse(web.WithHTTPLogs(handleEventCallback)))
+	web.RegisterRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.JSONRequestResponse(web.WithHTTPLogs(handleTicketerTarget)))
 }
 
 type integrationMetadata struct {
@@ -48,7 +47,7 @@ type channelbackResponse struct {
 	AllowChannelback bool   `json:"allow_channelback"`
 }
 
-func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &channelbackRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
@@ -131,7 +130,7 @@ type eventCallbackRequest struct {
 	Events []*channelEvent `json:"events" validate:"required"`
 }
 
-func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	request := &eventCallbackRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return err, http.StatusBadRequest, nil
@@ -252,7 +251,7 @@ type targetRequest struct {
 	Status string `json:"status"`
 }
 
-func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up our ticketer
