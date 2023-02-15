@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/change_topic", web.RequireAuthToken(handleChangeTopic))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/change_topic", web.RequireAuthToken(web.JSONRequestResponse(handleChangeTopic)))
 }
 
 type changeTopicRequest struct {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/ivr"
@@ -176,10 +175,7 @@ type IVRRequest struct {
 
 // writeGenericErrorResponse is just a small utility method to write out a simple JSON error when we don't have a client yet
 func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
-	_, err = w.Write(jsonx.MustMarshal(map[string]string{"error": err.Error()}))
-	return err
+	return web.WriteMarshalled(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 }
 
 func buildResumeURL(cfg *runtime.Config, channel *models.Channel, call *models.Call, urn urns.URN) string {

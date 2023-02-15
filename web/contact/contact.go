@@ -16,10 +16,10 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(handleInterrupt))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(web.JSONRequestResponse(handleCreate)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(web.JSONRequestResponse(handleModify)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(web.JSONRequestResponse(handleResolve)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(web.JSONRequestResponse(handleInterrupt)))
 }
 
 // Request to create a new contact.

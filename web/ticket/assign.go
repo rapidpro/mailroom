@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(handleAssign))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(web.JSONRequestResponse(handleAssign)))
 }
 
 type assignRequest struct {

@@ -7,12 +7,11 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.WithHTTPLogs(handleReopen)))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.JSONRequestResponse(web.WithHTTPLogs(handleReopen))))
 }
 
 // Reopens any closed tickets with the given ids

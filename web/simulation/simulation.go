@@ -25,8 +25,8 @@ var testChannel = assets.NewChannelReference("440099cf-200c-4d45-a8e7-4a564f4a0e
 var testURN = urns.URN("tel:+12065551212")
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
+	web.RegisterRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(web.JSONRequestResponse(handleStart)))
+	web.RegisterRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(web.JSONRequestResponse(handleResume)))
 }
 
 type flowDefinition struct {

@@ -15,8 +15,8 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/msg/send", web.RequireAuthToken(handleSend))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/msg/resend", web.RequireAuthToken(handleResend))
+	web.RegisterRoute(http.MethodPost, "/mr/msg/send", web.RequireAuthToken(web.JSONRequestResponse(handleSend)))
+	web.RegisterRoute(http.MethodPost, "/mr/msg/resend", web.RequireAuthToken(web.JSONRequestResponse(handleResend)))
 }
 
 // Request to send a message.

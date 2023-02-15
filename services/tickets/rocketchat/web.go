@@ -20,7 +20,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/rocketchat"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleEventCallback))
+	web.RegisterRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}", web.JSONRequestResponse(web.WithHTTPLogs(handleEventCallback)))
 }
 
 type eventCallbackRequest struct {

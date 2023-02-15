@@ -16,12 +16,11 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(handleSubmit))
+	web.RegisterRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(web.JSONRequestResponse(handleSubmit)))
 }
 
 // Represents a surveyor submission

@@ -16,7 +16,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -24,9 +23,9 @@ import (
 func init() {
 	base := "/mr/tickets/types/zendesk"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterRoute(http.MethodPost, base+"/channelback", web.JSONRequestResponse(handleChannelback))
+	web.RegisterRoute(http.MethodPost, base+"/event_callback", web.JSONRequestResponse(web.WithHTTPLogs(handleEventCallback)))
+	web.RegisterRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.JSONRequestResponse(web.WithHTTPLogs(handleTicketerTarget)))
 }
 
 type integrationMetadata struct {

@@ -19,8 +19,8 @@ import (
 var excludeProperties = []string{"arguments"}
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/po/export", handleExport)
-	web.RegisterJSONRoute(http.MethodPost, "/mr/po/import", handleImport)
+	web.RegisterRoute(http.MethodPost, "/mr/po/export", web.RequireAuthToken(handleExport))
+	web.RegisterRoute(http.MethodPost, "/mr/po/import", web.RequireAuthToken(web.JSONRequestResponse(handleImport)))
 }
 
 // Exports a PO file from the given set of flows.
