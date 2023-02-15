@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.MarshaledResponse(handleSearch)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.JSONPayload(handleSearch)))
 	web.RegisterRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(web.JSONPayload(handleParseQuery)))
 }
 
@@ -61,31 +61,21 @@ type SearchResponse struct {
 }
 
 // handles a contact search request
-func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &searchRequest{
-		Offset:   0,
-		PageSize: 50,
-		Sort:     "-id",
-	}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
+func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, r.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	var group *models.Group
-	if request.GroupID != 0 {
-		group = oa.GroupByID(request.GroupID)
-	} else if request.GroupUUID != "" {
-		group = oa.GroupByUUID(request.GroupUUID)
+	if r.GroupID != 0 {
+		group = oa.GroupByID(r.GroupID)
+	} else if r.GroupUUID != "" {
+		group = oa.GroupByUUID(r.GroupUUID)
 	}
 
 	// perform our search
-	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
+	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -109,8 +99,8 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 		Query:      normalized,
 		ContactIDs: hits,
 		Total:      total,
-		Offset:     request.Offset,
-		Sort:       request.Sort,
+		Offset:     r.Offset,
+		Sort:       r.Sort,
 		Metadata:   metadata,
 	}
 

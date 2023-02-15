@@ -1,3 +1,7 @@
+v8.1.21 (2023-02-15)
+-------------------------
+ * Cleanup server and http wrappers
+
 v8.1.20 (2023-02-15)
 -------------------------
  * Add endpoint to send a single message
