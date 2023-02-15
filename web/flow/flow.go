@@ -35,7 +35,7 @@ type migrateRequest struct {
 	ToVersion *semver.Version `json:"to_version"`
 }
 
-func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &migrateRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -69,7 +69,7 @@ type inspectRequest struct {
 	OrgID models.OrgID    `json:"org_id"`
 }
 
-func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &inspectRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -107,7 +107,7 @@ type cloneRequest struct {
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
 }
 
-func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &cloneRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -139,7 +139,7 @@ type changeLanguageRequest struct {
 	Flow     json.RawMessage `json:"flow"     validate:"required"`
 }
 
-func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &changeLanguageRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil

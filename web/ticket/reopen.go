@@ -21,26 +21,26 @@ func init() {
 //	  "user_id": 234,
 //	  "ticket_ids": [1234, 2345]
 //	}
-func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	request := &bulkTicketRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
 	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
+		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
 	evts, err := models.ReopenTickets(ctx, rt, oa, request.UserID, tickets, true, l)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
+		return nil, 0, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}
 
 	return newBulkResponse(evts), http.StatusOK, nil

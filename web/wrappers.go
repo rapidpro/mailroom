@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error)
+type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
 
 func JSONRequestResponse(handler JSONHandler) Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
@@ -101,11 +101,11 @@ func RequireAuthToken(handler Handler) Handler {
 }
 
 // LoggingJSONHandler is a JSON web handler which logs HTTP logs
-type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
+type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error)
 
 // WithHTTPLogs wraps a handler to create a handler which can record and save HTTP logs
 func WithHTTPLogs(handler LoggingJSONHandler) JSONHandler {
-	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 		logger := &models.HTTPLogger{}
 
 		response, status, err := handler(ctx, rt, r, logger)

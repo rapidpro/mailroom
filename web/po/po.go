@@ -73,7 +73,7 @@ type importForm struct {
 	Language envs.Language   `form:"language" validate:"required"`
 }
 
-func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	form := &importForm{}
 	if err := web.DecodeAndValidateForm(form, r); err != nil {
 		return err, http.StatusBadRequest, nil

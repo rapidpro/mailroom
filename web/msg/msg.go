@@ -37,7 +37,7 @@ type sendRequest struct {
 }
 
 // handles a request to resend the given messages
-func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &sendRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
@@ -105,7 +105,7 @@ type resendRequest struct {
 }
 
 // handles a request to resend the given messages
-func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &resendRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
@@ -114,17 +114,17 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// grab our org
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "unable to load org assets")
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
 	msgs, err := models.GetMessagesByID(ctx, rt.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading messages to resend")
+		return nil, 0, errors.Wrap(err, "error loading messages to resend")
 	}
 
 	resends, err := models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error resending messages")
+		return nil, 0, errors.Wrap(err, "error resending messages")
 	}
 
 	msgio.SendMessages(ctx, rt, rt.DB, nil, resends)
@@ -134,5 +134,5 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	for i, m := range resends {
 		resentMsgIDs[i] = m.ID()
 	}
-	return map[string]interface{}{"msg_ids": resentMsgIDs}, http.StatusOK, nil
+	return map[string]any{"msg_ids": resentMsgIDs}, http.StatusOK, nil
 }

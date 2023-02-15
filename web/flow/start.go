@@ -70,7 +70,7 @@ type previewStartResponse struct {
 	Metadata  *contactql.Inspection `json:"metadata,omitempty"`
 }
 
-func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &previewStartRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -78,12 +78,12 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	flow, err := oa.FlowByID(request.FlowID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load flow")
+		return nil, 0, errors.Wrapf(err, "unable to load flow")
 	}
 
 	groups := make([]*models.Group, 0, len(request.Include.GroupUUIDs))
@@ -100,7 +100,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		if isQueryError {
 			return qerr, http.StatusBadRequest, nil
 		}
-		return nil, http.StatusInternalServerError, err
+		return nil, 0, err
 	}
 	if query == "" {
 		return &previewStartResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
@@ -108,7 +108,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 
 	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error querying preview")
+		return nil, 0, errors.Wrap(err, "error querying preview")
 	}
 
 	inspection := contactql.Inspect(parsedQuery)

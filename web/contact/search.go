@@ -62,7 +62,7 @@ type SearchResponse struct {
 }
 
 // handles a contact search request
-func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &searchRequest{
 		Offset:   0,
 		PageSize: 50,
@@ -75,7 +75,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// grab our org assets
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	var group *models.Group
@@ -93,7 +93,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		if isQueryError {
 			return qerr, http.StatusBadRequest, nil
 		}
-		return nil, http.StatusInternalServerError, err
+		return nil, 0, err
 	}
 
 	// normalize and inspect the query
@@ -152,7 +152,7 @@ type parseResponse struct {
 }
 
 // handles a query parsing request
-func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &parseRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -161,7 +161,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 	// grab our org assets
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	var group *models.Group
@@ -183,7 +183,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 		if isQueryError {
 			return qerr, http.StatusBadRequest, nil
 		}
-		return nil, http.StatusInternalServerError, err
+		return nil, 0, err
 	}
 
 	// normalize and inspect the query
@@ -195,7 +195,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 		eq := search.BuildElasticQuery(oa, group, models.NilContactStatus, nil, parsed)
 		elasticSource, err = eq.Source()
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error getting elastic source")
+			return nil, 0, errors.Wrap(err, "error getting elastic source")
 		}
 	}
 

@@ -48,28 +48,28 @@ type submitResponse struct {
 }
 
 // handles a surveyor request
-func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &submitRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+		return nil, 0, errors.Wrapf(err, "request failed validation")
 	}
 
 	// grab our org assets
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
 	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// and our user id
 	_, valid := ctx.Value(web.UserIDKey).(int64)
 	if !valid {
-		return nil, http.StatusInternalServerError, errors.Errorf("missing request user")
+		return nil, 0, errors.Errorf("missing request user")
 	}
 
 	fs, err := goflow.Engine(rt.Config).ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
+		return nil, 0, errors.Wrapf(err, "error reading session")
 	}
 
 	// and our events
@@ -77,7 +77,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	for _, e := range request.Events {
 		event, err := events.ReadEvent(e)
 		if err != nil {
-			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling event: %s", string(e))
+			return nil, 0, errors.Wrapf(err, "error unmarshalling event: %s", string(e))
 		}
 		sessionEvents = append(sessionEvents, event)
 	}
@@ -85,7 +85,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// and our modifiers
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.IgnoreMissing)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, 0, err
 	}
 
 	// get the current version of this contact from the database
@@ -98,12 +98,12 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 		modelContact, flowContact, _, err = models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, models.NilChannelID)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
+			return nil, 0, errors.Wrapf(err, "unable to look up contact")
 		}
 	} else {
 		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to create contact")
+			return nil, 0, errors.Wrapf(err, "unable to create contact")
 		}
 	}
 
@@ -129,7 +129,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// write our session out
 	tx, err := rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
+		return nil, 0, errors.Wrap(err, "error starting transaction for session write")
 	}
 	sessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, []*models.Contact{modelContact}, nil)
 	if err == nil && len(sessions) == 0 {
@@ -137,27 +137,27 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 	if err != nil {
 		tx.Rollback()
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error writing session")
+		return nil, 0, errors.Wrap(err, "error writing session")
 	}
 	err = tx.Commit()
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing sessions")
+		return nil, 0, errors.Wrap(err, "error committing sessions")
 	}
 
 	tx, err = rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit hooks")
+		return nil, 0, errors.Wrap(err, "error starting transaction for post commit hooks")
 	}
 
 	// write our post commit hooks
 	err = models.ApplyEventPostCommitHooks(ctx, rt, tx, oa, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")
+		return nil, 0, errors.Wrap(err, "error applying post commit hooks")
 	}
 	err = tx.Commit()
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing post commit hooks")
+		return nil, 0, errors.Wrap(err, "error committing post commit hooks")
 	}
 
 	response := &submitResponse{}
