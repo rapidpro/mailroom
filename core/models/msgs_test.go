@@ -661,6 +661,39 @@ func TestNewOutgoingIVR(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
 }
 
+func TestNewMsgOut(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	_, cathy := testdata.Cathy.Load(rt, oa)
+
+	out, ch := models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	assert.Equal(t, "hello", out.Text())
+	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
+	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
+	assert.Equal(t, envs.Locale(`eng-US`), out.Locale())
+	assert.Equal(t, "Twilio", ch.Name())
+
+	cathy.SetStatus(flows.ContactStatusBlocked)
+
+	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
+	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
+	assert.Equal(t, "Twilio", ch.Name())
+	assert.Equal(t, flows.UnsendableReasonContactStatus, out.UnsendableReason())
+
+	cathy.SetStatus(flows.ContactStatusActive)
+	cathy.ClearURNs()
+
+	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	assert.Equal(t, urns.NilURN, out.URN())
+	assert.Nil(t, out.Channel())
+	assert.Nil(t, ch)
+	assert.Equal(t, flows.UnsendableReasonNoDestination, out.UnsendableReason())
+}
+
 func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow) *models.Session {
 	testdata.InsertWaitingSession(rt, org, contact, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
 

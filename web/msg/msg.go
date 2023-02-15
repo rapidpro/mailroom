@@ -78,11 +78,13 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (inte
 		}
 	}
 
+	msgio.SendMessages(ctx, rt, rt.DB, nil, []*models.Msg{msg})
+
 	return map[string]any{
 		"id":          msg.ID(),
 		"channel":     out.Channel(),
 		"contact":     contact.Reference(),
-		"urn":         out.URN(),
+		"urn":         msg.URN(),
 		"text":        msg.Text(),
 		"attachments": msg.Attachments(),
 		"status":      msg.Status(),

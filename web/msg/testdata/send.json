@@ -39,7 +39,7 @@
         }
     },
     {
-        "label": "simple text only message",
+        "label": "text only message",
         "method": "POST",
         "path": "/mr/msg/send",
         "body": {
@@ -62,6 +62,40 @@
             "urn": "tel:+16055741111?id=10000&priority=1000",
             "text": "hello",
             "attachments": [],
+            "status": "Q",
+            "created_on": "2018-07-06T12:30:00.123456789Z"
+        }
+    },
+    {
+        "label": "attachments only message",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_id": 10000,
+            "attachments": [
+                "image/jpeg:https://aws.com/test/test.jpg",
+                "audio/mp3:https://aws.com/test/test.mp3"
+            ]
+        },
+        "status": 200,
+        "response": {
+            "id": 2,
+            "contact": {
+                "name": "Cathy",
+                "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "channel": {
+                "name": "Twilio",
+                "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+            },
+            "urn": "tel:+16055741111?id=10000&priority=1000",
+            "text": "",
+            "attachments": [
+                "image/jpeg:https://aws.com/test/test.jpg",
+                "audio/mp3:https://aws.com/test/test.mp3"
+            ],
             "status": "Q",
             "created_on": "2018-07-06T12:30:00.123456789Z"
         }
