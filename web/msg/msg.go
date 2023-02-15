@@ -46,35 +46,35 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (inte
 	// grab our org
 	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "unable to load org assets")
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
 	// load the contact and generate as a flow contact
 	c, err := models.LoadContact(ctx, rt.DB, oa, request.ContactID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading contact")
+		return nil, 0, errors.Wrap(err, "error loading contact")
 	}
 
 	contact, err := c.FlowContact(oa)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error creating flow contact")
+		return nil, 0, errors.Wrap(err, "error creating flow contact")
 	}
 
 	out, ch := models.NewMsgOut(oa, contact, request.Text, request.Attachments, nil, contact.Locale(oa.Env()))
 	msg, err := models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, out, dates.Now())
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error creating outgoing message")
+		return nil, 0, errors.Wrap(err, "error creating outgoing message")
 	}
 
 	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error inserting outgoing message")
+		return nil, 0, errors.Wrap(err, "error inserting outgoing message")
 	}
 
 	// if message was a ticket reply, update the ticket
 	if request.TicketID != models.NilTicketID {
 		if err := models.RecordTicketReply(ctx, rt.DB, oa, request.TicketID, request.UserID); err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error recording ticket reply")
+			return nil, 0, errors.Wrap(err, "error recording ticket reply")
 		}
 	}
 
@@ -89,6 +89,7 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (inte
 		"attachments": msg.Attachments(),
 		"status":      msg.Status(),
 		"created_on":  msg.CreatedOn(),
+		"modified_on": msg.ModifiedOn(),
 	}, http.StatusOK, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -123,6 +124,9 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 		tc.actualResponse, err = io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
+		// some timestamps come from db NOW() which we can't mock, so we replace them with $recent_timestamp$
+		tc.actualResponse = overwriteRecentTimestamps(tc.actualResponse)
+
 		if !test.UpdateSnapshots {
 			assert.Equal(t, tc.Status, actual.Status, "%s: unexpected status", tc.Label)
 
@@ -170,6 +174,19 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 		err = os.WriteFile(truthFile, truth, 0644)
 		require.NoError(t, err, "failed to update truth file")
 	}
+}
+
+var isoTimestampRegex = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}Z`)
+
+func overwriteRecentTimestamps(resp []byte) []byte {
+	return isoTimestampRegex.ReplaceAllFunc(resp, func(b []byte) []byte {
+		fmt.Printf("found timestamp %s\n", b)
+		t, _ := time.Parse(time.RFC3339, string(b))
+		if time.Since(t) < time.Second*10 {
+			return []byte(`$recent_timestamp$`)
+		}
+		return b
+	})
 }
 
 // MultiPartPart is a single part in a multipart encoded request

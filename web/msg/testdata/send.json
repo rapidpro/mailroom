@@ -63,7 +63,8 @@
             "text": "hello",
             "attachments": [],
             "status": "Q",
-            "created_on": "2018-07-06T12:30:00.123456789Z"
+            "created_on": "2018-07-06T12:30:00.123456789Z",
+            "modified_on": "$recent_timestamp$"
         }
     },
     {
@@ -97,7 +98,8 @@
                 "audio/mp3:https://aws.com/test/test.mp3"
             ],
             "status": "Q",
-            "created_on": "2018-07-06T12:30:00.123456789Z"
+            "created_on": "2018-07-06T12:30:00.123456789Z",
+            "modified_on": "$recent_timestamp$"
         }
     }
 ]
