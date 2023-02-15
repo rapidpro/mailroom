@@ -1,3 +1,9 @@
+v8.1.20 (2023-02-15)
+-------------------------
+ * Add endpoint to send a single message
+ * Cleanup broadcasts and starts
+ * Update test database
+
 v8.1.19 (2023-02-13)
 -------------------------
  * Stop writing Broadcast.send_all
