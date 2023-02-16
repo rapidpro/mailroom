@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(web.MarshaledResponse(handleAssign)))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(web.JSONPayload(handleAssign)))
 }
 
 type assignRequest struct {
@@ -30,24 +30,18 @@ type assignRequest struct {
 //	  "assignee_id": 567,
 //	  "note": "please look at these"
 //	}
-func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &assignRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handleAssign(ctx context.Context, rt *runtime.Runtime, r *assignRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
+	tickets, err := models.LoadTickets(ctx, rt.DB, r.TicketIDs)
 	if err != nil {
-		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
+		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", r.OrgID)
 	}
 
-	evts, err := models.TicketsAssign(ctx, rt.DB, oa, request.UserID, tickets, request.AssigneeID, request.Note)
+	evts, err := models.TicketsAssign(ctx, rt.DB, oa, r.UserID, tickets, r.AssigneeID, r.Note)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error assigning tickets")
 	}

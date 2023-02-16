@@ -15,8 +15,8 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/msg/send", web.RequireAuthToken(web.MarshaledResponse(handleSend)))
-	web.RegisterRoute(http.MethodPost, "/mr/msg/resend", web.RequireAuthToken(web.MarshaledResponse(handleResend)))
+	web.RegisterRoute(http.MethodPost, "/mr/msg/send", web.RequireAuthToken(web.JSONPayload(handleSend)))
+	web.RegisterRoute(http.MethodPost, "/mr/msg/resend", web.RequireAuthToken(web.JSONPayload(handleResend)))
 }
 
 // Request to send a message.
@@ -37,20 +37,15 @@ type sendRequest struct {
 }
 
 // handles a request to resend the given messages
-func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &sendRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
+func handleSend(ctx context.Context, rt *runtime.Runtime, r *sendRequest) (any, int, error) {
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
 	// load the contact and generate as a flow contact
-	c, err := models.LoadContact(ctx, rt.DB, oa, request.ContactID)
+	c, err := models.LoadContact(ctx, rt.DB, oa, r.ContactID)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error loading contact")
 	}
@@ -60,7 +55,7 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any,
 		return nil, 0, errors.Wrap(err, "error creating flow contact")
 	}
 
-	out, ch := models.NewMsgOut(oa, contact, request.Text, request.Attachments, nil, contact.Locale(oa.Env()))
+	out, ch := models.NewMsgOut(oa, contact, r.Text, r.Attachments, nil, contact.Locale(oa.Env()))
 	msg, err := models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, out, dates.Now())
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error creating outgoing message")
@@ -72,8 +67,8 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any,
 	}
 
 	// if message was a ticket reply, update the ticket
-	if request.TicketID != models.NilTicketID {
-		if err := models.RecordTicketReply(ctx, rt.DB, oa, request.TicketID, request.UserID); err != nil {
+	if r.TicketID != models.NilTicketID {
+		if err := models.RecordTicketReply(ctx, rt.DB, oa, r.TicketID, r.UserID); err != nil {
 			return nil, 0, errors.Wrap(err, "error recording ticket reply")
 		}
 	}
@@ -105,19 +100,14 @@ type resendRequest struct {
 }
 
 // handles a request to resend the given messages
-func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &resendRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
+func handleResend(ctx context.Context, rt *runtime.Runtime, r *resendRequest) (any, int, error) {
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
-	msgs, err := models.GetMessagesByID(ctx, rt.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
+	msgs, err := models.GetMessagesByID(ctx, rt.DB, r.OrgID, models.DirectionOut, r.MsgIDs)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error loading messages to resend")
 	}

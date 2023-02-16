@@ -11,15 +11,14 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(web.MarshaledResponse(handleCreate)))
-	web.RegisterRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(web.MarshaledResponse(handleModify)))
-	web.RegisterRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(web.MarshaledResponse(handleResolve)))
-	web.RegisterRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(web.MarshaledResponse(handleInterrupt)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(web.JSONPayload(handleCreate)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(web.JSONPayload(handleModify)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(web.JSONPayload(handleResolve)))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(web.JSONPayload(handleInterrupt)))
 }
 
 // Request to create a new contact.
@@ -42,30 +41,24 @@ type createRequest struct {
 }
 
 // handles a request to create the given contact
-func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &createRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handleCreate(ctx context.Context, rt *runtime.Runtime, r *createRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
+	c, err := SpecToCreation(r.Contact, oa.Env(), oa.SessionAssets())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
-	_, contact, err := models.CreateContact(ctx, rt.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
+	_, contact, err := models.CreateContact(ctx, rt.DB, oa, r.UserID, c.Name, c.Language, c.URNs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, rt, oa, r.UserID, modifiersByContact)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error modifying new contact")
 	}
@@ -117,26 +110,20 @@ type modifyResult struct {
 }
 
 // handles a request to apply the passed in actions
-func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &modifyRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handleModify(ctx context.Context, rt *runtime.Runtime, r *modifyRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// read the modifiers from the request
-	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
+	mods, err := goflow.ReadModifiers(oa.SessionAssets(), r.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// load our contacts
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, request.ContactIDs)
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, r.ContactIDs)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load contact")
 	}
@@ -152,7 +139,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, r.UserID, modifiersByContact)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -183,19 +170,13 @@ type resolveRequest struct {
 }
 
 // handles a request to resolve a contact
-func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &resolveRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handleResolve(ctx context.Context, rt *runtime.Runtime, r *resolveRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
+	urn := r.URN.Normalize(string(oa.Env().DefaultCountry()))
 
 	// TODO rework normalization to be idempotent because an invalid number like +2621112222 normalizes to
 	// 2621112222 (invalid) and then normalizes to +12621112222 (valid)
@@ -205,7 +186,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (a
 		return errors.Wrap(err, "URN failed validation"), http.StatusBadRequest, nil
 	}
 
-	_, contact, created, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, request.ChannelID)
+	_, contact, created, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, r.ChannelID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "error getting or creating contact")
 	}
@@ -242,13 +223,8 @@ type interruptRequest struct {
 }
 
 // handles a request to interrupt a contact
-func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &interruptRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	count, err := models.InterruptSessionsForContacts(ctx, rt.DB, []models.ContactID{request.ContactID})
+func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *interruptRequest) (any, int, error) {
+	count, err := models.InterruptSessionsForContacts(ctx, rt.DB, []models.ContactID{r.ContactID})
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "unable to interrupt contact")
 	}

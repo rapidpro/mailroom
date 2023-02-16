@@ -59,21 +59,21 @@ func TestContactSearch(t *testing.T) {
 		{
 			method:         "POST",
 			url:            "/mr/contact/search",
-			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
 			expectedStatus: 400,
 			expectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
 		{
 			method:         "POST",
 			url:            "/mr/contact/search",
-			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
 			expectedStatus: 400,
 			expectedError:  "can't convert 'tomorrow' to a number",
 		},
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_id": %d}`, testdata.ActiveGroup.ID),
 			mockResult:           []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.Cathy.ID},
@@ -86,7 +86,7 @@ func TestContactSearch(t *testing.T) {
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, testdata.ActiveGroup.UUID, testdata.Bob.ID, testdata.George.ID),
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_id": %d, "exclude_ids": [%d, %d]}`, testdata.ActiveGroup.ID, testdata.Bob.ID, testdata.George.ID),
 			mockResult:           []models.ContactID{testdata.George.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.George.ID},
@@ -148,7 +148,7 @@ func TestContactSearch(t *testing.T) {
 		{
 			method:             "POST",
 			url:                "/mr/contact/search",
-			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_id": %d}`, testdata.ActiveGroup.ID),
 			mockResult:         []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:     200,
 			expectedHits:       []models.ContactID{testdata.Cathy.ID},
@@ -164,7 +164,7 @@ func TestContactSearch(t *testing.T) {
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_id": %d}`, testdata.ActiveGroup.ID),
 			mockResult:           []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.Cathy.ID},

@@ -11,12 +11,25 @@ import (
 	"github.com/pkg/errors"
 )
 
+type JSONHandler[T any] func(ctx context.Context, rt *runtime.Runtime, request *T) (any, int, error)
+
+func JSONPayload[T any](handler JSONHandler[T]) Handler {
+	return MarshaledResponse(func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
+		payload := new(T)
+
+		if err := ReadAndValidateJSON(r, payload); err != nil {
+			return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
+		}
+
+		return handler(ctx, rt, payload)
+	})
+}
+
 type MarshaledHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
 
+// MarshaledResponse wraps a handler to change the signature so that the return value is marshaled as the response
 func MarshaledResponse(handler MarshaledHandler) Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
-		w.Header().Set("Content-type", "application/json")
-
 		value, status, err := handler(ctx, rt, r)
 		if err != nil {
 			return err
