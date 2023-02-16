@@ -1,3 +1,7 @@
+v8.1.22 (2023-02-16)
+-------------------------
+ * Use generics to remove repeated code in server endpoints
+
 v8.1.21 (2023-02-15)
 -------------------------
  * Cleanup server and http wrappers
