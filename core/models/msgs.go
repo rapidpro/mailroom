@@ -47,10 +47,12 @@ const (
 type MsgType string
 
 const (
+	// need to rework RP side before we can stop using these for incoming messages
 	MsgTypeInbox = MsgType("I")
 	MsgTypeFlow  = MsgType("F")
-	MsgTypeIVR   = MsgType("V")
-	MsgTypeUSSD  = MsgType("U")
+
+	MsgTypeText  = MsgType("T")
+	MsgTypeVoice = MsgType("V")
 )
 
 type MsgStatus string
@@ -150,7 +152,7 @@ func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
 func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
 func (m *Msg) Status() MsgStatus                { return m.m.Status }
 func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
-func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
+func (m *Msg) Type() MsgType                    { return m.m.MsgType }
 func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
 func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
 func (m *Msg) FailedReason() MsgFailedReason    { return m.m.FailedReason }
@@ -222,7 +224,7 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, call *Call, in *flows.MsgI
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeIVR
+	m.MsgType = MsgTypeVoice
 	m.ContactID = call.ContactID()
 
 	urnID := call.ContactURNID()
@@ -253,7 +255,7 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	m.Direction = DirectionOut
 	m.Status = MsgStatusWired
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeIVR
+	m.MsgType = MsgTypeVoice
 	m.ContactID = call.ContactID()
 
 	urnID := call.ContactURNID()
@@ -274,59 +276,22 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	return msg
 }
 
-var msgRepetitionsScript = redis.NewScript(3, `
-local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
-local count = 1
-
--- try to look up in window
-local record = redis.call("HGET", key, contact_id)
-if record then
-	local record_count = tonumber(string.sub(record, 1, 2))
-	local record_text = string.sub(record, 4, -1)
-
-	if record_text == text then 
-		count = math.min(record_count + 1, 99)
-	else
-		count = 1
-	end		
-end
-
--- create our new record with our updated count
-record = string.format("%02d:%s", count, text)
-
--- write our new record with updated count and set expiration
-redis.call("HSET", key, contact_id, record)
-redis.call("EXPIRE", key, 300)
-
-return count
-`)
-
-// GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
-func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut) (int, error) {
-	rc := rp.Get()
-	defer rc.Close()
-
-	keyTime := dates.Now().UTC().Round(time.Minute * 5)
-	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
-	return redis.Int(msgRepetitionsScript.Do(rc, key, contact.ID(), msg.Text()))
-}
-
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID)
+	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
 }
 
 // NewOutgoingChatMsg creates an outgoing message from chat
 func NewOutgoingChatMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
@@ -340,7 +305,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeFlow
+	m.MsgType = MsgTypeText
 	m.MsgCount = 1
 	m.CreatedOn = createdOn
 	m.Metadata = null.Map(buildMsgMetadata(out))
@@ -412,8 +377,8 @@ func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
 	return metadata
 }
 
-// NewIncomingMsg creates a new incoming message for the passed in text and attachment
-func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
+// NewIncomingSurveyorMsg creates a new incoming message for the passed in text and attachment
+func NewIncomingSurveyorMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 
 	msg.SetChannel(channel)
@@ -436,6 +401,43 @@ func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactI
 	}
 
 	return msg
+}
+
+var msgRepetitionsScript = redis.NewScript(3, `
+local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
+local count = 1
+
+-- try to look up in window
+local record = redis.call("HGET", key, contact_id)
+if record then
+	local record_count = tonumber(string.sub(record, 1, 2))
+	local record_text = string.sub(record, 4, -1)
+
+	if record_text == text then 
+		count = math.min(record_count + 1, 99)
+	else
+		count = 1
+	end		
+end
+
+-- create our new record with our updated count
+record = string.format("%02d:%s", count, text)
+
+-- write our new record with updated count and set expiration
+redis.call("HSET", key, contact_id, record)
+redis.call("EXPIRE", key, 300)
+
+return count
+`)
+
+// GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
+func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut) (int, error) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	keyTime := dates.Now().UTC().Round(time.Minute * 5)
+	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
+	return redis.Int(msgRepetitionsScript.Do(rc, key, contact.ID(), msg.Text()))
 }
 
 var loadMessagesSQL = `

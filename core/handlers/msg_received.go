@@ -30,7 +30,7 @@ func handleMsgReceived(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa
 			"urn":          event.Msg.URN(),
 		}).Debug("msg received event")
 
-		msg := models.NewIncomingMsg(rt.Config, oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
+		msg := models.NewIncomingSurveyorMsg(rt.Config, oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
 
 		// we'll commit this message with all the others
 		scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
