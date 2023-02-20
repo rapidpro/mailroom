@@ -87,7 +87,7 @@ func TestBatchStart(t *testing.T) {
 
 		assertdb.Query(t, rt.DB,
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
-			AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'F' AND channel_id = $3`,
+			AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T' AND channel_id = $3`,
 			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
 			Returns(tc.TotalCount, "%d: unexpected number of messages", i)
 

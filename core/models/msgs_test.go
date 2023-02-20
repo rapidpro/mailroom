@@ -186,6 +186,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, oa.OrgID(), msg.OrgID())
 		assert.Equal(t, tc.Text, msg.Text())
+		assert.Equal(t, models.MsgTypeText, msg.Type())
 		assert.Equal(t, expectedAttachments, msg.Attachments())
 		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
@@ -649,6 +650,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	dbMsg := models.NewOutgoingIVR(rt.Config, testdata.Org1.ID, conn, flowMsg, createdOn)
 
 	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())
+	assert.Equal(t, models.MsgTypeVoice, dbMsg.Type())
 	assert.Equal(t, "Hello", dbMsg.Text())
 	assert.Equal(t, []utils.Attachment{"audio:http://example.com/hi.mp3"}, dbMsg.Attachments())
 	assert.Equal(t, envs.Locale("eng-US"), dbMsg.Locale())
