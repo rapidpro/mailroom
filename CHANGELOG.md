@@ -1,3 +1,7 @@
+v8.1.23 (2023-02-20)
+-------------------------
+ * Use msg_type = T|V for outgoing messages
+
 v8.1.22 (2023-02-16)
 -------------------------
  * Use generics to remove repeated code in server endpoints
