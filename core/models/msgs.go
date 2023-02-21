@@ -58,14 +58,15 @@ const (
 type MsgStatus string
 
 const (
-	MsgStatusPending   = MsgStatus("P") // incoming msg created but not yet handled, or outgoing message that failed to queue
-	MsgStatusHandled   = MsgStatus("H") // incoming msg handled
-	MsgStatusQueued    = MsgStatus("Q") // outgoing msg created and queued to courier
-	MsgStatusWired     = MsgStatus("W") // outgoing msg requested to be sent via channel
-	MsgStatusSent      = MsgStatus("S") // outgoing msg having received sent confirmation from channel
-	MsgStatusDelivered = MsgStatus("D") // outgoing msg having received delivery confirmation from channel
-	MsgStatusErrored   = MsgStatus("E") // outgoing msg which has errored and will be retried
-	MsgStatusFailed    = MsgStatus("F") // outgoing msg which has failed permanently
+	MsgStatusPending      = MsgStatus("P") // incoming msg created but not yet handled
+	MsgStatusHandled      = MsgStatus("H") // incoming msg handled
+	MsgStatusInitializing = MsgStatus("I") // outgoing message that failed to queue
+	MsgStatusQueued       = MsgStatus("Q") // outgoing msg created and queued to courier
+	MsgStatusWired        = MsgStatus("W") // outgoing msg requested to be sent via channel
+	MsgStatusSent         = MsgStatus("S") // outgoing msg having received sent confirmation from channel
+	MsgStatusDelivered    = MsgStatus("D") // outgoing msg having received delivery confirmation from channel
+	MsgStatusErrored      = MsgStatus("E") // outgoing msg which has errored and will be retried
+	MsgStatusFailed       = MsgStatus("F") // outgoing msg which has failed permanently
 )
 
 type MsgFailedReason null.String
@@ -511,7 +512,7 @@ INNER JOIN
 INNER JOIN 
 	channels_channel c ON c.id = m.channel_id
 WHERE
-	m.direction = 'O' AND m.status IN ('P', 'E') AND m.next_attempt <= NOW() AND c.is_active = TRUE
+	m.direction = 'O' AND m.status IN ('I', 'E') AND m.next_attempt <= NOW() AND c.is_active = TRUE
 ORDER BY
     m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
@@ -636,11 +637,11 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatu
 	return nil
 }
 
-// MarkMessagesForRequeuing marks the passed in messages as pending(P) with a next attempt value
+// MarkMessagesForRequeuing marks the passed in messages as initializing(I) with a next attempt value
 // so that the retry messages task will pick them up.
 func MarkMessagesForRequeuing(ctx context.Context, db Queryer, msgs []*Msg) error {
 	nextAttempt := time.Now().Add(10 * time.Minute)
-	return updateMessageStatus(ctx, db, msgs, MsgStatusPending, &nextAttempt)
+	return updateMessageStatus(ctx, db, msgs, MsgStatusInitializing, &nextAttempt)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued(Q)
