@@ -70,8 +70,8 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 		SyncAndroidChannels(fc, androidChannels)
 	}
 
-	// any messages that didn't get sent should be moved back to pending (they are queued at creation to save an
-	// update in the common case)
+	// any messages that didn't get sent should be moved back to initializing(I) (they are queued(Q) at creation to
+	// save an update in the common case)
 	if len(pending) > 0 {
 		err := models.MarkMessagesForRequeuing(ctx, tx, pending)
 		if err != nil {

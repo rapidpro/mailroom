@@ -670,7 +670,7 @@ func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status Ms
 const sqlUpdateMsgForResending = `
 UPDATE msgs_msg m
    SET channel_id = r.channel_id::int,
-       status = 'P',
+       status = 'Q',
        error_count = 0,
        failed_reason = NULL,
        queued_on = r.queued_on::timestamp with time zone,

@@ -490,7 +490,7 @@ func TestResendMessages(t *testing.T) {
 	assert.True(t, resent[2].IsResend())
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[2].ChannelID()) // channel added
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'Q' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)
 
 	assertdb.Query(t, rt.DB, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out4.ID()).Columns(map[string]any{"status": "F", "failed_reason": "D"})
 	assertdb.Query(t, rt.DB, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out5.ID()).Columns(map[string]any{"status": "F", "failed_reason": "D"})
