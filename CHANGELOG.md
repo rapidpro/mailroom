@@ -1,3 +1,7 @@
+v8.1.25 (2023-02-22)
+-------------------------
+ * Support Msg.status = I for outgoing messages that should be retried
+
 v8.1.24 (2023-02-22)
 -------------------------
  * Update to latest goflow
