@@ -1,3 +1,7 @@
+v8.1.24 (2023-02-22)
+-------------------------
+ * Update to latest goflow
+
 v8.1.23 (2023-02-20)
 -------------------------
  * Use msg_type = T|V for outgoing messages
