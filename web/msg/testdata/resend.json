@@ -45,7 +45,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM msgs_msg WHERE status = 'P'",
+                "query": "SELECT count(*) FROM msgs_msg WHERE status = 'Q'",
                 "count": 2
             }
         ]

@@ -67,14 +67,14 @@ func TestSendMessages(t *testing.T) {
 		Msgs            []msgSpec
 		QueueSizes      map[string][]int
 		FCMTokensSynced []string
-		PendingMsgs     int
+		UnqueuedMsgs    int
 	}{
 		{
 			Description:     "no messages",
 			Msgs:            []msgSpec{},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "2 messages for Courier, and 1 Android",
@@ -102,7 +102,7 @@ func TestSendMessages(t *testing.T) {
 				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // 1 high priority message for Bob
 			},
 			FCMTokensSynced: []string{"FCMID1"},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "each Android channel synced once",
@@ -122,7 +122,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{"FCMID1", "FCMID2"},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "messages with FAILED status ignored",
@@ -135,7 +135,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "messages without channels set to PENDING",
@@ -147,7 +147,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     1,
+			UnqueuedMsgs:    1,
 		},
 	}
 
@@ -172,6 +172,6 @@ func TestSendMessages(t *testing.T) {
 
 		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
-		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'I'`).Returns(tc.UnqueuedMsgs, `initializing messages mismatch in '%s'`, tc.Description)
 	}
 }
