@@ -23,6 +23,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// maximum number of repeated messages to same contact allowed in 5 minute window
+const msgRepetitionLimit = 20
+
 // MsgID is our internal type for msg ids, which can be null/0
 type MsgID int64
 
@@ -334,7 +337,7 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 		if err != nil {
 			return nil, errors.Wrap(err, "error looking up msg repetitions")
 		}
-		if repetitions >= 20 {
+		if repetitions >= msgRepetitionLimit {
 			m.Status = MsgStatusFailed
 			m.FailedReason = MsgFailedLooping
 
@@ -406,26 +409,18 @@ func NewIncomingSurveyorMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, 
 
 var msgRepetitionsScript = redis.NewScript(3, `
 local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
+
+local msg_key = string.format("%d|%s", contact_id, string.lower(string.sub(text, 1, 128)))
 local count = 1
 
 -- try to look up in window
-local record = redis.call("HGET", key, contact_id)
+local record = redis.call("HGET", key, msg_key)
 if record then
-	local record_count = tonumber(string.sub(record, 1, 2))
-	local record_text = string.sub(record, 4, -1)
-
-	if record_text == text then 
-		count = math.min(record_count + 1, 99)
-	else
-		count = 1
-	end		
+	count = tonumber(record) + 1
 end
 
--- create our new record with our updated count
-record = string.format("%02d:%s", count, text)
-
--- write our new record with updated count and set expiration
-redis.call("HSET", key, contact_id, record)
+-- write updated count and set expiration
+redis.call("HSET", key, msg_key, count)
 redis.call("EXPIRE", key, 300)
 
 return count
