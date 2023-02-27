@@ -1,3 +1,8 @@
+v8.1.26 (2023-02-27)
+-------------------------
+ * Update goflow
+ * Improve detection of repeated outgoing messages
+
 v8.1.25 (2023-02-22)
 -------------------------
  * Support Msg.status = I for outgoing messages that should be retried
