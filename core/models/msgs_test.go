@@ -535,36 +535,32 @@ func TestGetMsgRepetitions(t *testing.T) {
 
 	oa := testdata.Org1.Load(rt)
 	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, george := testdata.George.Load(rt, oa)
 
 	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "FOO", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg3 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg4 := flows.NewMsgOut(testdata.George.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 
-	assertRepetitions := func(m *flows.MsgOut, expected int) {
-		count, err := models.GetMsgRepetitions(rt.RP, cathy, m)
+	assertRepetitions := func(contact *flows.Contact, m *flows.MsgOut, expected int) {
+		count, err := models.GetMsgRepetitions(rt.RP, contact, m)
 		require.NoError(t, err)
 		assert.Equal(t, expected, count)
 	}
 
-	// keep counts up to 99
-	for i := 0; i < 99; i++ {
-		assertRepetitions(msg1, i+1)
+	for i := 0; i < 20; i++ {
+		assertRepetitions(cathy, msg1, i+1)
 	}
-	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
-
-	for i := 0; i < 50; i++ {
-		assertRepetitions(msg1, 99)
+	for i := 0; i < 10; i++ {
+		assertRepetitions(cathy, msg2, i+21)
 	}
-	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
-
-	for i := 0; i < 19; i++ {
-		assertRepetitions(msg2, i+1)
+	for i := 0; i < 5; i++ {
+		assertRepetitions(cathy, msg3, i+1)
 	}
-	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
-
-	for i := 0; i < 50; i++ {
-		assertRepetitions(msg2, 20+i)
+	for i := 0; i < 5; i++ {
+		assertRepetitions(george, msg4, i+1)
 	}
-	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
+	assertredis.HGetAll(t, rt.RP, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000|foo": "30", "10000|bar": "5", "10002|foo": "5"})
 }
 
 func TestNormalizeAttachment(t *testing.T) {
