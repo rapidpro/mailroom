@@ -1,0 +1,94 @@
+name: Build Mailroom in SP, India and Ireland (Push Tag)
+
+on:
+  push:
+    tags:
+      - '*.*.*-staging'
+      - '*.*.*'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set variables
+        run: |
+            TAG="$( echo "${GITHUB_REF}" | cut -d'/' -f3 )"
+            if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
+              echo "Found environment: DEVELOP - ${TAG}"
+              echo "ENVIRONMENT=develop" | tee -a "${GITHUB_ENV}"
+              exit 1 # stop action
+            elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
+              echo "Found environment: STAGING - ${TAG}"
+              echo "ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
+            elif grep -qs -e '^.*.*' <<< "${TAG}" ; then
+              echo "No environment found, assuming: PRODUCTION - ${TAG}"
+              echo "ENVIRONMENT=production" | tee -a "${GITHUB_ENV}"
+            else
+              echo 'Not a valid tag. Skipping...'
+              exit 1
+            fi
+            echo "TAG=$TAG" | tee -a "${GITHUB_ENV}"
+            VERSION="${TAG}"
+            echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
+            echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
+            if [[ "${TAG}" == *"-india"* ]]; then
+              echo "IMAGE_TAG=${{ secrets.ECR_INDIA }}/mailroom:${TAG}" | tee -a "${GITHUB_ENV}"
+            elif [[ "${TAG}" == *"-ire"* ]]; then
+              echo "IMAGE_TAG=${{ secrets.ECR_IRE }}/rp-mailroom-rapidpro:${TAG}" | tee -a "${GITHUB_ENV}"
+            else
+              echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-mailroom:${TAG}" | tee -a "${GITHUB_ENV}"
+            fi
+            echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/mailroom" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_REPOSITORY=Ilhasoft/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_APPLICATION=weni-flows/mailroom" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee -a "${GITHUB_ENV}"
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:
+          ref: "${{env.GITHUB_SHA}}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Registry India
+        if: ${{ contains(env.TAG, '-india') }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_INDIA }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_INDIA }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_INDIA }}
+
+      - name: Login to Registry Ireland
+        if: ${{ contains(env.TAG, '-ire') }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_IRE }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_IRE }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_IRE }}
+
+      - name: Login to Registry SP
+        if: ${{ !contains(env.TAG, '-india') && !contains(env.TAG, '-ire') }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_SP }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SP }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SP }}
+
+      - name: Build and push - Mailroom Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          labels: |
+            tag=${{env.TAG}}
+            commit=${{env.COMMIT_SHA}}
+            repository=${{env.IMAGE_SOURCE_URL}}
+          file: docker/Dockerfile
+          push: true
+          tags: "${{env.IMAGE_TAG}}"
+          no-cache: true
+          
+          
