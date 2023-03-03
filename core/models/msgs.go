@@ -601,10 +601,10 @@ const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id)
+		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, created_by_id)
   VALUES(:uuid, :text, :attachments, :quick_replies, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
+		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :created_by_id)
 RETURNING 
 	id AS id, 
 	modified_on AS modified_on,

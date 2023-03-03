@@ -65,7 +65,13 @@
             "status": "Q",
             "created_on": "2018-07-06T12:30:00.123456789Z",
             "modified_on": "$recent_timestamp$"
-        }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND text = 'hello' AND status = 'Q' AND created_by_id = 3",
+                "count": 1
+            }
+        ]
     },
     {
         "label": "attachments only message",
