@@ -1,3 +1,7 @@
+v8.1.27 (2023-03-06)
+-------------------------
+ * Add Msg.created_by and populate for chat and broadcast messages
+
 v8.1.26 (2023-02-27)
 -------------------------
  * Update goflow
