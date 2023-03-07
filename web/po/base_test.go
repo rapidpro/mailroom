@@ -1,4 +1,4 @@
-package flow_test
+package po_test
 
 import (
 	"testing"
