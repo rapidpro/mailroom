@@ -9,15 +9,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/buger/jsonparser"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
-
-	"github.com/buger/jsonparser"
-	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/stretchr/testify/assert"
 )
 
