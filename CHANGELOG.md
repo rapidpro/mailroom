@@ -1,3 +1,8 @@
+v8.1.28 (2023-03-08)
+-------------------------
+ * Remove msg_type values INBOX and FLOW
+ * Re-organize web endpoints so each endpoint is in its own file
+
 v8.1.27 (2023-03-06)
 -------------------------
  * Add Msg.created_by and populate for chat and broadcast messages
