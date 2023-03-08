@@ -296,7 +296,7 @@ func TestMsgEvents(t *testing.T) {
 		models.FlushCache()
 
 		// reset our dummy db message into an unhandled state
-		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', msg_type = NULL WHERE id = $1`, dbMsg.ID())
+		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID())
 
 		// run our setup hook if we have one
 		if tc.preHook != nil {

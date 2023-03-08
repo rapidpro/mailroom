@@ -39,8 +39,8 @@ func TestRetryMsgs(t *testing.T) {
 
 	for _, msg := range testMsgs {
 		rt.DB.MustExec(
-			`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
-						   VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
+			`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, msg_type, status, created_on, visibility, msg_count, error_count, next_attempt) 
+						   VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        'T',      $8,     $9,         'V',        1,         0,           NOW())`,
 			uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
