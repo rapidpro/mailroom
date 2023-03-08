@@ -50,10 +50,6 @@ const (
 type MsgType string
 
 const (
-	// need to rework RP side before we can stop using these for incoming messages
-	MsgTypeInbox = MsgType("I")
-	MsgTypeFlow  = MsgType("F")
-
 	MsgTypeText  = MsgType("T")
 	MsgTypeVoice = MsgType("V")
 )
@@ -396,7 +392,7 @@ func NewIncomingSurveyorMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, 
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeFlow
+	m.MsgType = MsgTypeText
 	m.ContactID = contactID
 	m.OrgID = orgID
 	m.CreatedOn = createdOn
@@ -612,7 +608,8 @@ RETURNING
 `
 
 // UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
+func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
+	// TODO remove msg_type=T once courier is creating messages like that
 	_, err := tx.ExecContext(ctx,
 		`UPDATE 
 			msgs_msg 
@@ -625,7 +622,7 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatu
 			log_uuids = array_cat(log_uuids, $7)
 		WHERE
 			id = $1`,
-		msgID, status, visibility, msgType, flow, pq.Array(attachments), pq.Array(logUUIDs))
+		msgID, status, visibility, MsgTypeText, flow, pq.Array(attachments), pq.Array(logUUIDs))
 
 	if err != nil {
 		return errors.Wrapf(err, "error updating msg: %d", msgID)
