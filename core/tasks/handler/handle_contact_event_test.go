@@ -68,7 +68,6 @@ func TestMsgEvents(t *testing.T) {
 		contact       *testdata.Contact
 		text          string
 		expectedReply string
-		expectedType  models.MsgType
 		expectedFlow  *testdata.Flow
 	}{
 		// 0:
@@ -78,7 +77,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "noop",
 			expectedReply: "",
-			expectedType:  models.MsgTypeInbox,
 		},
 
 		// 1:
@@ -88,7 +86,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "start other",
 			expectedReply: "",
-			expectedType:  models.MsgTypeInbox,
 		},
 
 		// 2:
@@ -98,7 +95,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -109,7 +105,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "purple",
 			expectedReply: "I don't know that color. Try again.",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -120,7 +115,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "blue",
 			expectedReply: "Good choice, I like Blue too! What is your favorite beer?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -131,7 +125,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "MUTZIG",
 			expectedReply: "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -142,7 +135,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "Cathy",
 			expectedReply: "Thanks Cathy, we are all done!",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -153,7 +145,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Cathy,
 			text:          "noop",
 			expectedReply: "",
-			expectedType:  models.MsgTypeInbox,
 		},
 
 		// 8:
@@ -163,7 +154,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "other",
 			expectedReply: "Hey, how are you?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
 
@@ -174,7 +164,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 
@@ -185,7 +174,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "green",
 			expectedReply: "Good choice, I like Green too! What is your favorite beer?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 
@@ -196,7 +184,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "primus",
 			expectedReply: "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 
@@ -207,7 +194,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "george",
 			expectedReply: "Thanks george, we are all done!",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 
@@ -218,7 +204,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "blargh",
 			expectedReply: "Hey, how are you?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
 
@@ -229,7 +214,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Bob,
 			text:          "ivr",
 			expectedReply: "",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.IVRFlow,
 		},
 
@@ -243,7 +227,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.George,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -254,7 +237,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Alexandria,
 			text:          "start",
 			expectedReply: "",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Favorites,
 		},
 
@@ -265,7 +247,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 
@@ -279,7 +260,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "red",
 			expectedReply: "Hey, how are you?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
 
@@ -293,7 +273,6 @@ func TestMsgEvents(t *testing.T) {
 			contact:       testdata.Org2Contact,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
 	}
@@ -335,19 +314,19 @@ func TestMsgEvents(t *testing.T) {
 		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
-		var expectedFlowID interface{}
+		var expectedFlowID any
 		if tc.expectedFlow != nil {
 			expectedFlowID = int64(tc.expectedFlow.ID)
 		}
 
-		// check that message is marked as handled with expected type
+		// check that message is marked as handled
 		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
-			Columns(map[string]interface{}{"status": "H", "msg_type": string(tc.expectedType), "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
+			Columns(map[string]any{"status": "H", "msg_type": "T", "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
 		if tc.expectedReply != "" {
 			assertdb.Query(t, rt.DB, `SELECT text, status FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
-				Columns(map[string]interface{}{"text": tc.expectedReply, "status": "Q"}, "%d: response mismatch", i)
+				Columns(map[string]any{"text": tc.expectedReply, "status": "Q"}, "%d: response mismatch", i)
 		}
 
 		// check any open tickets for this contact where updated

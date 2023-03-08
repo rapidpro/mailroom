@@ -357,7 +357,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// contact has been deleted, or is blocked, or channel no longer exists, ignore this message but mark it as handled
 	if modelContact == nil || modelContact.Status() == models.ContactStatusBlocked || channel == nil {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, attachments, logUUIDs)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.NilFlowID, attachments, logUUIDs)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
@@ -619,14 +619,12 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 
 // utility to mark as message as handled and update any open contact tickets
 func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, attachments []utils.Attachment, tickets []*models.Ticket, logUUIDs []models.ChannelLogUUID) error {
-	msgType := models.MsgTypeInbox
 	flowID := models.NilFlowID
 	if flow != nil {
-		msgType = models.MsgTypeFlow
 		flowID = flow.ID()
 	}
 
-	err := models.UpdateMessage(ctx, db, models.MsgID(msg.ID()), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, attachments, logUUIDs)
+	err := models.UpdateMessage(ctx, db, models.MsgID(msg.ID()), models.MsgStatusHandled, models.VisibilityVisible, flowID, attachments, logUUIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
