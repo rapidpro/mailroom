@@ -206,11 +206,11 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		WHEN 'A' THEN 'answer'
 		WHEN 'U' THEN 'ussd'
 		END 
-		FROM unnest(regexp_split_to_array(c.role,'')) as r)
+		FROM unnest(regexp_split_to_array(c.role,'')) AS r)
 	) as roles,
-	JSONB_EXTRACT_PATH(c.config, 'matching_prefixes') as match_prefixes,
-	JSONB_EXTRACT_PATH(c.config, 'allow_international') as allow_international,
-	JSONB_EXTRACT_PATH(c.config, 'machine_detection') as machine_detection
+	jsonb_extract_path(c.config, 'matching_prefixes') AS match_prefixes,
+	jsonb_extract_path(c.config, 'allow_international') AS allow_international,
+	jsonb_extract_path(c.config, 'machine_detection') AS machine_detection
 FROM 
 	channels_channel c
 WHERE 
