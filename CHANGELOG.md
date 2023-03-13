@@ -1,3 +1,7 @@
+v8.1.29 (2023-03-13)
+-------------------------
+ * Don't set msg_type when handling messages as courier is already setting it
+
 v8.1.28 (2023-03-08)
 -------------------------
  * Remove msg_type values INBOX and FLOW
