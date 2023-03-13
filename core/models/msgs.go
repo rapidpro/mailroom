@@ -590,10 +590,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 		is[i] = &msgs[i].m
 	}
 
-	return BulkQuery(ctx, "insert messages", tx, insertMsgSQL, is)
+	return BulkQuery(ctx, "insert messages", tx, sqlInsertMsgSQL, is)
 }
 
-const insertMsgSQL = `
+const sqlInsertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
@@ -607,28 +607,13 @@ RETURNING
 	queued_on AS queued_on
 `
 
-// UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
-	// TODO remove msg_type=T once courier is creating messages like that
+// MarkMessageHandled updates a message after handling
+func MarkMessageHandled(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
-		`UPDATE 
-			msgs_msg 
-		SET 
-			status = $2,
-			visibility = $3,
-			msg_type = $4,
-			flow_id = $5,
-			attachments = $6,
-			log_uuids = array_cat(log_uuids, $7)
-		WHERE
-			id = $1`,
-		msgID, status, visibility, MsgTypeText, flow, pq.Array(attachments), pq.Array(logUUIDs))
-
-	if err != nil {
-		return errors.Wrapf(err, "error updating msg: %d", msgID)
-	}
-
-	return nil
+		`UPDATE msgs_msg SET status = $2, visibility = $3, flow_id = $4, attachments = $5, log_uuids = array_cat(log_uuids, $6) WHERE id = $1`,
+		msgID, status, visibility, flow, pq.Array(attachments), pq.Array(logUUIDs),
+	)
+	return errors.Wrapf(err, "error marking msg #%d as handled", msgID)
 }
 
 // MarkMessagesForRequeuing marks the passed in messages as initializing(I) with a next attempt value
