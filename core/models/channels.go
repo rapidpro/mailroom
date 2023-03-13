@@ -153,7 +153,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.name as name,
 	c.channel_type as channel_type,
 	COALESCE(c.tps, 10) as tps,
-	COALESCE(c.config, '{}')::json as config
+	c.config as config
 FROM 
 	channels_channel c
 WHERE 
@@ -197,7 +197,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,
-	COALESCE(c.config, '{}')::json as config,
+	c.config as config,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 
@@ -208,9 +208,9 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		END 
 		FROM unnest(regexp_split_to_array(c.role,'')) as r)
 	) as roles,
-	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
-	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international,
-	JSON_EXTRACT_PATH(c.config::json, 'machine_detection') as machine_detection
+	JSONB_EXTRACT_PATH(c.config, 'matching_prefixes') as match_prefixes,
+	JSONB_EXTRACT_PATH(c.config, 'allow_international') as allow_international,
+	JSONB_EXTRACT_PATH(c.config, 'machine_detection') as machine_detection
 FROM 
 	channels_channel c
 WHERE 

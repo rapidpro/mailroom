@@ -72,7 +72,7 @@ func TestTwilioIVR(t *testing.T) {
 	defer server.Stop()
 
 	// set callback domain and enable machine detection
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090", "machine_detection": true}'::jsonb WHERE id = $1`, testdata.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8090", "machine_detection": true}'::jsonb WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy bob, and george
 	parentSummary := json.RawMessage(`{
@@ -375,7 +375,7 @@ func TestVonageIVR(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// update callback domain and role
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(mockVonageHandler))

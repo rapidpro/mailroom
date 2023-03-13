@@ -3,6 +3,8 @@ package models
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -91,3 +93,27 @@ func ChunkSlice[T any](slice []T, size int) [][]T {
 	}
 	return chunks
 }
+
+// Map is a generic map which is written to the database as JSON. For nullable fields use null.Map.
+type JSONMap map[string]any
+
+// Scan implements the Scanner interface
+func (m *JSONMap) Scan(value any) error {
+	var raw []byte
+	switch typed := value.(type) {
+	case string:
+		raw = []byte(typed)
+	case []byte:
+		raw = typed
+	default:
+		return fmt.Errorf("unable to scan %T as map", value)
+	}
+
+	if err := json.Unmarshal(raw, m); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Value implements the Valuer interface
+func (m JSONMap) Value() (driver.Value, error) { return json.Marshal(m) }
