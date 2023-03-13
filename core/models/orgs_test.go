@@ -30,6 +30,7 @@ func TestOrgs(t *testing.T) {
 
 	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
 	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
+	tx.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdata.Org2.ID)
 
 	org, err := models.LoadOrg(ctx, rt.Config, tx, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -48,6 +49,7 @@ func TestOrgs(t *testing.T) {
 
 	org, err = models.LoadOrg(ctx, rt.Config, tx, testdata.Org2.ID)
 	assert.NoError(t, err)
+	assert.Equal(t, envs.DateFormatMonthDayYear, org.DateFormat())
 	assert.Equal(t, []envs.Language{}, org.AllowedLanguages())
 	assert.Equal(t, envs.NilLanguage, org.DefaultLanguage())
 	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
