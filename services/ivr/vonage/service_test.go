@@ -48,7 +48,7 @@ func TestResponseForSprint(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// update callback domain and roles for channel
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// set our UUID generator
 	uuids.SetGenerator(uuids.NewSeededGenerator(0))
