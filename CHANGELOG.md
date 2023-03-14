@@ -1,3 +1,9 @@
+v8.1.30 (2023-03-14)
+-------------------------
+ * Bump courier http client timeout
+ * Use Org.config and Channel.config as JSONB columns
+ * Fix YYYY-MM-DD date formats
+
 v8.1.29 (2023-03-13)
 -------------------------
  * Don't set msg_type when handling messages as courier is already setting it
