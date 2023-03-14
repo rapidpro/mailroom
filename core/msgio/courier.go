@@ -23,7 +23,7 @@ import (
 )
 
 var courierHttpClient = &http.Client{
-	Timeout: 5 * time.Second,
+	Timeout: 1 * time.Minute, // big so we let courier determine when things timeout
 }
 
 const (
