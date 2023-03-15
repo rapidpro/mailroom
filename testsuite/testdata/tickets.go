@@ -50,16 +50,19 @@ func InsertClosedTicket(rt *runtime.Runtime, org *Org, contact *Contact, tickete
 
 func insertTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, status models.TicketStatus, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {
 	uuid := flows.TicketUUID(uuids.New())
+
+	lastActivityOn := openedOn
 	var closedOn *time.Time
 	if status == models.TicketStatusClosed {
 		t := dates.Now()
+		lastActivityOn = t
 		closedOn = &t
 	}
 
 	var id models.TicketID
 	must(rt.DB.Get(&id,
 		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, topic_id, body, external_id, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, NOW(), $11) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, topic.ID, body, externalID, openedOn, closedOn, assignee.SafeID(),
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11, $12) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, topic.ID, body, externalID, openedOn, closedOn, lastActivityOn, assignee.SafeID(),
 	))
 	return &Ticket{id, uuid}
 }

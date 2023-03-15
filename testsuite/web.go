@@ -180,7 +180,6 @@ var isoTimestampRegex = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\
 
 func overwriteRecentTimestamps(resp []byte) []byte {
 	return isoTimestampRegex.ReplaceAllFunc(resp, func(b []byte) []byte {
-		fmt.Printf("found timestamp %s\n", b)
 		t, _ := time.Parse(time.RFC3339, string(b))
 		if time.Since(t) < time.Second*10 {
 			return []byte(`$recent_timestamp$`)

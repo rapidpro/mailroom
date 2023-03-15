@@ -902,3 +902,34 @@ func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDa
 func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
 	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, duration)
 }
+
+func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID TicketID, userID UserID) error {
+	firstReplyTime, err := TicketRecordReplied(ctx, db, ticketID, dates.Now())
+	if err != nil {
+		return err
+	}
+
+	// record reply counts for org, user and team
+	replyCounts := map[string]int{scopeOrg(oa): 1}
+
+	if userID != NilUserID {
+		user := oa.UserByID(userID)
+		if user != nil {
+			replyCounts[scopeUser(oa, user)] = 1
+			if user.Team() != nil {
+				replyCounts[scopeTeam(user.Team())] = 1
+			}
+		}
+	}
+
+	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
+		return err
+	}
+
+	if firstReplyTime >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
+			return err
+		}
+	}
+	return nil
+}

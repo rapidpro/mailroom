@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
@@ -43,12 +42,11 @@ type Broadcast struct {
 	Query         null.String                 `json:"query,omitempty"         db:"query"`
 	CreatedByID   UserID                      `json:"created_by_id,omitempty" db:"created_by_id"`
 	ParentID      BroadcastID                 `json:"parent_id,omitempty"     db:"parent_id"`
-	TicketID      TicketID                    `json:"ticket_id,omitempty"     db:"ticket_id"`
 }
 
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(orgID OrgID, translations flows.BroadcastTranslations,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, query string, ticketID TicketID, createdByID UserID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, query string, createdByID UserID) *Broadcast {
 
 	return &Broadcast{
 		OrgID:         orgID,
@@ -58,7 +56,6 @@ func NewBroadcast(orgID OrgID, translations flows.BroadcastTranslations,
 		URNs:          urns,
 		ContactIDs:    contactIDs,
 		GroupIDs:      groupIDs,
-		TicketID:      ticketID,
 		CreatedByID:   createdByID,
 	}
 }
@@ -80,7 +77,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 		}
 	}
 
-	return NewBroadcast(oa.OrgID(), event.Translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilTicketID, NilUserID), nil
+	return NewBroadcast(oa.OrgID(), event.Translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilUserID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastBatch {
@@ -91,7 +88,6 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastB
 		Translations:  b.Translations,
 		TemplateState: b.TemplateState,
 		CreatedByID:   b.CreatedByID,
-		TicketID:      b.TicketID,
 		ContactIDs:    contactIDs,
 		IsLast:        isLast,
 	}
@@ -120,7 +116,6 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.ContactIDs,
 		parent.GroupIDs,
 		string(parent.Query),
-		parent.TicketID,
 		parent.CreatedByID,
 	)
 	child.ParentID = parent.ID
@@ -170,8 +165,8 @@ type broadcastGroup struct {
 
 const sqlInsertBroadcast = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  base_language,  query, is_active)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :base_language, :query,      TRUE)
+	msgs_broadcast( org_id,  parent_id, created_on, modified_on, status,  translations,  base_language,  query, is_active)
+			VALUES(:org_id, :parent_id, NOW()     , NOW(),       'Q',    :translations, :base_language, :query,      TRUE)
 RETURNING id`
 
 const sqlInsertBroadcastContacts = `INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES(:broadcast_id, :contact_id)`
@@ -186,7 +181,6 @@ type BroadcastBatch struct {
 	TemplateState TemplateState               `json:"template_state"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
 	CreatedByID   UserID                      `json:"created_by_id"`
-	TicketID      TicketID                    `json:"ticket_id"`
 	IsLast        bool                        `json:"is_last"`
 }
 
@@ -215,13 +209,6 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 	err = InsertMessages(ctx, rt.DB, msgs)
 	if err != nil {
 		return nil, errors.Wrap(err, "error inserting broadcast messages")
-	}
-
-	// if the broadcast was a ticket reply, update the ticket
-	if b.TicketID != NilTicketID {
-		if err := RecordTicketReply(ctx, rt.DB, oa, b.TicketID, b.CreatedByID); err != nil {
-			return nil, err
-		}
 	}
 
 	return msgs, nil
@@ -270,35 +257,4 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 	}
 
 	return msg, nil
-}
-
-func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID TicketID, userID UserID) error {
-	firstReplyTime, err := TicketRecordReplied(ctx, db, ticketID, dates.Now())
-	if err != nil {
-		return err
-	}
-
-	// record reply counts for org, user and team
-	replyCounts := map[string]int{scopeOrg(oa): 1}
-
-	if userID != NilUserID {
-		user := oa.UserByID(userID)
-		if user != nil {
-			replyCounts[scopeUser(oa, user)] = 1
-			if user.Team() != nil {
-				replyCounts[scopeTeam(user.Team())] = 1
-			}
-		}
-	}
-
-	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
-		return err
-	}
-
-	if firstReplyTime >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
-			return err
-		}
-	}
-	return nil
 }
