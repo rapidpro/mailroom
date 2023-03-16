@@ -37,23 +37,6 @@ var runStatusMap = map[flows.RunStatus]RunStatus{
 	flows.RunStatusFailed:    RunStatusFailed,
 }
 
-// ExitType still needs to be set on runs until database triggers are updated to only look at status
-type ExitType = null.String
-
-const (
-	ExitInterrupted = ExitType("I")
-	ExitCompleted   = ExitType("C")
-	ExitExpired     = ExitType("E")
-	ExitFailed      = ExitType("F")
-)
-
-var runStatusToExitType = map[RunStatus]ExitType{
-	RunStatusInterrupted: ExitInterrupted,
-	RunStatusCompleted:   ExitCompleted,
-	RunStatusExpired:     ExitExpired,
-	RunStatusFailed:      ExitFailed,
-}
-
 // FlowRun is the mailroom type for a FlowRun
 type FlowRun struct {
 	r struct {

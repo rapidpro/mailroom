@@ -187,6 +187,8 @@ func resetStorage() {
 var sqlResetTestData = `
 UPDATE contacts_contact SET current_flow_id = NULL;
 
+DELETE FROM tickets_ticketdailycount;
+DELETE FROM tickets_ticketdailytiming;
 DELETE FROM notifications_notification;
 DELETE FROM notifications_incident;
 DELETE FROM request_logs_httplog;

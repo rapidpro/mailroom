@@ -2,7 +2,6 @@ package models_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
@@ -21,9 +20,6 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
-	modelTicket := ticket.Load(rt)
-
 	translations := flows.BroadcastTranslations{"eng": {Text: "Hi there"}}
 
 	// create a broadcast which doesn't actually exist in the DB
@@ -36,7 +32,6 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
 		"",
-		ticket.ID,
 		models.NilUserID,
 	)
 
@@ -45,7 +40,6 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
 	assert.Equal(t, translations, bcast.Translations)
 	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
-	assert.Equal(t, ticket.ID, bcast.TicketID)
 	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs)
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
@@ -57,7 +51,6 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage)
 	assert.Equal(t, translations, batch.Translations)
 	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState)
-	assert.Equal(t, ticket.ID, batch.TicketID)
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
@@ -69,9 +62,6 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, 2, len(msgs))
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
-
-	// test ticket was updated
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 }
 
 func TestBroadcastTranslations(t *testing.T) {

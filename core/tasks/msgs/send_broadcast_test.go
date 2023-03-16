@@ -130,9 +130,6 @@ func TestBroadcastTask(t *testing.T) {
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
-	ticket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
-	modelTicket := ticket.Load(rt)
-
 	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
@@ -146,7 +143,6 @@ func TestBroadcastTask(t *testing.T) {
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
-		TicketID      models.TicketID
 		CreatedByID   models.UserID
 		Queue         string
 		BatchCount    int
@@ -166,7 +162,6 @@ func TestBroadcastTask(t *testing.T) {
 			doctorsOnly,
 			cathyOnly,
 			nil,
-			models.NilTicketID,
 			testdata.Admin.ID,
 			queue.BatchQueue,
 			2,
@@ -186,7 +181,6 @@ func TestBroadcastTask(t *testing.T) {
 			nil,
 			cathyOnly,
 			nil,
-			ticket.ID,
 			testdata.Agent.ID,
 			queue.HandlerQueue,
 			1,
@@ -199,8 +193,7 @@ func TestBroadcastTask(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	for i, tc := range tcs {
-		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, "", tc.TicketID, tc.CreatedByID)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, "", tc.CreatedByID)
 
 		err = (&msgs.SendBroadcastTask{Broadcast: bcast}).Perform(ctx, rt, testdata.Org1.ID)
 		assert.NoError(t, err)
@@ -232,20 +225,7 @@ func TestBroadcastTask(t *testing.T) {
 		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
-		// if we had a ticket, make sure its replied_on and last_activity_on were updated
-		if tc.TicketID != models.NilTicketID {
-			assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
-				Returns(1, "%d: ticket last_activity_on not updated", i)
-			assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND replied_on IS NOT NULL`, tc.TicketID).
-				Returns(1, "%d: ticket replied_on not updated", i)
-		}
-
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
-
-	assertdb.Query(t, rt.DB, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
-	assertdb.Query(t, rt.DB, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text, ':u:', $2::text)`, testdata.Org1.ID, testdata.Agent.ID).Returns(1)
-
-	assertdb.Query(t, rt.DB, `SELECT SUM(count) FROM tickets_ticketdailytiming WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
 }
