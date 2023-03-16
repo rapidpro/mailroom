@@ -1,3 +1,8 @@
+v8.1.31 (2023-03-16)
+-------------------------
+ * Remove no longer used exit type constants
+ * Remove support for broadcasts with an associated ticket
+
 v8.1.30 (2023-03-14)
 -------------------------
  * Bump courier http client timeout
