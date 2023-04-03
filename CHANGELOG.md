@@ -1,3 +1,7 @@
+v8.1.32 (2023-04-03)
+-------------------------
+ * Fix not logging bodies of incoming IVR requests
+
 v8.1.31 (2023-03-16)
 -------------------------
  * Remove no longer used exit type constants
