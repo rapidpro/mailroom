@@ -156,7 +156,14 @@ func loadTestDump() {
 		dir = path.Dir(dir)
 	}
 
-	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+	cmd := exec.Command("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "PGPASSWORD=temba")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
+	}
 
 	// force re-connection
 	if _db != nil {
@@ -250,15 +257,6 @@ func resetData() {
 
 	// because groups have changed
 	models.FlushCache()
-}
-
-// utility function for running a command panicking if there is any error
-func mustExec(command string, args ...string) {
-	cmd := exec.Command(command, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
-	}
 }
 
 // convenience way to call a func and panic if it errors, e.g. must(foo())
