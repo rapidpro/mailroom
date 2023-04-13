@@ -43,21 +43,13 @@ type Msg struct {
 	QuickReplies         []string              `json:"quick_replies,omitempty"`
 	Locale               envs.Locale           `json:"locale,omitempty"`
 	HighPriority         bool                  `json:"high_priority"`
-	Direction            models.MsgDirection   `json:"direction"`
-	Status               models.MsgStatus      `json:"status"`
 	MsgCount             int                   `json:"tps_cost"`
 	CreatedOn            time.Time             `json:"created_on"`
-	ModifiedOn           time.Time             `json:"modified_on"`
-	ChannelID            models.ChannelID      `json:"channel_id"`
 	ChannelUUID          assets.ChannelUUID    `json:"channel_uuid"`
 	ContactID            models.ContactID      `json:"contact_id"`
 	ContactURNID         *models.URNID         `json:"contact_urn_id"`
 	URN                  urns.URN              `json:"urn"`
 	URNAuth              string                `json:"urn_auth,omitempty"`
-	SentOn               *time.Time            `json:"sent_on"`
-	QueuedOn             time.Time             `json:"queued_on"`
-	ErrorCount           int                   `json:"error_count"`
-	NextAttempt          *time.Time            `json:"next_attempt"`
 	Metadata             map[string]any        `json:"metadata,omitempty"`
 	Flow                 *assets.FlowReference `json:"flow,omitempty"`
 	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
@@ -89,21 +81,13 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel)
 		QuickReplies:         m.QuickReplies(),
 		Locale:               m.Locale(),
 		HighPriority:         m.HighPriority(),
-		Direction:            m.Direction(),
-		Status:               m.Status(),
 		MsgCount:             m.MsgCount(),
 		CreatedOn:            m.CreatedOn(),
-		ModifiedOn:           m.ModifiedOn(),
-		ChannelID:            m.ChannelID(),
 		ChannelUUID:          channel.UUID(),
 		ContactID:            m.ContactID(),
 		ContactURNID:         m.ContactURNID(),
 		URN:                  m.URN(),
 		URNAuth:              string(m.URNAuth()),
-		SentOn:               m.SentOn(),
-		QueuedOn:             m.QueuedOn(),
-		ErrorCount:           m.ErrorCount(),
-		NextAttempt:          m.NextAttempt(),
 		Metadata:             m.Metadata(),
 		Flow:                 flowRef,
 		ResponseToExternalID: string(m.ResponseToExternalID),
