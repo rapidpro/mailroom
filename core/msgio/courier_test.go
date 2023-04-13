@@ -96,6 +96,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"modified_on": %s,
 		"next_attempt": null,
 		"org_id": 1,
+		"origin": "flow",
 		"queued_on": %s,
 		"quick_replies": [
 			"yes",
@@ -149,6 +150,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"modified_on": %s,
 		"next_attempt": null,
 		"org_id": 1,
+		"origin": "flow",
 		"queued_on": %s,
 		"sent_on": null,
 		"session_id": %d,
@@ -187,6 +189,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"modified_on": %s,
 		"next_attempt": null,
 		"org_id": 1,
+		"origin": "broadcast",
 		"queued_on": %s,
 		"sent_on": null,
 		"status": "Q",
