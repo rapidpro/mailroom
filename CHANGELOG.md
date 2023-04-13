@@ -1,3 +1,7 @@
+v8.1.33 (2023-04-13)
+-------------------------
+ * Use envelope struct for marshalling courier messages and remove unused fields
+
 v8.1.32 (2023-04-03)
 -------------------------
  * Fix not logging bodies of incoming IVR requests
