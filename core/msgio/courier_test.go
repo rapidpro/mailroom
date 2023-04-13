@@ -22,14 +22,13 @@ func TestQueueCourierMessages(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
-	// create an Andoid channel
-	androidChannel := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
-
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
 
+	twilio := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+
 	// noop if no messages provided
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{})
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, []*models.Msg{})
 	testsuite.AssertCourierQueues(t, map[string][]int{})
 
 	// queue 3 messages for Cathy..
@@ -37,27 +36,13 @@ func TestQueueCourierMessages(t *testing.T) {
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
-		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 	}
 
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, msgs)
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, msgs)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
 		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // twilio, bulk priority
 		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // twilio, high priority
-		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1}, // vonage, bulk priority
-	})
-
-	// check that trying to queue a message without a channel will panic
-	assert.Panics(t, func() {
-		ms := msgSpec{Channel: nil, Contact: testdata.Cathy}
-		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
-	})
-
-	// check that trying to queue an Android message will panic
-	assert.Panics(t, func() {
-		ms := msgSpec{Channel: androidChannel, Contact: testdata.Cathy}
-		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
 	})
 }
 
@@ -71,15 +56,20 @@ func TestClearChannelCourierQueue(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
 
-	// queue 3 messages for Cathy..
-	msgs := []*models.Msg{
+	twilio := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)
+
+	// queue 3 Twilio messages for Cathy..
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, []*models.Msg{
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
-		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
-	}
+	})
 
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, msgs)
+	// and a Vonage message
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, vonage, []*models.Msg{
+		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+	})
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
 		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // twilio, bulk priority
