@@ -35,7 +35,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	blakeURNID := testdata.InsertContactURN(rt, testdata.Org1, blake, "tel:++250700000007", 1)
 
 	tcs := []struct {
-		ChannelUUID  assets.ChannelUUID
+		Channel      *testdata.Channel
 		Text         string
 		Contact      *testdata.Contact
 		URN          urns.URN
@@ -55,7 +55,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		ExpectedPriority     bool
 	}{
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "missing urn id",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN("tel:+250700000001"),
@@ -69,7 +69,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     true,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "test outgoing",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -84,7 +84,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "test outgoing",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -98,7 +98,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "suspended org",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -112,8 +112,8 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:                 "missing URN",
+			Channel:              nil,
+			Text:                 "no destination",
 			Contact:              testdata.Cathy,
 			URN:                  urns.NilURN,
 			URNID:                models.URNID(0),
@@ -126,21 +126,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "",
-			Text:                 "missing Channel",
-			Contact:              testdata.Cathy,
-			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
-			URNID:                testdata.Cathy.URNID,
-			Unsendable:           flows.UnsendableReasonNoDestination,
-			Flow:                 testdata.Favorites,
-			ExpectedStatus:       models.MsgStatusFailed,
-			ExpectedFailedReason: models.MsgFailedNoDestination,
-			ExpectedMetadata:     map[string]interface{}{},
-			ExpectedMsgCount:     1,
-			ExpectedPriority:     false,
-		},
-		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "blocked contact",
 			Contact:              blake,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000007?id=%d", blakeURNID)),
@@ -164,7 +150,15 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 		require.NoError(t, err)
 
-		channel := oa.ChannelByUUID(tc.ChannelUUID)
+		var ch *models.Channel
+		var chRef *assets.ChannelReference
+		expectedChannelID := models.NilChannelID
+		if tc.Channel != nil {
+			ch = oa.ChannelByUUID(tc.Channel.UUID)
+			chRef = ch.ChannelReference()
+			expectedChannelID = ch.ID()
+		}
+
 		flow, _ := oa.FlowByID(tc.Flow.ID)
 
 		session := insertTestSession(t, ctx, rt, testdata.Org1, tc.Contact, testdata.Favorites)
@@ -172,8 +166,8 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			session.SetIncomingMsg(tc.ResponseTo, null.NullString)
 		}
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
-		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
+		flowMsg := flows.NewMsgOut(tc.URN, chRef, tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
+		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), ch, session, flow, flowMsg, now)
 
 		assert.NoError(t, err)
 
@@ -190,8 +184,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, expectedAttachments, msg.Attachments())
 		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
-		assert.Equal(t, channel, msg.Channel())
-		assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
+		assert.Equal(t, expectedChannelID, msg.ChannelID())
 		assert.Equal(t, tc.URN, msg.URN())
 		if tc.URNID != models.NilURNID {
 			assert.Equal(t, tc.URNID, *msg.ContactURNID())
@@ -211,7 +204,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(4)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
 
 	// ensure org is unsuspended
 	rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
