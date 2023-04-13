@@ -43,6 +43,7 @@ type Channel struct {
 	c struct {
 		ID                 ChannelID                `json:"id"`
 		UUID               assets.ChannelUUID       `json:"uuid"`
+		OrgID              OrgID                    `json:"org_id"`
 		Parent             *assets.ChannelReference `json:"parent"`
 		Name               string                   `json:"name"`
 		Address            string                   `json:"address"`
@@ -60,6 +61,9 @@ type Channel struct {
 
 // ID returns the id of this channel
 func (c *Channel) ID() ChannelID { return c.c.ID }
+
+// OrgID returns the org id of this channel
+func (c *Channel) OrgID() OrgID { return c.c.OrgID }
 
 // UUID returns the UUID of this channel
 func (c *Channel) UUID() assets.ChannelUUID { return c.c.UUID }
@@ -150,6 +154,7 @@ const sqlSelectChannelsByID = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
+	c.org_id as org_id,
 	c.name as name,
 	c.channel_type as channel_type,
 	COALESCE(c.tps, 10) as tps,
@@ -190,6 +195,7 @@ const sqlSelectChannels = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
+	c.org_id as org_id,
 	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
 	c.name as name,
 	c.channel_type as channel_type,
