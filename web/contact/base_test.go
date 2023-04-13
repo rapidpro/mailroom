@@ -37,6 +37,12 @@ func TestCreate(t *testing.T) {
 	testsuite.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
+func TestInspect(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/inspect.json", nil)
+}
+
 func TestModify(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 

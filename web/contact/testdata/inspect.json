@@ -1,0 +1,12 @@
+[
+    {
+        "label": "error if fields not provided",
+        "method": "POST",
+        "path": "/mr/contact/inspect",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'contact_id' is required"
+        }
+    }
+]
