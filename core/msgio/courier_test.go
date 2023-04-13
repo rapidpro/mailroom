@@ -2,18 +2,200 @@ package msgio_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewCourierMsg(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	require.False(t, oa.Org().Suspended())
+
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	flow, _ := oa.FlowByID(testdata.Favorites.ID)
+	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
+	flowMsg1 := flows.NewMsgOut(
+		urn,
+		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
+		"Hi there",
+		[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+		[]string{"yes", "no"},
+		flows.NewMsgTemplating(assets.NewTemplateReference("4474d39c-ac2c-486d-bceb-8a774a515299", "tpl"), []string{"name"}, "tpls"),
+		flows.MsgTopicPurchase,
+		envs.Locale(`eng-US`),
+		flows.NilUnsendableReason,
+	)
+
+	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
+	_, flowContact := testdata.Cathy.Load(rt, oa)
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
+	require.NoError(t, err)
+
+	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	require.NoError(t, err)
+
+	cathy := session.Contact()
+
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg1})
+	require.NoError(t, err)
+
+	cmsg1, err := msgio.NewCourierMsg(oa, msg1, channel)
+	assert.NoError(t, err)
+
+	marshaled := jsonx.MustMarshal(cmsg1)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"attachments": [
+			"image/jpeg:https://dl-foo.com/image.jpg"
+		],
+		"channel_id": 10000,
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"direction": "O",
+		"error_count": 0,
+		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
+		"high_priority": false,
+		"id": %d,
+		"locale": "eng-US",
+		"metadata": {
+			"templating": {
+				"namespace": "tpls",
+				"template": {"name": "tpl", "uuid": "4474d39c-ac2c-486d-bceb-8a774a515299"},
+				"variables": ["name"]
+			},
+			"topic": "purchase"
+		},
+		"modified_on": %s,
+		"next_attempt": null,
+		"org_id": 1,
+		"queued_on": %s,
+		"quick_replies": [
+			"yes",
+			"no"
+		],
+		"sent_on": null,
+		"session_id": %d,
+		"session_status": "W",
+		"status": "Q",
+		"text": "Hi there",
+		"tps_cost": 2,
+		"urn": "tel:+250700000001?id=10000",
+		"uuid": "%s"
+	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
+
+	// create a priority flow message.. i.e. the session is responding to an incoming message
+	flowMsg2 := flows.NewMsgOut(
+		urn,
+		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
+		"Hi there",
+		nil, nil, nil,
+		flows.NilMsgTopic,
+		envs.NilLocale,
+		flows.NilUnsendableReason,
+	)
+	in1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
+	session.SetIncomingMsg(models.MsgID(in1.ID()), null.String("EX123"))
+	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	require.NoError(t, err)
+
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
+	require.NoError(t, err)
+
+	cmsg2, err := msgio.NewCourierMsg(oa, msg2, channel)
+	assert.NoError(t, err)
+
+	marshaled = jsonx.MustMarshal(cmsg2)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"channel_id": 10000,
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"direction": "O",
+		"error_count": 0,
+		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
+		"response_to_external_id": "EX123",
+		"high_priority": true,
+		"id": %d,
+		"modified_on": %s,
+		"next_attempt": null,
+		"org_id": 1,
+		"queued_on": %s,
+		"sent_on": null,
+		"session_id": %d,
+		"session_status": "W",
+		"status": "Q",
+		"text": "Hi there",
+		"tps_cost": 1,
+		"urn": "tel:+250700000001?id=10000",
+		"uuid": "%s"
+	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
+
+	// try a broadcast message which won't have session and flow fields set
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), &models.BroadcastBatch{BroadcastID: bcastID, CreatedByID: testdata.Admin.ID})
+	require.NoError(t, err)
+
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg3})
+	require.NoError(t, err)
+
+	cmsg3, err := msgio.NewCourierMsg(oa, msg3, channel)
+	assert.NoError(t, err)
+
+	marshaled = jsonx.MustMarshal(cmsg3)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"channel_id": 10000,
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"direction": "O",
+		"error_count": 0,
+		"high_priority": false,
+		"id": %d,
+		"modified_on": %s,
+		"next_attempt": null,
+		"org_id": 1,
+		"queued_on": %s,
+		"sent_on": null,
+		"status": "Q",
+		"text": "Blast",
+		"tps_cost": 1,
+		"urn": "tel:+250700000001?id=10000",
+		"uuid": "%s"
+	}`, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
+}
 
 func TestQueueCourierMessages(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
@@ -28,7 +210,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	twilio := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 
 	// noop if no messages provided
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, []*models.Msg{})
+	msgio.QueueCourierMessages(rc, oa, testdata.Cathy.ID, twilio, []*models.Msg{})
 	testsuite.AssertCourierQueues(t, map[string][]int{})
 
 	// queue 3 messages for Cathy..
@@ -38,7 +220,7 @@ func TestQueueCourierMessages(t *testing.T) {
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
 	}
 
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, msgs)
+	msgio.QueueCourierMessages(rc, oa, testdata.Cathy.ID, twilio, msgs)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
 		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // twilio, bulk priority
@@ -60,14 +242,14 @@ func TestClearChannelCourierQueue(t *testing.T) {
 	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)
 
 	// queue 3 Twilio messages for Cathy..
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, twilio, []*models.Msg{
+	msgio.QueueCourierMessages(rc, oa, testdata.Cathy.ID, twilio, []*models.Msg{
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
 	})
 
 	// and a Vonage message
-	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, vonage, []*models.Msg{
+	msgio.QueueCourierMessages(rc, oa, testdata.Cathy.ID, vonage, []*models.Msg{
 		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 	})
 
@@ -105,7 +287,7 @@ func TestPushCourierBatch(t *testing.T) {
 	msg1 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 	msg2 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
-	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg1, msg2}, "1636557205.123456")
+	err = msgio.PushCourierBatch(rc, oa, channel, []*models.Msg{msg1, msg2}, "1636557205.123456")
 	require.NoError(t, err)
 
 	// check that channel has been added to active list
@@ -132,7 +314,7 @@ func TestPushCourierBatch(t *testing.T) {
 
 	msg3 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
-	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg3}, "1636557205.234567")
+	err = msgio.PushCourierBatch(rc, oa, channel, []*models.Msg{msg3}, "1636557205.234567")
 	require.NoError(t, err)
 
 	queued, err = redis.ByteSlices(rc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
@@ -145,7 +327,7 @@ func TestPushCourierBatch(t *testing.T) {
 
 	msg4 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
-	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg4}, "1636557205.345678")
+	err = msgio.PushCourierBatch(rc, oa, channel, []*models.Msg{msg4}, "1636557205.345678")
 	require.NoError(t, err)
 
 	// check that channel has *not* been added to active list

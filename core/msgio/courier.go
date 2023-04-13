@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,6 +33,7 @@ const (
 	highPriority = 1
 )
 
+// Msg is the format of a message queued to courier
 type Msg struct {
 	ID                   flows.MsgID           `json:"id"`
 	UUID                 flows.MsgUUID         `json:"uuid"`
@@ -53,12 +53,12 @@ type Msg struct {
 	ContactID            models.ContactID      `json:"contact_id"`
 	ContactURNID         *models.URNID         `json:"contact_urn_id"`
 	URN                  urns.URN              `json:"urn"`
-	URNAuth              null.String           `json:"urn_auth,omitempty"`
+	URNAuth              string                `json:"urn_auth,omitempty"`
 	SentOn               *time.Time            `json:"sent_on"`
 	QueuedOn             time.Time             `json:"queued_on"`
 	ErrorCount           int                   `json:"error_count"`
 	NextAttempt          *time.Time            `json:"next_attempt"`
-	Metadata             null.Map              `json:"metadata,omitempty"`
+	Metadata             map[string]any        `json:"metadata,omitempty"`
 	Flow                 *assets.FlowReference `json:"flow,omitempty"`
 	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
 	IsResend             bool                  `json:"is_resend,omitempty"`
@@ -69,7 +69,17 @@ type Msg struct {
 	SessionTimeout       int                  `json:"session_timeout,omitempty"`
 }
 
-func NewMsg(m *models.Msg, ch *models.Channel) *Msg {
+// NewCourierMsg creates a courier message in the format it's expecting to be queued
+func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel) (*Msg, error) {
+	var flowRef *assets.FlowReference
+	if m.FlowID() != models.NilFlowID {
+		flow, err := oa.FlowByID(m.FlowID())
+		if err != nil {
+			return nil, errors.Wrap(err, "error loading message flow")
+		}
+		flowRef = flow.Reference()
+	}
+
 	return &Msg{
 		ID:                   m.ID(),
 		UUID:                 m.UUID(),
@@ -85,24 +95,24 @@ func NewMsg(m *models.Msg, ch *models.Channel) *Msg {
 		CreatedOn:            m.CreatedOn(),
 		ModifiedOn:           m.ModifiedOn(),
 		ChannelID:            m.ChannelID(),
-		ChannelUUID:          ch.UUID(),
+		ChannelUUID:          channel.UUID(),
 		ContactID:            m.ContactID(),
 		ContactURNID:         m.ContactURNID(),
 		URN:                  m.URN(),
-		URNAuth:              m.URNAuth(),
+		URNAuth:              string(m.URNAuth()),
 		SentOn:               m.SentOn(),
 		QueuedOn:             m.QueuedOn(),
 		ErrorCount:           m.ErrorCount(),
 		NextAttempt:          m.NextAttempt(),
 		Metadata:             m.Metadata(),
-		Flow:                 m.Flow,
+		Flow:                 flowRef,
 		ResponseToExternalID: string(m.ResponseToExternalID),
 		IsResend:             m.IsResend,
 		SessionID:            m.SessionID,
 		SessionStatus:        m.SessionStatus,
 		SessionWaitStartedOn: m.SessionWaitStartedOn,
 		SessionTimeout:       m.SessionTimeout,
-	}
+	}, nil
 }
 
 var queuePushScript = redis.NewScript(6, `
@@ -135,7 +145,7 @@ end
 `)
 
 // PushCourierBatch pushes a batch of messages for a single contact and channel onto the appropriate courier queue
-func PushCourierBatch(rc redis.Conn, ch *models.Channel, msgs []*models.Msg, timestamp string) error {
+func PushCourierBatch(rc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.Msg, timestamp string) error {
 	priority := bulkPriority
 	if msgs[0].HighPriority() {
 		priority = highPriority
@@ -143,7 +153,11 @@ func PushCourierBatch(rc redis.Conn, ch *models.Channel, msgs []*models.Msg, tim
 
 	batch := make([]*Msg, len(msgs))
 	for i, m := range msgs {
-		batch[i] = NewMsg(m, ch)
+		var err error
+		batch[i], err = NewCourierMsg(oa, m, ch)
+		if err != nil {
+			return errors.Wrap(err, "error creating courier message")
+		}
 	}
 
 	batchJSON := jsonx.MustMarshal(batch)
@@ -153,7 +167,7 @@ func PushCourierBatch(rc redis.Conn, ch *models.Channel, msgs []*models.Msg, tim
 }
 
 // QueueCourierMessages queues messages for a single contact to Courier
-func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, channel *models.Channel, msgs []*models.Msg) error {
+func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.Msg) error {
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -172,7 +186,7 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, channel *mo
 	commitBatch := func() error {
 		if len(batch) > 0 {
 			start := time.Now()
-			err := PushCourierBatch(rc, channel, batch, epochSeconds)
+			err := PushCourierBatch(rc, oa, channel, batch, epochSeconds)
 			if err != nil {
 				return err
 			}

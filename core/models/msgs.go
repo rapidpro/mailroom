@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -128,11 +127,10 @@ type Msg struct {
 	}
 
 	// extra data added to the courier payload
-	Flow                 *assets.FlowReference `json:"flow,omitempty"`
-	ResponseToExternalID null.String           `json:"response_to_external_id,omitempty"`
-	IsResend             bool                  `json:"is_resend,omitempty"`
-	SessionID            SessionID             `json:"session_id,omitempty"`
-	SessionStatus        SessionStatus         `json:"session_status,omitempty"`
+	ResponseToExternalID null.String   `json:"response_to_external_id,omitempty"`
+	IsResend             bool          `json:"is_resend,omitempty"`
+	SessionID            SessionID     `json:"session_id,omitempty"`
+	SessionStatus        SessionStatus `json:"session_status,omitempty"`
 
 	// These fields are set on the last outgoing message in a session's sprint. In the case
 	// of the session being at a wait with a timeout then the timeout will be set. It is up to
@@ -141,34 +139,34 @@ type Msg struct {
 	SessionTimeout       int        `json:"session_timeout,omitempty"`
 }
 
-func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
-func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
-func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
-func (m *Msg) Text() string                     { return m.m.Text }
-func (m *Msg) QuickReplies() []string           { return m.m.QuickReplies }
-func (m *Msg) Locale() envs.Locale              { return m.m.Locale }
-func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
-func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
-func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
-func (m *Msg) SentOn() *time.Time               { return m.m.SentOn }
-func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
-func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
-func (m *Msg) Status() MsgStatus                { return m.m.Status }
-func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
-func (m *Msg) Type() MsgType                    { return m.m.MsgType }
-func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
-func (m *Msg) FailedReason() MsgFailedReason    { return m.m.FailedReason }
-func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
-func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata }
-func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
-func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
-func (m *Msg) URN() urns.URN                    { return m.m.URN }
-func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
-func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
-func (m *Msg) FlowID() FlowID                   { return m.m.FlowID }
-func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
-func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
+func (m *Msg) ID() flows.MsgID               { return m.m.ID }
+func (m *Msg) BroadcastID() BroadcastID      { return m.m.BroadcastID }
+func (m *Msg) UUID() flows.MsgUUID           { return m.m.UUID }
+func (m *Msg) Text() string                  { return m.m.Text }
+func (m *Msg) QuickReplies() []string        { return m.m.QuickReplies }
+func (m *Msg) Locale() envs.Locale           { return m.m.Locale }
+func (m *Msg) HighPriority() bool            { return m.m.HighPriority }
+func (m *Msg) CreatedOn() time.Time          { return m.m.CreatedOn }
+func (m *Msg) ModifiedOn() time.Time         { return m.m.ModifiedOn }
+func (m *Msg) SentOn() *time.Time            { return m.m.SentOn }
+func (m *Msg) QueuedOn() time.Time           { return m.m.QueuedOn }
+func (m *Msg) Direction() MsgDirection       { return m.m.Direction }
+func (m *Msg) Status() MsgStatus             { return m.m.Status }
+func (m *Msg) Visibility() MsgVisibility     { return m.m.Visibility }
+func (m *Msg) Type() MsgType                 { return m.m.MsgType }
+func (m *Msg) ErrorCount() int               { return m.m.ErrorCount }
+func (m *Msg) NextAttempt() *time.Time       { return m.m.NextAttempt }
+func (m *Msg) FailedReason() MsgFailedReason { return m.m.FailedReason }
+func (m *Msg) ExternalID() null.String       { return m.m.ExternalID }
+func (m *Msg) Metadata() map[string]any      { return m.m.Metadata }
+func (m *Msg) MsgCount() int                 { return m.m.MsgCount }
+func (m *Msg) ChannelID() ChannelID          { return m.m.ChannelID }
+func (m *Msg) URN() urns.URN                 { return m.m.URN }
+func (m *Msg) URNAuth() null.String          { return m.m.URNAuth }
+func (m *Msg) OrgID() OrgID                  { return m.m.OrgID }
+func (m *Msg) FlowID() FlowID                { return m.m.FlowID }
+func (m *Msg) ContactID() ContactID          { return m.m.ContactID }
+func (m *Msg) ContactURNID() *URNID          { return m.m.ContactURNID }
 
 func (m *Msg) SetChannel(channel *Channel) {
 	if channel != nil {
@@ -205,10 +203,6 @@ func (m *Msg) Attachments() []utils.Attachment {
 		attachments[i] = utils.Attachment(m.m.Attachments[i])
 	}
 	return attachments
-}
-
-func (m *Msg) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.m)
 }
 
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
@@ -348,7 +342,6 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 
 		if flow != nil {
 			m.FlowID = flow.ID()
-			msg.Flow = flow.Reference()
 		}
 
 		// if we're responding to an incoming message, send as high priority

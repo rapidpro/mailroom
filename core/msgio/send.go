@@ -36,7 +36,7 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 
 		oa, err := models.GetOrgAssets(ctx, rt, msg.OrgID())
 		if err != nil {
-			return errors.Wrap(err, "unable to load org assets")
+			return errors.Wrap(err, "error getting org assets")
 		}
 
 		channel := oa.ChannelByID(msg.ChannelID())
@@ -62,7 +62,12 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 		defer rc.Close()
 
 		for cc, contactMsgs := range courierMsgs {
-			err := QueueCourierMessages(rc, cc.contactID, cc.channel, contactMsgs)
+			oa, err := models.GetOrgAssets(ctx, rt, cc.channel.OrgID())
+			if err != nil {
+				return errors.Wrap(err, "error getting org assets")
+			}
+
+			err = QueueCourierMessages(rc, oa, cc.contactID, cc.channel, contactMsgs)
 
 			// not being able to queue a message isn't the end of the world, log but don't return an error
 			if err != nil {
