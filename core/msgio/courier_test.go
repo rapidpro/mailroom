@@ -74,13 +74,10 @@ func TestNewCourierMsg(t *testing.T) {
 		"attachments": [
 			"image/jpeg:https://dl-foo.com/image.jpg"
 		],
-		"channel_id": 10000,
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
 		"id": %d,
@@ -93,24 +90,19 @@ func TestNewCourierMsg(t *testing.T) {
 			},
 			"topic": "purchase"
 		},
-		"modified_on": %s,
-		"next_attempt": null,
 		"org_id": 1,
 		"origin": "flow",
-		"queued_on": %s,
 		"quick_replies": [
 			"yes",
 			"no"
 		],
-		"sent_on": null,
 		"session_id": %d,
 		"session_status": "W",
-		"status": "Q",
 		"text": "Hi there",
 		"tps_cost": 2,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
+	}`, msg1.ID(), session.ID(), msg1.UUID())), marshaled)
 
 	// create a priority flow message.. i.e. the session is responding to an incoming message
 	flowMsg2 := flows.NewMsgOut(
@@ -136,31 +128,23 @@ func TestNewCourierMsg(t *testing.T) {
 	marshaled = jsonx.MustMarshal(cmsg2)
 
 	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"channel_id": 10000,
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"response_to_external_id": "EX123",
 		"high_priority": true,
 		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
 		"org_id": 1,
 		"origin": "flow",
-		"queued_on": %s,
-		"sent_on": null,
 		"session_id": %d,
 		"session_status": "W",
-		"status": "Q",
 		"text": "Hi there",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
+	}`, msg2.ID(), session.ID(), msg2.UUID())), marshaled)
 
 	// try a broadcast message which won't have session and flow fields set
 	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
@@ -177,27 +161,19 @@ func TestNewCourierMsg(t *testing.T) {
 	marshaled = jsonx.MustMarshal(cmsg3)
 
 	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"channel_id": 10000,
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"high_priority": false,
 		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
 		"org_id": 1,
 		"origin": "broadcast",
-		"queued_on": %s,
-		"sent_on": null,
-		"status": "Q",
 		"text": "Blast",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
+	}`, msg3.ID(), msg3.UUID())), marshaled)
 }
 
 func TestQueueCourierMessages(t *testing.T) {
