@@ -38,7 +38,8 @@ type MsgOrigin string
 const (
 	MsgOriginFlow      MsgOrigin = "flow"
 	MsgOriginBroadcast MsgOrigin = "broadcast"
-	MsgOriginHuman     MsgOrigin = "human"
+	MsgOriginTicket    MsgOrigin = "ticket"
+	MsgOriginChat      MsgOrigin = "chat"
 )
 
 // Msg is the format of a message queued to courier
@@ -72,7 +73,7 @@ type Msg struct {
 
 // NewCourierMsg creates a courier message in the format it's expecting to be queued
 func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel) (*Msg, error) {
-	origin := MsgOriginHuman
+	origin := MsgOriginChat
 	var flowRef *assets.FlowReference
 
 	if m.FlowID() != models.NilFlowID {
@@ -85,6 +86,8 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel)
 		flowRef = flow.Reference()
 	} else if m.BroadcastID() != models.NilBroadcastID {
 		origin = MsgOriginBroadcast
+	} else if m.TicketID() != models.NilTicketID {
+		origin = MsgOriginTicket
 	}
 
 	return &Msg{

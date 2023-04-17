@@ -54,7 +54,14 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *sendRequest) (any, 
 	}
 
 	out, ch := models.NewMsgOut(oa, contact, r.Text, r.Attachments, nil, contact.Locale(oa.Env()))
-	msg, err := models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, out, dates.Now(), r.UserID)
+	var msg *models.Msg
+
+	if r.TicketID != models.NilTicketID {
+		msg, err = models.NewOutgoingTicketMsg(rt, oa.Org(), ch, contact, out, dates.Now(), r.TicketID, r.UserID)
+	} else {
+		msg, err = models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, out, dates.Now(), r.UserID)
+	}
+
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error creating outgoing message")
 	}
