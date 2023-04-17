@@ -33,11 +33,21 @@ const (
 	highPriority = 1
 )
 
+type MsgOrigin string
+
+const (
+	MsgOriginFlow      MsgOrigin = "flow"
+	MsgOriginBroadcast MsgOrigin = "broadcast"
+	MsgOriginTicket    MsgOrigin = "ticket"
+	MsgOriginChat      MsgOrigin = "chat"
+)
+
 // Msg is the format of a message queued to courier
 type Msg struct {
 	ID                   flows.MsgID           `json:"id"`
 	UUID                 flows.MsgUUID         `json:"uuid"`
 	OrgID                models.OrgID          `json:"org_id"`
+	Origin               MsgOrigin             `json:"origin"`
 	Text                 string                `json:"text"`
 	Attachments          []utils.Attachment    `json:"attachments,omitempty"`
 	QuickReplies         []string              `json:"quick_replies,omitempty"`
@@ -63,19 +73,28 @@ type Msg struct {
 
 // NewCourierMsg creates a courier message in the format it's expecting to be queued
 func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel) (*Msg, error) {
+	origin := MsgOriginChat
 	var flowRef *assets.FlowReference
+
 	if m.FlowID() != models.NilFlowID {
+		origin = MsgOriginFlow
+
 		flow, err := oa.FlowByID(m.FlowID())
 		if err != nil {
 			return nil, errors.Wrap(err, "error loading message flow")
 		}
 		flowRef = flow.Reference()
+	} else if m.BroadcastID() != models.NilBroadcastID {
+		origin = MsgOriginBroadcast
+	} else if m.TicketID() != models.NilTicketID {
+		origin = MsgOriginTicket
 	}
 
 	return &Msg{
 		ID:                   m.ID(),
 		UUID:                 m.UUID(),
 		OrgID:                m.OrgID(),
+		Origin:               origin,
 		Text:                 m.Text(),
 		Attachments:          m.Attachments(),
 		QuickReplies:         m.QuickReplies(),

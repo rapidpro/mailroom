@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null/v2"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,6 +90,7 @@ func TestNewCourierMsg(t *testing.T) {
 			"topic": "purchase"
 		},
 		"org_id": 1,
+		"origin": "flow",
 		"quick_replies": [
 			"yes",
 			"no"
@@ -136,6 +136,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"high_priority": true,
 		"id": %d,
 		"org_id": 1,
+		"origin": "flow",
 		"session_id": %d,
 		"session_status": "W",
 		"text": "Hi there",
@@ -166,6 +167,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"high_priority": false,
 		"id": %d,
 		"org_id": 1,
+		"origin": "broadcast",
 		"text": "Blast",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
