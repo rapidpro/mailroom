@@ -64,6 +64,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Fetch GoFlow docs
         # for backward compatibility, English docs are copied to root of docs directory
@@ -78,19 +80,17 @@ jobs:
           go-version: ${{ env.go-version }}
 
       - name: Publish release
-        uses: goreleaser/goreleaser-action@v1
+        uses: goreleaser/goreleaser-action@v4
         if: ${{ !contains(github.ref, '-') }}
         with:
-          version: v0.147.2
-          args: release --rm-dist
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish non-master release
-        uses: goreleaser/goreleaser-action@v1
+        uses: goreleaser/goreleaser-action@v4
         if: contains(github.ref, '-')
         with:
-          version: v0.147.2
-          args: release --rm-dist --skip-validate
+          args: release --clean --skip-validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
