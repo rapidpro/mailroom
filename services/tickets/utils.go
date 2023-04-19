@@ -108,7 +108,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	}
 
 	out, ch := models.NewMsgOut(oa, contact, text, attachments, nil, contact.Locale(oa.Env()))
-	msg, err := models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, out, dates.Now(), models.NilUserID)
+	msg, err := models.NewOutgoingTicketMsg(rt, oa.Org(), ch, contact, out, dates.Now(), ticket.ID(), models.NilUserID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating outgoing message")
 	}

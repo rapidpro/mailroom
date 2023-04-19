@@ -33,36 +33,39 @@ const (
 	highPriority = 1
 )
 
+type MsgOrigin string
+
+const (
+	MsgOriginFlow      MsgOrigin = "flow"
+	MsgOriginBroadcast MsgOrigin = "broadcast"
+	MsgOriginTicket    MsgOrigin = "ticket"
+	MsgOriginChat      MsgOrigin = "chat"
+)
+
 // Msg is the format of a message queued to courier
 type Msg struct {
 	ID                   flows.MsgID           `json:"id"`
 	UUID                 flows.MsgUUID         `json:"uuid"`
 	OrgID                models.OrgID          `json:"org_id"`
+	Origin               MsgOrigin             `json:"origin"`
 	Text                 string                `json:"text"`
 	Attachments          []utils.Attachment    `json:"attachments,omitempty"`
 	QuickReplies         []string              `json:"quick_replies,omitempty"`
 	Locale               envs.Locale           `json:"locale,omitempty"`
 	HighPriority         bool                  `json:"high_priority"`
-	Direction            models.MsgDirection   `json:"direction"`
-	Status               models.MsgStatus      `json:"status"`
 	MsgCount             int                   `json:"tps_cost"`
 	CreatedOn            time.Time             `json:"created_on"`
-	ModifiedOn           time.Time             `json:"modified_on"`
-	ChannelID            models.ChannelID      `json:"channel_id"`
 	ChannelUUID          assets.ChannelUUID    `json:"channel_uuid"`
 	ContactID            models.ContactID      `json:"contact_id"`
-	ContactURNID         *models.URNID         `json:"contact_urn_id"`
+	ContactURNID         models.URNID          `json:"contact_urn_id"`
 	URN                  urns.URN              `json:"urn"`
 	URNAuth              string                `json:"urn_auth,omitempty"`
-	SentOn               *time.Time            `json:"sent_on"`
-	QueuedOn             time.Time             `json:"queued_on"`
-	ErrorCount           int                   `json:"error_count"`
-	NextAttempt          *time.Time            `json:"next_attempt"`
 	Metadata             map[string]any        `json:"metadata,omitempty"`
 	Flow                 *assets.FlowReference `json:"flow,omitempty"`
 	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
 	IsResend             bool                  `json:"is_resend,omitempty"`
 
+	ContactLastSeenOn    *time.Time           `json:"contact_last_seen_on"`
 	SessionID            models.SessionID     `json:"session_id,omitempty"`
 	SessionStatus        models.SessionStatus `json:"session_status,omitempty"`
 	SessionWaitStartedOn *time.Time           `json:"session_wait_started_on,omitempty"`
@@ -71,48 +74,60 @@ type Msg struct {
 
 // NewCourierMsg creates a courier message in the format it's expecting to be queued
 func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel) (*Msg, error) {
-	var flowRef *assets.FlowReference
+	msg := &Msg{
+		ID:           m.ID(),
+		UUID:         m.UUID(),
+		OrgID:        m.OrgID(),
+		Text:         m.Text(),
+		Attachments:  m.Attachments(),
+		QuickReplies: m.QuickReplies(),
+		Locale:       m.Locale(),
+		HighPriority: m.HighPriority(),
+		MsgCount:     m.MsgCount(),
+		CreatedOn:    m.CreatedOn(),
+		ChannelUUID:  channel.UUID(),
+		ContactID:    m.ContactID(),
+		ContactURNID: *m.ContactURNID(),
+		URN:          m.URN(),
+		URNAuth:      string(m.URNAuth()),
+		Metadata:     m.Metadata(),
+		IsResend:     m.IsResend,
+	}
+
 	if m.FlowID() != models.NilFlowID {
 		flow, err := oa.FlowByID(m.FlowID())
 		if err != nil {
 			return nil, errors.Wrap(err, "error loading message flow")
 		}
-		flowRef = flow.Reference()
+		msg.Flow = flow.Reference()
+		msg.Origin = MsgOriginFlow
+	} else if m.BroadcastID() != models.NilBroadcastID {
+		msg.Origin = MsgOriginBroadcast
+	} else if m.TicketID() != models.NilTicketID {
+		msg.Origin = MsgOriginTicket
+	} else {
+		msg.Origin = MsgOriginChat
 	}
 
-	return &Msg{
-		ID:                   m.ID(),
-		UUID:                 m.UUID(),
-		OrgID:                m.OrgID(),
-		Text:                 m.Text(),
-		Attachments:          m.Attachments(),
-		QuickReplies:         m.QuickReplies(),
-		Locale:               m.Locale(),
-		HighPriority:         m.HighPriority(),
-		Direction:            m.Direction(),
-		Status:               m.Status(),
-		MsgCount:             m.MsgCount(),
-		CreatedOn:            m.CreatedOn(),
-		ModifiedOn:           m.ModifiedOn(),
-		ChannelID:            m.ChannelID(),
-		ChannelUUID:          channel.UUID(),
-		ContactID:            m.ContactID(),
-		ContactURNID:         m.ContactURNID(),
-		URN:                  m.URN(),
-		URNAuth:              string(m.URNAuth()),
-		SentOn:               m.SentOn(),
-		QueuedOn:             m.QueuedOn(),
-		ErrorCount:           m.ErrorCount(),
-		NextAttempt:          m.NextAttempt(),
-		Metadata:             m.Metadata(),
-		Flow:                 flowRef,
-		ResponseToExternalID: string(m.ResponseToExternalID),
-		IsResend:             m.IsResend,
-		SessionID:            m.SessionID,
-		SessionStatus:        m.SessionStatus,
-		SessionWaitStartedOn: m.SessionWaitStartedOn,
-		SessionTimeout:       m.SessionTimeout,
-	}, nil
+	if m.Contact != nil {
+		msg.ContactLastSeenOn = m.Contact.LastSeenOn()
+	}
+
+	if m.Session != nil {
+		msg.SessionID = m.Session.ID()
+		msg.SessionStatus = m.Session.Status()
+		msg.ResponseToExternalID = string(m.Session.IncomingMsgExternalID())
+
+		if m.LastInSprint && m.Session.Timeout() != nil && m.Session.WaitStartedOn() != nil {
+			// These fields are set on the last outgoing message in a session's sprint. In the case
+			// of the session being at a wait with a timeout then the timeout will be set. It is up to
+			// Courier to update the session's timeout appropriately after sending the message.
+			msg.SessionWaitStartedOn = m.Session.WaitStartedOn()
+			msg.SessionTimeout = int(*m.Session.Timeout() / time.Second)
+		}
+	}
+
+	return msg, nil
 }
 
 var queuePushScript = redis.NewScript(6, `

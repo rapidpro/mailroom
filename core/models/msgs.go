@@ -95,6 +95,7 @@ type Msg struct {
 		// origin
 		BroadcastID BroadcastID `db:"broadcast_id"`
 		FlowID      FlowID      `db:"flow_id"`
+		TicketID    TicketID    `db:"ticket_id"`
 		CreatedByID UserID      `db:"created_by_id"`
 
 		// content
@@ -126,17 +127,11 @@ type Msg struct {
 		FailedReason MsgFailedReason `db:"failed_reason"`
 	}
 
-	// extra data added to the courier payload
-	ResponseToExternalID null.String   `json:"response_to_external_id,omitempty"`
-	IsResend             bool          `json:"is_resend,omitempty"`
-	SessionID            SessionID     `json:"session_id,omitempty"`
-	SessionStatus        SessionStatus `json:"session_status,omitempty"`
-
-	// These fields are set on the last outgoing message in a session's sprint. In the case
-	// of the session being at a wait with a timeout then the timeout will be set. It is up to
-	// Courier to update the session's timeout appropriately after sending the message.
-	SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
-	SessionTimeout       int        `json:"session_timeout,omitempty"`
+	// transient fields set during message creation that provide extra data when queuing to courier
+	Contact      *flows.Contact
+	Session      *Session
+	LastInSprint bool
+	IsResend     bool
 }
 
 func (m *Msg) ID() flows.MsgID               { return m.m.ID }
@@ -165,6 +160,7 @@ func (m *Msg) URN() urns.URN                 { return m.m.URN }
 func (m *Msg) URNAuth() null.String          { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                  { return m.m.OrgID }
 func (m *Msg) FlowID() FlowID                { return m.m.FlowID }
+func (m *Msg) TicketID() TicketID            { return m.m.TicketID }
 func (m *Msg) ContactID() ContactID          { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID          { return m.m.ContactURNID }
 
@@ -270,26 +266,32 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilUserID)
+	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilUserID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, bb *BroadcastBatch) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, bb.CreatedByID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, NilTicketID, bb.CreatedByID)
+}
+
+// NewOutgoingTicketMsg creates an outgoing message from a ticket
+func NewOutgoingTicketMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, ticketID TicketID, userID UserID) (*Msg, error) {
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, ticketID, userID)
 }
 
 // NewOutgoingChatMsg creates an outgoing message from chat
 func NewOutgoingChatMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, userID UserID) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, userID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, NilTicketID, userID)
 }
 
-func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID, userID UserID) (*Msg, error) {
+func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID, ticketID TicketID, userID UserID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
 	m.OrgID = org.ID()
 	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
+	m.TicketID = ticketID
 	m.Text = out.Text()
 	m.QuickReplies = out.QuickReplies()
 	m.Locale = out.Locale()
@@ -334,26 +336,23 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 		}
 	}
 
-	// if we have a session, set fields on the message from that
-	if session != nil {
-		msg.ResponseToExternalID = session.IncomingMsgExternalID()
-		msg.SessionID = session.ID()
-		msg.SessionStatus = session.Status()
-
-		if flow != nil {
-			m.FlowID = flow.ID()
-		}
-
-		// if we're responding to an incoming message, send as high priority
-		if session.IncomingMsgID() != NilMsgID {
-			m.HighPriority = true
-		}
+	// if we're a chat/ticket message, or we're responding to an incoming message in a flow, send as high priority
+	if (broadcastID == NilBroadcastID && session == nil) || (session != nil && session.IncomingMsgID() != NilMsgID) {
+		m.HighPriority = true
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
 	if m.URN.Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
 	}
+
+	if flow != nil {
+		m.FlowID = flow.ID()
+	}
+
+	// set transient fields which we'll use when queuing to courier
+	msg.Contact = contact
+	msg.Session = session
 
 	return msg, nil
 }
@@ -427,8 +426,10 @@ func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut
 var loadMessagesSQL = `
 SELECT 
 	id,
+	uuid,	
 	broadcast_id,
-	uuid,
+	flow_id,
+	ticket_id,
 	text,
 	attachments,
 	quick_replies,
@@ -465,8 +466,10 @@ func GetMessagesByID(ctx context.Context, db Queryer, orgID OrgID, direction Msg
 var loadMessagesForRetrySQL = `
 SELECT 
 	m.id,
-	m.broadcast_id,
 	m.uuid,
+	m.broadcast_id,
+	m.flow_id,
+	m.ticket_id,
 	m.text,
 	m.attachments,
 	m.quick_replies,
@@ -546,12 +549,6 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
-// SetTimeout sets the timeout for this message
-func (m *Msg) SetTimeout(start time.Time, timeout time.Duration) {
-	m.SessionWaitStartedOn = &start
-	m.SessionTimeout = int(timeout / time.Second)
-}
-
 // InsertMessages inserts the passed in messages in a single query
 func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 	is := make([]interface{}, len(msgs))
@@ -566,10 +563,10 @@ const sqlInsertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, created_by_id)
+		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, ticket_id, created_by_id)
   VALUES(:uuid, :text, :attachments, :quick_replies, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :created_by_id)
+		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :ticket_id, :created_by_id)
 RETURNING 
 	id AS id, 
 	modified_on AS modified_on,

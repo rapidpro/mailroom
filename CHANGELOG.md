@@ -1,3 +1,12 @@
+v8.1.35 (2023-04-18)
+-------------------------
+ * Fix goreleaser changelog generation and use latest action
+
+v8.1.34 (2023-04-17)
+-------------------------
+ * Add ticket_id to msg and use to set origin on messages queued to courier
+ * Remove fields from courier payload that it doesn't use
+
 v8.1.33 (2023-04-13)
 -------------------------
  * Use envelope struct for marshalling courier messages and remove unused fields

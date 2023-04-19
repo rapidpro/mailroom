@@ -1,6 +1,7 @@
 package msgio_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -17,10 +18,10 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null/v2"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,6 +37,7 @@ func TestNewCourierMsg(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, oa.Org().Suspended())
 
+	_, cathy := testdata.Cathy.Load(rt, oa)
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 	flow, _ := oa.FlowByID(testdata.Favorites.ID)
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
@@ -53,37 +55,24 @@ func TestNewCourierMsg(t *testing.T) {
 
 	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
 	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
-	_, flowContact := testdata.Cathy.Load(rt, oa)
-	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, cathy)
 	require.NoError(t, err)
 
 	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
-	cathy := session.Contact()
-
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg1})
-	require.NoError(t, err)
-
-	cmsg1, err := msgio.NewCourierMsg(oa, msg1, channel)
-	assert.NoError(t, err)
-
-	marshaled := jsonx.MustMarshal(cmsg1)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+	createAndAssertCourierMsg(t, ctx, rt, oa, msg1, fmt.Sprintf(`{
 		"attachments": [
 			"image/jpeg:https://dl-foo.com/image.jpg"
 		],
-		"channel_id": 10000,
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
+		"contact_last_seen_on": null,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
-		"id": %d,
+		"id": 1,
 		"locale": "eng-US",
 		"metadata": {
 			"templating": {
@@ -93,23 +82,19 @@ func TestNewCourierMsg(t *testing.T) {
 			},
 			"topic": "purchase"
 		},
-		"modified_on": %s,
-		"next_attempt": null,
 		"org_id": 1,
-		"queued_on": %s,
+		"origin": "flow",
 		"quick_replies": [
 			"yes",
 			"no"
 		],
-		"sent_on": null,
 		"session_id": %d,
 		"session_status": "W",
-		"status": "Q",
 		"text": "Hi there",
 		"tps_cost": 2,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
+	}`, session.ID(), msg1.UUID()))
 
 	// create a priority flow message.. i.e. the session is responding to an incoming message
 	flowMsg2 := flows.NewMsgOut(
@@ -126,75 +111,62 @@ func TestNewCourierMsg(t *testing.T) {
 	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
-	require.NoError(t, err)
-
-	cmsg2, err := msgio.NewCourierMsg(oa, msg2, channel)
-	assert.NoError(t, err)
-
-	marshaled = jsonx.MustMarshal(cmsg2)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"channel_id": 10000,
+	createAndAssertCourierMsg(t, ctx, rt, oa, msg2, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
+		"contact_last_seen_on": null,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"response_to_external_id": "EX123",
 		"high_priority": true,
-		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
+		"id": 3,
 		"org_id": 1,
-		"queued_on": %s,
-		"sent_on": null,
+		"origin": "flow",
 		"session_id": %d,
 		"session_status": "W",
-		"status": "Q",
 		"text": "Hi there",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
+	}`, session.ID(), msg2.UUID()))
 
-	// try a broadcast message which won't have session and flow fields set
+	// try a broadcast message which won't have session and flow fields set and won't be high priority
 	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), &models.BroadcastBatch{BroadcastID: bcastID, CreatedByID: testdata.Admin.ID})
 	require.NoError(t, err)
 
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg3})
-	require.NoError(t, err)
-
-	cmsg3, err := msgio.NewCourierMsg(oa, msg3, channel)
-	assert.NoError(t, err)
-
-	marshaled = jsonx.MustMarshal(cmsg3)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"channel_id": 10000,
+	createAndAssertCourierMsg(t, ctx, rt, oa, msg3, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
+		"contact_last_seen_on": null,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
 		"high_priority": false,
-		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
+		"id": 4,
 		"org_id": 1,
-		"queued_on": %s,
-		"sent_on": null,
-		"status": "Q",
+		"origin": "broadcast",
 		"text": "Blast",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
 		"uuid": "%s"
-	}`, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
+	}`, msg3.UUID()))
+}
+
+func createAndAssertCourierMsg(t *testing.T, ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, m *models.Msg, expectedJSON string) {
+	// insert to db so that it gets an id
+	err := models.InsertMessages(ctx, rt.DB, []*models.Msg{m})
+	require.NoError(t, err)
+
+	channel := oa.ChannelByID(m.ChannelID())
+
+	cmsg3, err := msgio.NewCourierMsg(oa, m, channel)
+	assert.NoError(t, err)
+
+	marshaled := jsonx.MustMarshal(cmsg3)
+
+	test.AssertEqualJSON(t, []byte(expectedJSON), marshaled)
 }
 
 func TestQueueCourierMessages(t *testing.T) {
