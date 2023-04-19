@@ -3,11 +3,10 @@ package hooks
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // SendMessagesHook is our hook for sending scene messages
@@ -20,17 +19,15 @@ func (h *sendMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *s
 	msgs := make([]*models.Msg, 0, 1)
 
 	// for each scene gather all our messages
-	for s, args := range scenes {
+	for _, args := range scenes {
 		sceneMsgs := make([]*models.Msg, 0, 1)
 
 		for _, m := range args {
 			sceneMsgs = append(sceneMsgs, m.(*models.Msg))
 		}
 
-		// if our scene has a timeout, set it on our last message
-		if len(sceneMsgs) > 0 && s.Session().Timeout() != nil && s.Session().WaitStartedOn() != nil {
-			sceneMsgs[len(sceneMsgs)-1].SetTimeout(*s.Session().WaitStartedOn(), *s.Session().Timeout())
-		}
+		// mark the last message in the sprint (used for setting timeouts)
+		sceneMsgs[len(sceneMsgs)-1].LastInSprint = true
 
 		msgs = append(msgs, sceneMsgs...)
 	}
