@@ -21,7 +21,7 @@ func TestSend(t *testing.T) {
 		"cathy_ticket_id": fmt.Sprintf("%d", cathyTicket.ID),
 	})
 
-	testsuite.AssertCourierQueues(t, map[string][]int{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1, 1, 1}})
+	testsuite.AssertCourierQueues(t, map[string][]int{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1, 1, 1}})
 }
 
 func TestResend(t *testing.T) {

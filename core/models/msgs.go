@@ -127,17 +127,11 @@ type Msg struct {
 		FailedReason MsgFailedReason `db:"failed_reason"`
 	}
 
-	// extra data added to the courier payload
-	ResponseToExternalID null.String   `json:"response_to_external_id,omitempty"`
-	IsResend             bool          `json:"is_resend,omitempty"`
-	SessionID            SessionID     `json:"session_id,omitempty"`
-	SessionStatus        SessionStatus `json:"session_status,omitempty"`
-
-	// These fields are set on the last outgoing message in a session's sprint. In the case
-	// of the session being at a wait with a timeout then the timeout will be set. It is up to
-	// Courier to update the session's timeout appropriately after sending the message.
-	SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
-	SessionTimeout       int        `json:"session_timeout,omitempty"`
+	// transient fields set during message creation that provide extra data when queuing to courier
+	Contact      *flows.Contact
+	Session      *Session
+	LastInSprint bool
+	IsResend     bool
 }
 
 func (m *Msg) ID() flows.MsgID               { return m.m.ID }
@@ -342,26 +336,23 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 		}
 	}
 
-	// if we have a session, set fields on the message from that
-	if session != nil {
-		msg.ResponseToExternalID = session.IncomingMsgExternalID()
-		msg.SessionID = session.ID()
-		msg.SessionStatus = session.Status()
-
-		if flow != nil {
-			m.FlowID = flow.ID()
-		}
-
-		// if we're responding to an incoming message, send as high priority
-		if session.IncomingMsgID() != NilMsgID {
-			m.HighPriority = true
-		}
+	// if we're a chat/ticket message, or we're responding to an incoming message in a flow, send as high priority
+	if (broadcastID == NilBroadcastID && session == nil) || (session != nil && session.IncomingMsgID() != NilMsgID) {
+		m.HighPriority = true
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
 	if m.URN.Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
 	}
+
+	if flow != nil {
+		m.FlowID = flow.ID()
+	}
+
+	// set transient fields which we'll use when queuing to courier
+	msg.Contact = contact
+	msg.Session = session
 
 	return msg, nil
 }
@@ -556,12 +547,6 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 		}
 	}
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
-}
-
-// SetTimeout sets the timeout for this message
-func (m *Msg) SetTimeout(start time.Time, timeout time.Duration) {
-	m.SessionWaitStartedOn = &start
-	m.SessionTimeout = int(timeout / time.Second)
 }
 
 // InsertMessages inserts the passed in messages in a single query
