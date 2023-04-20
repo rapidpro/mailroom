@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/test"
@@ -39,6 +40,11 @@ func TestCreate(t *testing.T) {
 
 func TestInspect(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// give cathy an unsendable twitterid URN with a display value
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("twitterid:23145325#cathy"), 20000)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/inspect.json", nil)
 }
