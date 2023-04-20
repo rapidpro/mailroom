@@ -1,3 +1,7 @@
+v8.1.37 (2023-04-20)
+-------------------------
+ * Add contact/inspect endpoint to return all URNs with channel if there is one
+
 v8.1.36 (2023-04-19)
 -------------------------
  * Fix not queuing chat messages as high priority and add contact_last_seen_on
