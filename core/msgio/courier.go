@@ -65,7 +65,7 @@ type Msg struct {
 	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
 	IsResend             bool                  `json:"is_resend,omitempty"`
 
-	ContactLastSeenOn    *time.Time           `json:"contact_last_seen_on"`
+	ContactLastSeenOn    *time.Time           `json:"contact_last_seen_on,omitempty"`
 	SessionID            models.SessionID     `json:"session_id,omitempty"`
 	SessionStatus        models.SessionStatus `json:"session_status,omitempty"`
 	SessionWaitStartedOn *time.Time           `json:"session_wait_started_on,omitempty"`

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -31,13 +30,12 @@ func TestNewCourierMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
-
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 	require.False(t, oa.Org().Suspended())
 
 	_, cathy := testdata.Cathy.Load(rt, oa)
+
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 	flow, _ := oa.FlowByID(testdata.Favorites.ID)
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
@@ -67,7 +65,6 @@ func TestNewCourierMsg(t *testing.T) {
 		],
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
-		"contact_last_seen_on": null,
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
@@ -97,6 +94,7 @@ func TestNewCourierMsg(t *testing.T) {
 	}`, session.ID(), msg1.UUID()))
 
 	// create a priority flow message.. i.e. the session is responding to an incoming message
+	cathy.SetLastSeenOn(time.Date(2023, 4, 20, 10, 15, 0, 0, time.UTC))
 	flowMsg2 := flows.NewMsgOut(
 		urn,
 		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
@@ -114,7 +112,7 @@ func TestNewCourierMsg(t *testing.T) {
 	createAndAssertCourierMsg(t, ctx, rt, oa, msg2, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
-		"contact_last_seen_on": null,
+		"contact_last_seen_on": "2023-04-20T10:15:00Z",
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
@@ -140,7 +138,7 @@ func TestNewCourierMsg(t *testing.T) {
 	createAndAssertCourierMsg(t, ctx, rt, oa, msg3, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
-		"contact_last_seen_on": null,
+		"contact_last_seen_on": "2023-04-20T10:15:00Z",
 		"contact_urn_id": 10000,
 		"created_on": "2021-11-09T14:03:30Z",
 		"high_priority": false,
