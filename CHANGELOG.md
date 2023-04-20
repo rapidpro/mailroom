@@ -1,3 +1,8 @@
+v8.1.36 (2023-04-19)
+-------------------------
+ * Fix not queuing chat messages as high priority and add contact_last_seen_on
+ * Use services for github actions
+
 v8.1.35 (2023-04-18)
 -------------------------
  * Fix goreleaser changelog generation and use latest action
