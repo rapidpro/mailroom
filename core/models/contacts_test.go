@@ -25,9 +25,11 @@ func TestContacts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	// for now it's still possible to have more than one open ticket in the database
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", time.Now(), testdata.Agent)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", time.Now(), nil)
+
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", time.Now(), testdata.Editor)
 
 	// delete mailgun ticketer
@@ -60,13 +62,11 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, len(cathy.URNs()), 1)
 	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
 	assert.Equal(t, 1, cathy.Groups().Count())
-	assert.Equal(t, 2, cathy.Tickets().Count())
+	assert.NotNil(t, cathy.Ticket())
 
-	cathyTickets := cathy.Tickets().All()
-	assert.Equal(t, "Support", cathyTickets[0].Topic().Name())
-	assert.Equal(t, "agent1@nyaruka.com", cathyTickets[0].Assignee().Email())
-	assert.Equal(t, "Sales", cathyTickets[1].Topic().Name())
-	assert.Nil(t, cathyTickets[1].Assignee())
+	cathyTicket := cathy.Ticket()
+	assert.Equal(t, "Sales", cathyTicket.Topic().Name())
+	assert.Nil(t, cathyTicket.Assignee())
 
 	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
 	assert.Equal(t, "Dokshi", cathy.Fields()["ward"].QueryValue())
@@ -79,13 +79,13 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "tel:+16055742222?id=10001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
 	assert.Equal(t, 0, bob.Groups().Count())
-	assert.Equal(t, 0, bob.Tickets().Count()) // because ticketer no longer exists
+	assert.Nil(t, bob.Ticket()) // because ticketer no longer exists
 
 	assert.Equal(t, "George", george.Name())
 	assert.Equal(t, decimal.RequireFromString("30"), george.Fields()["age"].QueryValue())
 	assert.Equal(t, 0, len(george.URNs()))
 	assert.Equal(t, 0, george.Groups().Count())
-	assert.Equal(t, 0, george.Tickets().Count())
+	assert.Nil(t, george.Ticket())
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(testdata.TwilioChannel.ID)
