@@ -1367,24 +1367,22 @@
                     "id": 10000,
                     "language": "fra",
                     "status": "active",
-                    "tickets": [
-                        {
-                            "assignee": {
-                                "email": "admin1@nyaruka.com",
-                                "name": "Andy Admin"
-                            },
-                            "body": "Need help",
-                            "ticketer": {
-                                "name": "RapidPro Tickets",
-                                "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
-                            },
-                            "topic": {
-                                "name": "Support",
-                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
-                            },
-                            "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
-                        }
-                    ],
+                    "ticket": {
+                        "assignee": {
+                            "email": "admin1@nyaruka.com",
+                            "name": "Andy Admin"
+                        },
+                        "body": "Need help",
+                        "ticketer": {
+                            "name": "RapidPro Tickets",
+                            "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                        },
+                        "topic": {
+                            "name": "Support",
+                            "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                        },
+                        "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                    },
                     "timezone": "America/Los_Angeles",
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
                 },
@@ -1470,24 +1468,22 @@
                     "name": "Juan",
                     "language": "spa",
                     "status": "active",
-                    "tickets": [
-                        {
-                            "assignee": {
-                                "email": "admin1@nyaruka.com",
-                                "name": "Andy Admin"
-                            },
-                            "body": "Need help",
-                            "ticketer": {
-                                "name": "RapidPro Tickets",
-                                "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
-                            },
-                            "topic": {
-                                "name": "Support",
-                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
-                            },
-                            "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
-                        }
-                    ],
+                    "ticket": {
+                        "assignee": {
+                            "email": "admin1@nyaruka.com",
+                            "name": "Andy Admin"
+                        },
+                        "body": "Need help",
+                        "ticketer": {
+                            "name": "RapidPro Tickets",
+                            "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                        },
+                        "topic": {
+                            "name": "Support",
+                            "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                        },
+                        "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                    },
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [

@@ -80,7 +80,7 @@ type Contact struct {
 	fields        map[string]*flows.Value
 	groups        []*Group
 	urns          []urns.URN
-	tickets       []*Ticket
+	ticket        *Ticket
 	createdOn     time.Time
 	modifiedOn    time.Time
 	lastSeenOn    *time.Time
@@ -204,11 +204,11 @@ func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 		}
 	}
 
-	// convert our tickets to flow tickets
-	tickets := make([]*flows.Ticket, len(c.tickets))
+	// convert our ticket to a flow ticket
+	var ticket *flows.Ticket
 	var err error
-	for i, t := range c.tickets {
-		tickets[i], err = t.FlowTicket(oa)
+	if c.ticket != nil {
+		ticket, err = c.ticket.FlowTicket(oa)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating flow ticket")
 		}
@@ -228,7 +228,7 @@ func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 		c.urns,
 		groups,
 		c.fields,
-		tickets,
+		ticket,
 		assets.IgnoreMissing,
 	)
 	if err != nil {
@@ -323,15 +323,14 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 		}
 		contact.urns = contactURNs
 
-		// initialize our tickets
-		tickets := make([]*Ticket, 0, len(e.Tickets))
-		for _, t := range e.Tickets {
+		// grab the last opened open ticket
+		if len(e.Tickets) > 0 {
+			t := e.Tickets[0]
 			ticketer := oa.TicketerByID(t.TicketerID)
 			if ticketer != nil {
-				tickets = append(tickets, NewTicket(t.UUID, oa.OrgID(), NilUserID, NilFlowID, contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil))
+				contact.ticket = NewTicket(t.UUID, oa.OrgID(), NilUserID, NilFlowID, contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil)
 			}
 		}
-		contact.tickets = tickets
 
 		contacts = append(contacts, contact)
 	}
@@ -544,7 +543,7 @@ LEFT JOIN (
 				'ticketer_id', t.ticketer_id,
 				'topic_id', t.topic_id,
 				'assignee_id', t.assignee_id
-			) ORDER BY t.opened_on ASC, t.id ASC
+			) ORDER BY t.opened_on DESC, t.id DESC
 		) as tickets
 	FROM
 		tickets_ticket t
