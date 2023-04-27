@@ -38,7 +38,6 @@ func TestMsgEvents(t *testing.T) {
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
 			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
 		},
 	}
@@ -329,7 +328,7 @@ func TestMsgEvents(t *testing.T) {
 				Columns(map[string]any{"text": tc.expectedReply, "status": "Q"}, "%d: response mismatch", i)
 		}
 
-		// check any open tickets for this contact where updated
+		// check last open ticket for this contact was updated
 		numOpenTickets := len(openTickets[tc.contact])
 		assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.contact.ID, last).
 			Returns(numOpenTickets, "%d: updated open ticket mismatch", i)
