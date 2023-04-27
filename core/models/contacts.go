@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v2"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
@@ -1315,12 +1316,6 @@ func (i ContactID) Value() (driver.Value, error)  { return null.IntValue(i) }
 func (i *ContactID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
 func (i ContactID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// GetContactLocker returns the locker for a particular contact
-func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
-	key := fmt.Sprintf("lock:c:%d:%d", orgID, contactID)
-	return redisx.NewLocker(key, time.Minute*5)
-}
-
 // ContactStatusChange struct used for our contact status change
 type ContactStatusChange struct {
 	ContactID ContactID
@@ -1384,3 +1379,56 @@ FROM (
 WHERE
 	c.id = r.id::int
 `
+
+// LockContacts tries to grab locks for the given contacts, returning the locks and the skipped contacts
+func LockContacts(rt *runtime.Runtime, orgID OrgID, ids []ContactID, retry time.Duration) (map[ContactID]string, []ContactID, error) {
+	locks := make(map[ContactID]string, len(ids))
+	skipped := make([]ContactID, 0, 5)
+
+	success := false
+
+	for _, contactID := range ids {
+		locker := getContactLocker(orgID, contactID)
+
+		lock, err := locker.Grab(rt.RP, retry)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "error attempting to grab lock")
+		}
+
+		// no error but we didn't get the lock
+		if lock == "" {
+			skipped = append(skipped, contactID)
+			continue
+		}
+
+		locks[contactID] = lock
+
+		// if we error we want to release all locks on way out
+		defer func() {
+			if !success {
+				locker.Release(rt.RP, lock)
+			}
+		}()
+	}
+
+	success = true
+	return locks, skipped, nil
+}
+
+// UnlockContacts unlocks the given contacts using the given lock values
+func UnlockContacts(rt *runtime.Runtime, orgID OrgID, locks map[ContactID]string) error {
+	for contactID, lock := range locks {
+		locker := getContactLocker(orgID, contactID)
+
+		err := locker.Release(rt.RP, lock)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// returns the locker for a particular contact
+func getContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
+	return redisx.NewLocker(fmt.Sprintf("lock:c:%d:%d", orgID, contactID), time.Minute*5)
+}

@@ -15,9 +15,11 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/test"
+	"github.com/nyaruka/redisx/assertredis"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func TestContacts(t *testing.T) {
@@ -606,4 +608,32 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
+}
+
+func TestLockContacts(t *testing.T) {
+	_, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetRedis)
+
+	// grab lock for contact #102
+	models.LockContacts(rt, testdata.Org1.ID, []models.ContactID{102}, time.Second)
+
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+
+	// try to get locks for #101, #102, #103
+	locks, skipped, err := models.LockContacts(rt, testdata.Org1.ID, []models.ContactID{101, 102, 103}, time.Second)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []models.ContactID{101, 103}, maps.Keys(locks))
+	assert.Equal(t, []models.ContactID{102}, skipped) // because it's already locked
+
+	assertredis.Exists(t, rt.RP, "lock:c:1:101")
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+	assertredis.Exists(t, rt.RP, "lock:c:1:103")
+
+	err = models.UnlockContacts(rt, testdata.Org1.ID, locks)
+	assert.NoError(t, err)
+
+	assertredis.NotExists(t, rt.RP, "lock:c:1:101")
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+	assertredis.NotExists(t, rt.RP, "lock:c:1:103")
 }
