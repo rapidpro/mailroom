@@ -1,3 +1,7 @@
+v8.1.39 (2023-04-27)
+-------------------------
+ * Refactor how we lock and unlock contacts
+
 v8.1.38 (2023-04-27)
 -------------------------
  * Handled incoming messages should be associated with any open ticket
