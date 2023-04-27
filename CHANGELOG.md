@@ -1,3 +1,8 @@
+v8.1.38 (2023-04-27)
+-------------------------
+ * Handled incoming messages should be associated with any open ticket
+ * Only load the last opened open ticket for a contact
+
 v8.1.37 (2023-04-20)
 -------------------------
  * Add contact/inspect endpoint to return all URNs with channel if there is one
