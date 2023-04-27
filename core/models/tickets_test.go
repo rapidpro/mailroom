@@ -144,10 +144,10 @@ func TestTickets(t *testing.T) {
 	cathy, err := models.LoadContact(ctx, rt.DB, org1, testdata.Cathy.ID)
 	require.NoError(t, err)
 
-	tks, err := models.LoadOpenTicketsForContact(ctx, rt.DB, cathy)
+	tk, err := models.LoadOpenTicketForContact(ctx, rt.DB, cathy)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(tks))
-	assert.Equal(t, "Where are my cookies?", tks[0].Body())
+	assert.NotNil(t, tk)
+	assert.Equal(t, "Where are my cookies?", tk.Body())
 }
 
 func TestUpdateTicketConfig(t *testing.T) {

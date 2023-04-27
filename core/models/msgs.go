@@ -574,10 +574,10 @@ RETURNING
 `
 
 // MarkMessageHandled updates a message after handling
-func MarkMessageHandled(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
+func MarkMessageHandled(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flowID FlowID, ticketID TicketID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
-		`UPDATE msgs_msg SET status = $2, visibility = $3, flow_id = $4, attachments = $5, log_uuids = array_cat(log_uuids, $6) WHERE id = $1`,
-		msgID, status, visibility, flow, pq.Array(attachments), pq.Array(logUUIDs),
+		`UPDATE msgs_msg SET status = $2, visibility = $3, flow_id = $4, ticket_id = $5, attachments = $6, log_uuids = array_cat(log_uuids, $7) WHERE id = $1`,
+		msgID, status, visibility, flowID, ticketID, pq.Array(attachments), pq.Array(logUUIDs),
 	)
 	return errors.Wrapf(err, "error marking msg #%d as handled", msgID)
 }
