@@ -1381,13 +1381,22 @@ WHERE
 `
 
 // LockContacts tries to grab locks for the given contacts, returning the locks and the skipped contacts
-func LockContacts(rt *runtime.Runtime, orgID OrgID, ids []ContactID, retry time.Duration) (map[ContactID]string, []ContactID, error) {
+func LockContacts(ctx context.Context, rt *runtime.Runtime, orgID OrgID, ids []ContactID, retry time.Duration) (map[ContactID]string, []ContactID, error) {
 	locks := make(map[ContactID]string, len(ids))
 	skipped := make([]ContactID, 0, 5)
 
+	// this is set to true at the end of the function so the defer calls won't release the locks unless we're returning
+	// early due to an error
 	success := false
 
 	for _, contactID := range ids {
+		// error if context has finished before we have
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		default:
+		}
+
 		locker := getContactLocker(orgID, contactID)
 
 		lock, err := locker.Grab(rt.RP, retry)
