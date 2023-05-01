@@ -318,7 +318,7 @@ func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, f
 // couldn't get their locks
 func tryToStartWithLock(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, flow *models.Flow, ids []models.ContactID, options *StartOptions) ([]*models.Session, []models.ContactID, error) {
 	// try to get locks for these contacts, waiting for up to a second for each contact
-	locks, skipped, err := models.LockContacts(rt, oa.OrgID(), ids, time.Second)
+	locks, skipped, err := models.LockContacts(ctx, rt, oa.OrgID(), ids, time.Second)
 	if err != nil {
 		return nil, nil, err
 	}

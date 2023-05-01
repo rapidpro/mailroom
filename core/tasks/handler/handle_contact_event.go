@@ -42,7 +42,7 @@ func (t *HandleContactEventTask) Timeout() time.Duration {
 // this task ingests and handles all the events for a contact, one by one.
 func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	// try to get the lock for this contact, waiting up to 10 seconds
-	locks, _, err := models.LockContacts(rt, orgID, []models.ContactID{t.ContactID}, time.Second*10)
+	locks, _, err := models.LockContacts(ctx, rt, orgID, []models.ContactID{t.ContactID}, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", t.ContactID)
 	}

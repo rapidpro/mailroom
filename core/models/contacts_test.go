@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -611,17 +612,17 @@ func TestUpdateContactURNs(t *testing.T) {
 }
 
 func TestLockContacts(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 
-	// grab lock for contact #102
-	models.LockContacts(rt, testdata.Org1.ID, []models.ContactID{102}, time.Second)
+	// grab lock for contact 102
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{102}, time.Second)
 
 	assertredis.Exists(t, rt.RP, "lock:c:1:102")
 
-	// try to get locks for #101, #102, #103
-	locks, skipped, err := models.LockContacts(rt, testdata.Org1.ID, []models.ContactID{101, 102, 103}, time.Second)
+	// try to get locks for 101, 102, 103
+	locks, skipped, err := models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{101, 102, 103}, time.Second)
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []models.ContactID{101, 103}, maps.Keys(locks))
 	assert.Equal(t, []models.ContactID{102}, skipped) // because it's already locked
@@ -636,4 +637,22 @@ func TestLockContacts(t *testing.T) {
 	assertredis.NotExists(t, rt.RP, "lock:c:1:101")
 	assertredis.Exists(t, rt.RP, "lock:c:1:102")
 	assertredis.NotExists(t, rt.RP, "lock:c:1:103")
+
+	// lock contacts 103, 104, 105 so only 101 is unlocked
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{103}, time.Second)
+
+	// create a new context with a 2 second timelimit
+	ctx2, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	start := time.Now()
+
+	_, _, err = models.LockContacts(ctx2, rt, testdata.Org1.ID, []models.ContactID{101, 102, 103, 104}, time.Second)
+	assert.EqualError(t, err, "context deadline exceeded")
+
+	// call should have completed in just over the context deadline
+	assert.Less(t, time.Since(start), time.Second*3)
+
+	// since we errored, any locks we grabbed before the error, should have been released
+	assertredis.NotExists(t, rt.RP, "lock:c:1:101")
 }
