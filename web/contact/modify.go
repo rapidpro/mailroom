@@ -106,10 +106,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *modifyRequest) (a
 }
 
 func tryToLockAndModify(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ids []models.ContactID, mods []flows.Modifier, userID models.UserID) (map[*flows.Contact][]flows.Event, []models.ContactID, error) {
-	// divide up the time we can afford to wait for each contact
-	retry := 5 * time.Second / time.Duration(len(ids))
-
-	locks, skipped, err := models.LockContacts(rt, oa.OrgID(), ids, retry)
+	locks, skipped, err := models.LockContacts(ctx, rt, oa.OrgID(), ids, time.Second)
 	if err != nil {
 		return nil, nil, err
 	}

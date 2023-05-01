@@ -1,3 +1,7 @@
+v8.1.40 (2023-05-01)
+-------------------------
+ * Add context paramter to LockContacts so it can error if context is done
+
 v8.1.39 (2023-04-27)
 -------------------------
  * Refactor how we lock and unlock contacts

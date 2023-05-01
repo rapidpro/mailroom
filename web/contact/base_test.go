@@ -72,7 +72,7 @@ func TestModify(t *testing.T) {
 	models.FlushCache()
 
 	// lock a contact to test skipping them
-	models.LockContacts(rt, testdata.Org1.ID, []models.ContactID{testdata.Alexandria.ID}, time.Second)
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{testdata.Alexandria.ID}, time.Second)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
 }
