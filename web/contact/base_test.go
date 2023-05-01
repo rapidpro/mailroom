@@ -71,9 +71,10 @@ func TestModify(t *testing.T) {
 	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
+	// lock a contact to test skipping them
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{testdata.Alexandria.ID}, time.Second)
 
-	models.FlushCache()
+	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
 }
 
 func TestResolve(t *testing.T) {
