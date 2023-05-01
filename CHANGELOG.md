@@ -1,3 +1,7 @@
+v8.1.41 (2023-05-01)
+-------------------------
+ * Add contact locking to modify endpoint
+
 v8.1.40 (2023-05-01)
 -------------------------
  * Add context paramter to LockContacts so it can error if context is done
