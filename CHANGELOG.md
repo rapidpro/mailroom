@@ -1,3 +1,7 @@
+v8.1.42 (2023-05-03)
+-------------------------
+ * Update to latest goflow which fixes parsing locations with non-ASCII chars
+
 v8.1.41 (2023-05-01)
 -------------------------
  * Add contact locking to modify endpoint
