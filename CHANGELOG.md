@@ -1,3 +1,7 @@
+v8.1.44 (2023-05-08)
+-------------------------
+ * Start writing exclusions blob on start batch tasks
+
 v8.1.43 (2023-05-08)
 -------------------------
  * Add contact locking to ticket/reopen endpoint
