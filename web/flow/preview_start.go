@@ -28,13 +28,13 @@ func init() {
 //	    "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
 //	    "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
 //	    "urns": ["tel:+1234567890"],
-//	    "user_query": ""
+//	    "query": ""
 //	  },
 //	  "exclude": {
 //	    "non_active": false,
 //	    "in_a_flow": false,
 //	    "started_previously": true,
-//	    "not_seen_recently": false
+//	    "not_seen_since_days": 90
 //	  },
 //	  "sample_size": 5
 //	}
