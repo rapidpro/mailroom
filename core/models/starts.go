@@ -257,10 +257,6 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 		IsLast:         last,
 		TotalContacts:  totalContacts,
 		CreatedByID:    s.CreatedByID,
-
-		//deprecated
-		RestartParticipants: s.RestartParticipants,
-		IncludeActive:       s.IncludeActive,
 	}
 }
 
@@ -281,14 +277,7 @@ type FlowStartBatch struct {
 
 	IsLast        bool `json:"is_last,omitempty"`
 	TotalContacts int  `json:"total_contacts"`
-
-	// deprecated
-	RestartParticipants bool `json:"restart_participants"`
-	IncludeActive       bool `json:"include_active"`
 }
-
-func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.RestartParticipants }
-func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.IncludeActive }
 
 // ReadSessionHistory reads a session history from the given JSON
 func ReadSessionHistory(data []byte) (*flows.SessionHistory, error) {
