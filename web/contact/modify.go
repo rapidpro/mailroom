@@ -118,7 +118,7 @@ func tryToLockAndModify(ctx context.Context, rt *runtime.Runtime, oa *models.Org
 	// load our contacts
 	contacts, err := models.LoadContacts(ctx, rt.DB, oa, locked)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unable to load contact")
+		return nil, nil, errors.Wrap(err, "unable to load contacts")
 	}
 
 	// convert to map of flow contacts to modifiers

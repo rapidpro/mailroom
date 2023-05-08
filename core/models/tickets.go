@@ -211,28 +211,27 @@ func LoadOpenTicketForContact(ctx context.Context, db Queryer, contact *Contact)
 
 const sqlSelectTicketsByID = `
 SELECT
-  t.id,
-  t.uuid,
-  t.org_id,
-  t.contact_id,
-  t.ticketer_id,
-  t.external_id,
-  t.status,
-  t.topic_id,
-  t.body,
-  t.assignee_id,
-  t.config,
-  t.opened_on,
-  t.opened_by_id,
-  t.opened_in_id,
-  t.replied_on,
-  t.modified_on,
-  t.closed_on,
-  t.last_activity_on
-FROM
-  tickets_ticket t
-WHERE
-  t.id = ANY($1)`
+  id,
+  uuid,
+  org_id,
+  contact_id,
+  ticketer_id,
+  external_id,
+  status,
+  topic_id,
+  body,
+  assignee_id,
+  config,
+  opened_on,
+  opened_by_id,
+  opened_in_id,
+  replied_on,
+  modified_on,
+  closed_on,
+  last_activity_on
+    FROM tickets_ticket
+   WHERE id = ANY($1)
+ORDER BY opened_on DESC`
 
 // LoadTickets loads all of the tickets with the given ids
 func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {

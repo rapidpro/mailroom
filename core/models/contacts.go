@@ -96,6 +96,7 @@ func (c *Contact) Status() ContactStatus           { return c.status }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
+func (c *Contact) Ticket() *Ticket                 { return c.ticket }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }

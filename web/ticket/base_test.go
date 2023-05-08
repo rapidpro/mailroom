@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -64,12 +65,16 @@ func TestTicketClose(t *testing.T) {
 func TestTicketReopen(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
-	// create 2 closed tickets and 1 open one for Cathy
+	// we should be able to reopen ticket #1 because Cathy has no other tickets open
 	testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", testdata.Admin)
+
+	// but then we won't be able to open ticket #2
 	testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "21", nil)
-	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "34", time.Now(), testdata.Editor)
+
+	testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Bob, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "27", testdata.Editor)
+	testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Alexandria, testdata.Internal, testdata.DefaultTopic, "Have you seen my cookies?", "", testdata.Editor)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/reopen.json", nil)
 }
