@@ -33,7 +33,7 @@ func TestBuildStartQuery(t *testing.T) {
 		contactUUIDs []flows.ContactUUID
 		urns         []urns.URN
 		userQuery    string
-		exclusions   search.Exclusions
+		exclusions   models.Exclusions
 		expected     string
 		err          string
 	}{
@@ -41,14 +41,14 @@ func TestBuildStartQuery(t *testing.T) {
 			groups:       []*models.Group{doctors, testers},
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID, testdata.George.UUID},
 			urns:         []urns.URN{"tel:+1234567890", "telegram:9876543210"},
-			exclusions:   search.Exclusions{},
+			exclusions:   models.Exclusions{},
 			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "8d024bcd-f473-4719-a00a-bd0bb1190135" OR tel = "+1234567890" OR telegram = 9876543210`,
 		},
 		{
 			groups:       []*models.Group{doctors},
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
 			urns:         []urns.URN{"tel:+1234567890"},
-			exclusions: search.Exclusions{
+			exclusions: models.Exclusions{
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
@@ -58,19 +58,19 @@ func TestBuildStartQuery(t *testing.T) {
 		},
 		{
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
-			exclusions: search.Exclusions{
+			exclusions: models.Exclusions{
 				NonActive: true,
 			},
 			expected: `uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" AND status = "active"`,
 		},
 		{
 			userQuery:  `gender = "M"`,
-			exclusions: search.Exclusions{},
+			exclusions: models.Exclusions{},
 			expected:   `gender = "M"`,
 		},
 		{
 			userQuery: `gender = "M"`,
-			exclusions: search.Exclusions{
+			exclusions: models.Exclusions{
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
@@ -80,7 +80,7 @@ func TestBuildStartQuery(t *testing.T) {
 		},
 		{
 			userQuery: `name ~ ben`,
-			exclusions: search.Exclusions{
+			exclusions: models.Exclusions{
 				NonActive:         false,
 				InAFlow:           false,
 				StartedPreviously: false,
@@ -90,7 +90,7 @@ func TestBuildStartQuery(t *testing.T) {
 		},
 		{
 			userQuery: `name ~ ben OR name ~ eric`,
-			exclusions: search.Exclusions{
+			exclusions: models.Exclusions{
 				NonActive:         false,
 				InAFlow:           false,
 				StartedPreviously: false,
@@ -100,12 +100,12 @@ func TestBuildStartQuery(t *testing.T) {
 		},
 		{
 			userQuery:  `name ~`, // syntactically invalid user query
-			exclusions: search.Exclusions{},
+			exclusions: models.Exclusions{},
 			err:        "invalid user query: mismatched input '<EOF>' expecting {TEXT, STRING}",
 		},
 		{
 			userQuery:  `goats > 14`, // no such field
-			exclusions: search.Exclusions{},
+			exclusions: models.Exclusions{},
 			err:        "invalid user query: can't resolve 'goats' to attribute, scheme or field",
 		},
 	}

@@ -59,7 +59,7 @@ type previewStartRequest struct {
 		URNs         []urns.URN          `json:"urns"`
 		Query        string              `json:"query"`
 	} `json:"include"   validate:"required"`
-	Exclude    search.Exclusions `json:"exclude"`
+	Exclude    models.Exclusions `json:"exclude"`
 	SampleSize int               `json:"sample_size"  validate:"required"`
 }
 

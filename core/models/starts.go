@@ -47,29 +47,13 @@ const (
 	StartStatusFailed   = StartStatus("F")
 )
 
-// FlowStartBatch represents a single flow batch that needs to be started
-type FlowStartBatch struct {
-	StartID     StartID     `json:"start_id"`
-	StartType   StartType   `json:"start_type"`
-	OrgID       OrgID       `json:"org_id"`
-	CreatedByID UserID      `json:"created_by_id"`
-	FlowID      FlowID      `json:"flow_id"`
-	FlowType    FlowType    `json:"flow_type"`
-	ContactIDs  []ContactID `json:"contact_ids"`
-
-	ParentSummary  null.JSON `json:"parent_summary,omitempty"`
-	SessionHistory null.JSON `json:"session_history,omitempty"`
-	Extra          null.JSON `json:"extra,omitempty"`
-
-	RestartParticipants bool `json:"restart_participants"`
-	IncludeActive       bool `json:"include_active"`
-
-	IsLast        bool `json:"is_last,omitempty"`
-	TotalContacts int  `json:"total_contacts"`
+// Exclusions are preset exclusion conditions
+type Exclusions struct {
+	NonActive         bool `json:"non_active"`          // contacts who are blocked, stopped or archived
+	InAFlow           bool `json:"in_a_flow"`           // contacts who are currently in a flow (including this one)
+	StartedPreviously bool `json:"started_previously"`  // contacts who have been in this flow in the last 90 days
+	NotSeenSinceDays  int  `json:"not_seen_since_days"` // contacts who have not been seen for more than this number of days
 }
-
-func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.RestartParticipants }
-func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.IncludeActive }
 
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
@@ -260,22 +244,51 @@ INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:flowst
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
 	return &FlowStartBatch{
-		StartID:             s.ID,
-		StartType:           s.StartType,
-		OrgID:               s.OrgID,
-		FlowID:              s.FlowID,
-		FlowType:            s.FlowType,
-		ContactIDs:          contactIDs,
+		StartID:        s.ID,
+		StartType:      s.StartType,
+		OrgID:          s.OrgID,
+		FlowID:         s.FlowID,
+		FlowType:       s.FlowType,
+		ContactIDs:     contactIDs,
+		Exclusions:     Exclusions{StartedPreviously: !s.RestartParticipants, InAFlow: !s.IncludeActive},
+		ParentSummary:  s.ParentSummary,
+		SessionHistory: s.SessionHistory,
+		Extra:          s.Extra,
+		IsLast:         last,
+		TotalContacts:  totalContacts,
+		CreatedByID:    s.CreatedByID,
+
+		//deprecated
 		RestartParticipants: s.RestartParticipants,
 		IncludeActive:       s.IncludeActive,
-		ParentSummary:       s.ParentSummary,
-		SessionHistory:      s.SessionHistory,
-		Extra:               s.Extra,
-		IsLast:              last,
-		TotalContacts:       totalContacts,
-		CreatedByID:         s.CreatedByID,
 	}
 }
+
+// FlowStartBatch represents a single flow batch that needs to be started
+type FlowStartBatch struct {
+	StartID     StartID     `json:"start_id"`
+	StartType   StartType   `json:"start_type"`
+	OrgID       OrgID       `json:"org_id"`
+	CreatedByID UserID      `json:"created_by_id"`
+	FlowID      FlowID      `json:"flow_id"`
+	FlowType    FlowType    `json:"flow_type"`
+	ContactIDs  []ContactID `json:"contact_ids"`
+	Exclusions  Exclusions  `json:"exclusions"`
+
+	ParentSummary  null.JSON `json:"parent_summary,omitempty"`
+	SessionHistory null.JSON `json:"session_history,omitempty"`
+	Extra          null.JSON `json:"extra,omitempty"`
+
+	IsLast        bool `json:"is_last,omitempty"`
+	TotalContacts int  `json:"total_contacts"`
+
+	// deprecated
+	RestartParticipants bool `json:"restart_participants"`
+	IncludeActive       bool `json:"include_active"`
+}
+
+func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.RestartParticipants }
+func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.IncludeActive }
 
 // ReadSessionHistory reads a session history from the given JSON
 func ReadSessionHistory(data []byte) (*flows.SessionHistory, error) {
