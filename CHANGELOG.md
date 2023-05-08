@@ -1,3 +1,7 @@
+v8.1.43 (2023-05-08)
+-------------------------
+ * Add contact locking to ticket/reopen endpoint
+
 v8.1.42 (2023-05-03)
 -------------------------
  * Update to latest goflow which fixes parsing locations with non-ASCII chars
