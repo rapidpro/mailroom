@@ -55,10 +55,25 @@ type Exclusions struct {
 	NotSeenSinceDays  int  `json:"not_seen_since_days"` // contacts who have not been seen for more than this number of days
 }
 
+// Scan supports reading exclusion values from JSON in database
+func (e *Exclusions) Scan(value any) error {
+	if value == nil {
+		*e = Exclusions{}
+		return nil
+	}
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("failed type assertion to []byte")
+	}
+	return json.Unmarshal(b, &e)
+}
+
+func (e Exclusions) Value() (driver.Value, error) { return json.Marshal(e) }
+
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	ID          StartID    `json:"start_id"      db:"id"`
-	UUID        uuids.UUID `                     db:"uuid"`
+	UUID        uuids.UUID `json:"-"             db:"uuid"`
 	StartType   StartType  `json:"start_type"    db:"start_type"`
 	OrgID       OrgID      `json:"org_id"        db:"org_id"`
 	CreatedByID UserID     `json:"created_by_id" db:"created_by_id"`
@@ -71,23 +86,27 @@ type FlowStart struct {
 	ExcludeGroupIDs []GroupID   `json:"exclude_group_ids,omitempty"` // used when loading scheduled triggers as flow starts
 	Query           null.String `json:"query,omitempty"        db:"query"`
 	CreateContact   bool        `json:"create_contact"`
+	Exclusions      Exclusions  `json:"exclusions"             db:"exclusions"`
 
-	RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
-	IncludeActive       bool `json:"include_active"       db:"include_active"`
-
-	Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
+	Params         null.JSON `json:"params,omitempty"          db:"params"`
 	ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
 	SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
+
+	// deprecated
+	Extra               null.JSON `json:"extra,omitempty"      db:"extra"`
+	RestartParticipants bool      `json:"restart_participants" db:"restart_participants"`
+	IncludeActive       bool      `json:"include_active"       db:"include_active"`
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
 func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID) *FlowStart {
 	return &FlowStart{
-		UUID:                uuids.New(),
-		OrgID:               orgID,
-		StartType:           startType,
-		FlowType:            flowType,
-		FlowID:              flowID,
+		UUID:      uuids.New(),
+		OrgID:     orgID,
+		StartType: startType,
+		FlowType:  flowType,
+		FlowID:    flowID,
+		// deprecated
 		RestartParticipants: true,
 		IncludeActive:       true,
 	}
@@ -120,12 +139,14 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 
 func (s *FlowStart) ExcludeStartedPreviously() bool { return !s.RestartParticipants }
 func (s *FlowStart) WithExcludeStartedPreviously(exclude bool) *FlowStart {
+	s.Exclusions.StartedPreviously = exclude
 	s.RestartParticipants = !exclude
 	return s
 }
 
 func (s *FlowStart) ExcludeInAFlow() bool { return !s.IncludeActive }
 func (s *FlowStart) WithExcludeInAFlow(exclude bool) *FlowStart {
+	s.Exclusions.InAFlow = exclude
 	s.IncludeActive = !exclude
 	return s
 }
@@ -145,8 +166,9 @@ func (s *FlowStart) WithSessionHistory(history json.RawMessage) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
-	s.Extra = null.JSON(extra)
+func (s *FlowStart) WithParams(params json.RawMessage) *FlowStart {
+	s.Params = null.JSON(params)
+	s.Extra = null.JSON(params)
 	return s
 }
 
@@ -229,8 +251,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const sqlInsertStart = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary,  session_history)
-			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary, :session_history)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on, modified_on, query,  exclusions,  status, params,  parent_summary,  session_history,  extra,  restart_participants,  include_active)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),      NOW(),       :query, :exclusions, 'P',    :params, :parent_summary, :session_history, :extra, :restart_participants, :include_active)
 RETURNING
 	id
 `
@@ -253,10 +275,12 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 		Exclusions:     Exclusions{StartedPreviously: !s.RestartParticipants, InAFlow: !s.IncludeActive},
 		ParentSummary:  s.ParentSummary,
 		SessionHistory: s.SessionHistory,
-		Extra:          s.Extra,
+		Params:         s.Extra,
 		IsLast:         last,
 		TotalContacts:  totalContacts,
 		CreatedByID:    s.CreatedByID,
+		// deprecated
+		Extra: s.Extra,
 	}
 }
 
@@ -271,12 +295,15 @@ type FlowStartBatch struct {
 	ContactIDs  []ContactID `json:"contact_ids"`
 	Exclusions  Exclusions  `json:"exclusions"`
 
+	Params         null.JSON `json:"params,omitempty"`
 	ParentSummary  null.JSON `json:"parent_summary,omitempty"`
 	SessionHistory null.JSON `json:"session_history,omitempty"`
-	Extra          null.JSON `json:"extra,omitempty"`
 
 	IsLast        bool `json:"is_last,omitempty"`
 	TotalContacts int  `json:"total_contacts"`
+
+	// deprecated
+	Extra null.JSON `json:"extra,omitempty"`
 }
 
 // ReadSessionHistory reads a session history from the given JSON

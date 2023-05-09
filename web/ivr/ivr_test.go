@@ -392,7 +392,7 @@ func TestVonageIVR(t *testing.T) {
 	// create a flow start for cathy and george
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
-		WithExtra(json.RawMessage(`{"ref_id":"123"}`))
+		WithParams(json.RawMessage(`{"ref_id":"123"}`))
 
 	err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
 	require.NoError(t, err)
