@@ -40,7 +40,7 @@ func TestBatchStart(t *testing.T) {
 		Flow                     models.FlowID
 		ExcludeStartedPreviously bool
 		ExcludeInAFlow           bool
-		Extra                    json.RawMessage
+		Params                   json.RawMessage
 		Msg                      string
 		Count                    int
 		TotalCount               int
@@ -53,7 +53,7 @@ func TestBatchStart(t *testing.T) {
 			Flow:                     testdata.IncomingExtraFlow.ID,
 			ExcludeStartedPreviously: false,
 			ExcludeInAFlow:           true,
-			Extra:                    json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
+			Params:                   json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
 			Msg:                      "Great to meet you Fred. Your age is 33.",
 			Count:                    2,
 			TotalCount:               2,
@@ -67,7 +67,7 @@ func TestBatchStart(t *testing.T) {
 			WithContactIDs(contactIDs).
 			WithExcludeInAFlow(tc.ExcludeInAFlow).
 			WithExcludeStartedPreviously(tc.ExcludeStartedPreviously).
-			WithExtra(tc.Extra)
+			WithParams(tc.Params)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
 		sessions, err := runner.StartFlowBatch(ctx, rt, batch)

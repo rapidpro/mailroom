@@ -107,25 +107,37 @@ func TestStartsBuilding(t *testing.T) {
 		WithExcludeGroupIDs([]models.GroupID{testdata.TestersGroup.ID}).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}).
 		WithQuery(`language != ""`).
-		WithCreateContact(true)
+		WithCreateContact(true).
+		WithParams(json.RawMessage(`{"foo": "bar"}`))
 
 	marshalled, err := jsonx.Marshal(start)
 	require.NoError(t, err)
 
 	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"UUID": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
 		"contact_ids": [%d, %d],
 		"create_contact": true,
 		"created_by_id": null,
 		"exclude_group_ids": [%d],
+		"exclusions": {
+			"in_a_flow": false,
+        	"non_active": false,
+        	"not_seen_since_days": 0,
+        	"started_previously": false
+		},
 		"flow_id": %d,
 		"flow_type": "M",
 		"group_ids": [%d],
-		"include_active": true,
 		"org_id": 1,
+		"params": {
+			"foo": "bar"
+		},
 		"query": "language != \"\"",
-		"restart_participants": true,
 		"start_id": null,
-		"start_type": "M"
+		"start_type": "M",
+		"extra": {
+			"foo": "bar"
+		},
+		"include_active": true,
+		"restart_participants": true
 	}`, testdata.Cathy.ID, testdata.Bob.ID, testdata.TestersGroup.ID, testdata.Favorites.ID, testdata.DoctorsGroup.ID)), marshalled)
 }
