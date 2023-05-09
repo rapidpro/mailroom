@@ -335,10 +335,10 @@ func StartIVRFlow(
 	}
 
 	var params *types.XObject
-	if !start.Extra.IsNull() {
-		params, err = types.ReadXObject(start.Extra)
+	if !start.Params.IsNull() {
+		params, err = types.ReadXObject(start.Params)
 		if err != nil {
-			return errors.Wrap(err, "unable to read JSON from flow start extra")
+			return errors.Wrap(err, "unable to read JSON from flow start params")
 		}
 	}
 
@@ -349,6 +349,10 @@ func StartIVRFlow(
 			return errors.Wrap(err, "unable to read JSON from flow start history")
 		}
 	}
+
+	//fmt.Printf("=== %v ==== \n", start.Extra)
+	//fmt.Printf("=== %v ==== \n", start.Params)
+	//fmt.Printf("=== %s ==== \n", params)
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())

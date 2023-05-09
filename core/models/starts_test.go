@@ -30,6 +30,7 @@ func TestStarts(t *testing.T) {
 		"start_type": "M",
 		"org_id": %d,
 		"created_by_id": %d,
+		"exclusions": {},
 		"flow_id": %d,
 		"flow_type": "M",
 		"contact_ids": [%d, %d],
@@ -37,11 +38,12 @@ func TestStarts(t *testing.T) {
 		"exclude_group_ids": [%d],
 		"urns": ["tel:+12025550199"],
 		"query": null,
-		"restart_participants": true,
-		"include_active": true,
+		"params": {"foo": "bar"},
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
-		"extra": {"foo": "bar"}
+		"extra": {"foo": "bar"},
+		"restart_participants": true,
+		"include_active": true
 	}`, startID, testdata.Org1.ID, testdata.Admin.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID, testdata.DoctorsGroup.ID, testdata.TestersGroup.ID))
 
 	start := &models.FlowStart{}
@@ -54,15 +56,15 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID)
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
 	assert.Equal(t, null.NullString, start.Query)
-	assert.False(t, start.ExcludeStartedPreviously())
-	assert.False(t, start.ExcludeInAFlow())
+	assert.False(t, start.Exclusions.StartedPreviously)
+	assert.False(t, start.Exclusions.InAFlow)
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, start.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs)
 	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs)
 
 	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary)
 	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory)
-	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra)
+	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Params)
 
 	err = models.MarkStartStarted(ctx, rt.DB, startID, 2)
 	require.NoError(t, err)
@@ -83,7 +85,7 @@ func TestStarts(t *testing.T) {
 
 	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), batch.ParentSummary)
 	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), batch.SessionHistory)
-	assert.Equal(t, null.JSON(`{"foo": "bar"}`), batch.Extra)
+	assert.Equal(t, null.JSON(`{"foo": "bar"}`), batch.Params)
 
 	history, err := models.ReadSessionHistory(batch.SessionHistory)
 	assert.NoError(t, err)

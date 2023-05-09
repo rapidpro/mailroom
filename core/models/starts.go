@@ -137,14 +137,12 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) ExcludeStartedPreviously() bool { return !s.RestartParticipants }
 func (s *FlowStart) WithExcludeStartedPreviously(exclude bool) *FlowStart {
 	s.Exclusions.StartedPreviously = exclude
 	s.RestartParticipants = !exclude
 	return s
 }
 
-func (s *FlowStart) ExcludeInAFlow() bool { return !s.IncludeActive }
 func (s *FlowStart) WithExcludeInAFlow(exclude bool) *FlowStart {
 	s.Exclusions.InAFlow = exclude
 	s.IncludeActive = !exclude
@@ -190,10 +188,10 @@ func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
 	return errors.Wrapf(err, "error setting flow start as failed")
 }
 
-// GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
+// GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and params
 func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
-	err := db.GetContext(ctx, start, `SELECT id, uuid, flow_id, extra, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
+	err := db.GetContext(ctx, start, `SELECT id, uuid, flow_id, params, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load start attributes for id: %d", startID)
 	}
@@ -251,7 +249,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const sqlInsertStart = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on, modified_on, query,  exclusions,  status, params,  parent_summary,  session_history,  extra,  restart_participants,  include_active)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on, modified_on, query,  exclusions,  status, "params",  parent_summary,  session_history,  extra,  restart_participants,  include_active)
 			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),      NOW(),       :query, :exclusions, 'P',    :params, :parent_summary, :session_history, :extra, :restart_participants, :include_active)
 RETURNING
 	id
@@ -272,15 +270,13 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 		FlowID:         s.FlowID,
 		FlowType:       s.FlowType,
 		ContactIDs:     contactIDs,
-		Exclusions:     Exclusions{StartedPreviously: !s.RestartParticipants, InAFlow: !s.IncludeActive},
+		Exclusions:     s.Exclusions,
 		ParentSummary:  s.ParentSummary,
 		SessionHistory: s.SessionHistory,
-		Params:         s.Extra,
+		Params:         s.Params,
 		IsLast:         last,
 		TotalContacts:  totalContacts,
 		CreatedByID:    s.CreatedByID,
-		// deprecated
-		Extra: s.Extra,
 	}
 }
 
@@ -301,9 +297,6 @@ type FlowStartBatch struct {
 
 	IsLast        bool `json:"is_last,omitempty"`
 	TotalContacts int  `json:"total_contacts"`
-
-	// deprecated
-	Extra null.JSON `json:"extra,omitempty"`
 }
 
 // ReadSessionHistory reads a session history from the given JSON
