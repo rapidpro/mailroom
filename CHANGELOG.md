@@ -1,3 +1,8 @@
+v8.1.45 (2023-05-09)
+-------------------------
+ * Always write new FlowStart fields
+ * Flow start batches should read from exclusions and remove legacy fields
+
 v8.1.44 (2023-05-08)
 -------------------------
  * Start writing exclusions blob on start batch tasks
