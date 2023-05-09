@@ -230,8 +230,8 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.ExcludeStartedPreviously = batch.ExcludeStartedPreviously()
-	options.ExcludeInAFlow = batch.ExcludeInAFlow()
+	options.ExcludeStartedPreviously = batch.Exclusions.StartedPreviously
+	options.ExcludeInAFlow = batch.Exclusions.InAFlow
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
