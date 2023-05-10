@@ -179,10 +179,10 @@ func StartFlowBatch(
 	}
 
 	var params *types.XObject
-	if !batch.Extra.IsNull() {
-		params, err = types.ReadXObject(batch.Extra)
+	if !batch.Params.IsNull() {
+		params, err = types.ReadXObject(batch.Params)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to read JSON from flow start extra")
+			return nil, errors.Wrap(err, "unable to read JSON from flow start params")
 		}
 	}
 
@@ -208,7 +208,7 @@ func StartFlowBatch(
 		}
 
 		tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual()
-		if batch.Extra != nil {
+		if !batch.Params.IsNull() {
 			tb = tb.WithParams(params)
 		}
 		if batchStart {
