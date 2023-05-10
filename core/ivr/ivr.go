@@ -350,10 +350,6 @@ func StartIVRFlow(
 		}
 	}
 
-	//fmt.Printf("=== %v ==== \n", start.Extra)
-	//fmt.Printf("=== %v ==== \n", start.Params)
-	//fmt.Printf("=== %s ==== \n", params)
-
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
