@@ -1,3 +1,8 @@
+v8.1.46 (2023-05-10)
+-------------------------
+ * Update to latest null library
+ * Read from new flow start fields
+
 v8.1.45 (2023-05-09)
 -------------------------
  * Always write new FlowStart fields
