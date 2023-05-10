@@ -92,8 +92,8 @@ github.com/nyaruka/librato v1.0.0 h1:Vznj9WCeC1yZXbBYyYp40KnbmXLbEkjKmHesV/v2SR0
 github.com/nyaruka/librato v1.0.0/go.mod h1:pkRNLFhFurOz0QqBz6/DuTFhHHxAubWxs4Jx+J7yUgg=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d h1:hyp9u36KIwbTCo2JAJ+TuJcJBc+UZzEig7RI/S5Dvkc=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d/go.mod h1:FGdPJVDTNqbRAD+2RvnK9YoO2HcEW7ogSMPzc90b638=
-github.com/nyaruka/null/v2 v2.0.2 h1:JHUiA/BRPlJHdTaWF2htuBqjAkxiYjwkjNPZPARmNFE=
-github.com/nyaruka/null/v2 v2.0.2/go.mod h1:OCVeCkCXwrg5/qE6RU0c1oUVZBy+ZDrT+xYg1XSaIWA=
+github.com/nyaruka/null/v2 v2.0.3 h1:rdmMRQyVzrOF3Jff/gpU/7BDR9mQX0lcLl4yImsA3kw=
+github.com/nyaruka/null/v2 v2.0.3/go.mod h1:OCVeCkCXwrg5/qE6RU0c1oUVZBy+ZDrT+xYg1XSaIWA=
 github.com/nyaruka/phonenumbers v1.1.6 h1:DcueYq7QrOArAprAYNoQfDgp0KetO4LqtnBtQC6Wyes=
 github.com/nyaruka/phonenumbers v1.1.6/go.mod h1:yShPJHDSH3aTKzCbXyVxNpbl2kA+F+Ne5Pun/MvFRos=
 github.com/nyaruka/redisx v0.2.2 h1:OAJ4g1So2opn6O5akDWEWiDWgEOvPMKU10EUCG/Nv9Y=
