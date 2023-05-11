@@ -91,11 +91,6 @@ type FlowStart struct {
 	Params         null.JSON `json:"params,omitempty"          db:"params"`
 	ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
 	SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
-
-	// deprecated
-	Extra               null.JSON `json:"extra,omitempty"      db:"extra"`
-	RestartParticipants bool      `json:"restart_participants" db:"restart_participants"`
-	IncludeActive       bool      `json:"include_active"       db:"include_active"`
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
@@ -106,9 +101,6 @@ func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID Fl
 		StartType: startType,
 		FlowType:  flowType,
 		FlowID:    flowID,
-		// deprecated
-		RestartParticipants: true,
-		IncludeActive:       true,
 	}
 }
 
@@ -139,13 +131,11 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 
 func (s *FlowStart) WithExcludeStartedPreviously(exclude bool) *FlowStart {
 	s.Exclusions.StartedPreviously = exclude
-	s.RestartParticipants = !exclude
 	return s
 }
 
 func (s *FlowStart) WithExcludeInAFlow(exclude bool) *FlowStart {
 	s.Exclusions.InAFlow = exclude
-	s.IncludeActive = !exclude
 	return s
 }
 
@@ -166,7 +156,6 @@ func (s *FlowStart) WithSessionHistory(history json.RawMessage) *FlowStart {
 
 func (s *FlowStart) WithParams(params json.RawMessage) *FlowStart {
 	s.Params = null.JSON(params)
-	s.Extra = null.JSON(params)
 	return s
 }
 
@@ -249,8 +238,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const sqlInsertStart = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on, modified_on, query,  exclusions,  status, params,  parent_summary,  session_history,  extra,  restart_participants,  include_active)
-			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),      NOW(),       :query, :exclusions, 'P',    :params, :parent_summary, :session_history, :extra, :restart_participants, :include_active)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on, modified_on, query,  exclusions,  status, params,  parent_summary,  session_history)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),      NOW(),       :query, :exclusions, 'P',    :params, :parent_summary, :session_history)
 RETURNING
 	id
 `
