@@ -1,3 +1,8 @@
+v8.1.47 (2023-05-11)
+-------------------------
+ * Still queue a courier message even if fetching the flow fails
+ * Stop writing old FlowStart fields
+
 v8.1.46 (2023-05-10)
 -------------------------
  * Update to latest null library
