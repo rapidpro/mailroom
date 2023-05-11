@@ -40,10 +40,7 @@ func TestStarts(t *testing.T) {
 		"query": null,
 		"params": {"foo": "bar"},
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
-		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
-		"extra": {"foo": "bar"},
-		"restart_participants": true,
-		"include_active": true
+		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}
 	}`, startID, testdata.Org1.ID, testdata.Admin.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID, testdata.DoctorsGroup.ID, testdata.TestersGroup.ID))
 
 	start := &models.FlowStart{}
@@ -135,11 +132,6 @@ func TestStartsBuilding(t *testing.T) {
 		},
 		"query": "language != \"\"",
 		"start_id": null,
-		"start_type": "M",
-		"extra": {
-			"foo": "bar"
-		},
-		"include_active": true,
-		"restart_participants": true
+		"start_type": "M"
 	}`, testdata.Cathy.ID, testdata.Bob.ID, testdata.TestersGroup.ID, testdata.Favorites.ID, testdata.DoctorsGroup.ID)), marshalled)
 }
