@@ -95,12 +95,11 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel)
 	}
 
 	if m.FlowID() != models.NilFlowID {
-		flow, err := oa.FlowByID(m.FlowID())
-		if err != nil {
-			return nil, errors.Wrap(err, "error loading message flow")
-		}
-		msg.Flow = flow.Reference()
 		msg.Origin = MsgOriginFlow
+		flow, _ := oa.FlowByID(m.FlowID()) // always a chance flow no longer exists
+		if flow != nil {
+			msg.Flow = flow.Reference()
+		}
 	} else if m.BroadcastID() != models.NilBroadcastID {
 		msg.Origin = MsgOriginBroadcast
 	} else if m.TicketID() != models.NilTicketID {
