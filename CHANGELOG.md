@@ -1,3 +1,8 @@
+v8.1.48 (2023-05-15)
+-------------------------
+ * Fix loading of scheduled triggers
+ * Update test database
+
 v8.1.47 (2023-05-11)
 -------------------------
  * Still queue a courier message even if fetching the flow fails
