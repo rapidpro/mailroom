@@ -71,8 +71,8 @@ func ImportFlows(rt *runtime.Runtime, org *Org, path string) []*Flow {
 func InsertFlowStart(rt *runtime.Runtime, org *Org, flow *Flow, contacts []*Contact) models.StartID {
 	var id models.StartID
 	must(rt.DB.Get(&id,
-		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, exclusions, created_on, modified_on, contact_count, status, created_by_id, restart_participants, include_active)
-		 VALUES($1, $2, $3, 'M', '{}', NOW(), NOW(), 2, 'P', 1, TRUE, TRUE) RETURNING id`, uuids.New(), org.ID, flow.ID,
+		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, exclusions, created_on, modified_on, contact_count, status, created_by_id)
+		 VALUES($1, $2, $3, 'M', '{}', NOW(), NOW(), 2, 'P', 1) RETURNING id`, uuids.New(), org.ID, flow.ID,
 	))
 
 	for _, c := range contacts {
