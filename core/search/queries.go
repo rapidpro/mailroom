@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -13,7 +12,7 @@ import (
 )
 
 // BuildStartQuery builds a start query for the given flow and start options
-func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, urnz []urns.URN, userQuery string, excs models.Exclusions) (string, error) {
+func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery string, excs models.Exclusions, excGroups []*models.Group) (string, error) {
 	var parsedQuery *contactql.ContactQuery
 	var err error
 
@@ -24,10 +23,10 @@ func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.G
 		}
 	}
 
-	return contactql.Stringify(buildStartQuery(oa.Env(), flow, groups, contactUUIDs, urnz, parsedQuery, excs)), nil
+	return contactql.Stringify(buildStartQuery(oa.Env(), flow, groups, contactUUIDs, parsedQuery, excs, excGroups)), nil
 }
 
-func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, urnz []urns.URN, userQuery *contactql.ContactQuery, excs models.Exclusions) contactql.QueryNode {
+func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery *contactql.ContactQuery, excs models.Exclusions, excGroups []*models.Group) contactql.QueryNode {
 	inclusions := make([]contactql.QueryNode, 0, 10)
 
 	for _, group := range groups {
@@ -35,10 +34,6 @@ func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.G
 	}
 	for _, contactUUID := range contactUUIDs {
 		inclusions = append(inclusions, contactql.NewCondition("uuid", contactql.PropertyTypeAttribute, contactql.OpEqual, string(contactUUID)))
-	}
-	for _, urn := range urnz {
-		scheme, path, _, _ := urn.ToParts()
-		inclusions = append(inclusions, contactql.NewCondition(scheme, contactql.PropertyTypeScheme, contactql.OpEqual, path))
 	}
 	if userQuery != nil {
 		inclusions = append(inclusions, userQuery.Root())
@@ -57,6 +52,9 @@ func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.G
 	if excs.NotSeenSinceDays > 0 {
 		seenSince := dates.Now().Add(-time.Hour * time.Duration(24*excs.NotSeenSinceDays))
 		exclusions = append(exclusions, contactql.NewCondition("last_seen_on", contactql.PropertyTypeAttribute, contactql.OpGreaterThan, formatQueryDate(env, seenSince)))
+	}
+	for _, group := range excGroups {
+		exclusions = append(exclusions, contactql.NewCondition("group", contactql.PropertyTypeAttribute, contactql.OpNotEqual, group.Name()))
 	}
 
 	return contactql.NewBoolCombination(contactql.BoolOperatorAnd,

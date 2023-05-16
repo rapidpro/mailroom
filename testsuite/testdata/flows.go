@@ -16,6 +16,14 @@ type Flow struct {
 	UUID assets.FlowUUID
 }
 
+func (f *Flow) Load(rt *runtime.Runtime, oa *models.OrgAssets) *models.Flow {
+	flow, err := oa.FlowByID(f.ID)
+	if err != nil {
+		panic(err)
+	}
+	return flow
+}
+
 func (f *Flow) Reference() *assets.FlowReference {
 	return &assets.FlowReference{UUID: f.UUID, Name: ""}
 }

@@ -29,32 +29,32 @@ func TestBuildStartQuery(t *testing.T) {
 	testers := oa.GroupByID(testdata.TestersGroup.ID)
 
 	tcs := []struct {
-		groups       []*models.Group
-		contactUUIDs []flows.ContactUUID
-		urns         []urns.URN
-		userQuery    string
-		exclusions   models.Exclusions
-		expected     string
-		err          string
+		groups        []*models.Group
+		contactUUIDs  []flows.ContactUUID
+		urns          []urns.URN
+		userQuery     string
+		exclusions    models.Exclusions
+		excludeGroups []*models.Group
+		expected      string
+		err           string
 	}{
 		{
 			groups:       []*models.Group{doctors, testers},
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID, testdata.George.UUID},
-			urns:         []urns.URN{"tel:+1234567890", "telegram:9876543210"},
 			exclusions:   models.Exclusions{},
-			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "8d024bcd-f473-4719-a00a-bd0bb1190135" OR tel = "+1234567890" OR telegram = 9876543210`,
+			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "8d024bcd-f473-4719-a00a-bd0bb1190135"`,
 		},
 		{
 			groups:       []*models.Group{doctors},
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
-			urns:         []urns.URN{"tel:+1234567890"},
 			exclusions: models.Exclusions{
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
 				NotSeenSinceDays:  90,
 			},
-			expected: `(group = "Doctors" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR tel = "+1234567890") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > "20-01-2022"`,
+			excludeGroups: []*models.Group{testers},
+			expected:      `(group = "Doctors" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > "20-01-2022" AND group != "Testers"`,
 		},
 		{
 			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
@@ -111,7 +111,7 @@ func TestBuildStartQuery(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		actual, err := search.BuildStartQuery(oa, flow, tc.groups, tc.contactUUIDs, tc.urns, tc.userQuery, tc.exclusions)
+		actual, err := search.BuildStartQuery(oa, flow, tc.groups, tc.contactUUIDs, tc.userQuery, tc.exclusions, tc.excludeGroups)
 		if tc.err != "" {
 			assert.Equal(t, "", actual)
 			assert.EqualError(t, err, tc.err)

@@ -358,59 +358,61 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	assert.NoError(t, err)
+
 	// add an orphaned URN
 	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
-	contactIDSeq := models.ContactID(30000)
-	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
-	prevContact := func() models.ContactID { return contactIDSeq - 1 }
-
-	org, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	tcs := []struct {
-		OrgID      models.OrgID
-		URNs       []urns.URN
-		ContactIDs map[urns.URN]models.ContactID
+		orgID   models.OrgID
+		urns    []urns.URN
+		fetched map[urns.URN]*models.Contact
+		created []urns.URN
 	}{
 		{
-			testdata.Org1.ID,
-			[]urns.URN{testdata.Cathy.URN},
-			map[urns.URN]models.ContactID{testdata.Cathy.URN: testdata.Cathy.ID},
-		},
-		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
-			map[urns.URN]models.ContactID{urns.URN(testdata.Cathy.URN.String() + "?foo=bar"): testdata.Cathy.ID},
-		},
-		{
-			testdata.Org1.ID,
-			[]urns.URN{testdata.Cathy.URN, urns.URN("telegram:100001")},
-			map[urns.URN]models.ContactID{
-				testdata.Cathy.URN:          testdata.Cathy.ID,
-				urns.URN("telegram:100001"): newContact(),
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{testdata.Cathy.URN},
+			fetched: map[urns.URN]*models.Contact{
+				testdata.Cathy.URN: cathy,
 			},
+			created: []urns.URN{},
 		},
 		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN("telegram:100001")},
-			map[urns.URN]models.ContactID{urns.URN("telegram:100001"): prevContact()},
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
+			fetched: map[urns.URN]*models.Contact{
+				urns.URN(testdata.Cathy.URN.String() + "?foo=bar"): cathy,
+			},
+			created: []urns.URN{},
 		},
 		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN("telegram:200001")},
-			map[urns.URN]models.ContactID{urns.URN("telegram:200001"): newContact()}, // new contact assigned orphaned URN
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{testdata.Cathy.URN, urns.URN("telegram:100001")},
+			fetched: map[urns.URN]*models.Contact{
+				testdata.Cathy.URN: cathy,
+			},
+			created: []urns.URN{"telegram:100001"},
+		},
+		{
+			orgID:   testdata.Org1.ID,
+			urns:    []urns.URN{urns.URN("telegram:200001")},
+			fetched: map[urns.URN]*models.Contact{},
+			created: []urns.URN{"telegram:200001"}, // new contact assigned orphaned URN
 		},
 	}
 
 	for i, tc := range tcs {
-		ids, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, org, tc.URNs)
+		fetched, created, err := models.GetOrCreateContactsFromURNs(ctx, rt.DB, oa, tc.urns)
 		assert.NoError(t, err, "%d: error getting contact ids", i)
-		assert.Equal(t, tc.ContactIDs, ids, "%d: mismatch in contact ids", i)
+		assert.Equal(t, tc.fetched, fetched, "%d: fetched contacts mismatch", i)
+		assert.Equal(t, tc.created, maps.Keys(created), "%d: created contacts mismatch", i)
 	}
 }
 
-func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
+func TestGetOrCreateContactsFromURNsRace(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
@@ -427,13 +429,13 @@ func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
 		return nil
 	})
 
-	var contacts [2]models.ContactID
+	var contacts [2]*models.Contact
 	var errs [2]error
 
 	test.RunConcurrently(2, func(i int) {
-		var cmap map[urns.URN]models.ContactID
-		cmap, errs[i] = models.GetOrCreateContactIDsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
-		contacts[i] = cmap[urns.URN("telegram:100007")]
+		var created map[urns.URN]*models.Contact
+		_, created, errs[i] = models.GetOrCreateContactsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+		contacts[i] = created[urns.URN("telegram:100007")]
 	})
 
 	require.NoError(t, errs[0])

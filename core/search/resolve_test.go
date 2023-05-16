@@ -1,6 +1,7 @@
 package search_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
@@ -21,54 +22,160 @@ func TestResolveRecipients(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	mocks.ES.AddResponse(testdata.Cathy.ID, testdata.Bob.ID)
-	mocks.ES.AddResponse(testdata.Cathy.ID)
-
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	tcs := []struct {
-		recipients  *search.Recipients
-		expectedIDs []models.ContactID
+		flow               *testdata.Flow
+		recipients         *search.Recipients
+		limit              int
+		expectedElastic    string
+		expectedCreatedIDs []models.ContactID
 	}{
-		{
-			recipients:  &search.Recipients{},
-			expectedIDs: []models.ContactID{},
+		{ // 0
+			recipients:      &search.Recipients{},
+			expectedElastic: "",
 		},
-		{
+		{ // 1
 			recipients: &search.Recipients{
 				ContactIDs: []models.ContactID{testdata.Bob.ID},
 				GroupIDs:   []models.GroupID{group1.ID},
 				Query:      `name = "Cathy" OR name = "Bob"`,
 			},
-			expectedIDs: []models.ContactID{testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID, testdata.Cathy.ID},
+			limit: -1,
+			expectedElastic: `{
+				"_source": false,
+				"query": {
+					"bool": {
+						"must": [
+							{"term": {"org_id": 1}},
+							{"term": {"is_active": true}},
+							{"term": {"status": "A"}},
+							{
+								"bool": {
+									"should": [
+										{"term": {"group_ids": 30000}},
+										{"term": {"uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"}},
+										{"term": {"name.keyword": "Cathy"}},
+										{"term": {"name.keyword": "Bob"}}
+									]
+								}
+							}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			expectedCreatedIDs: []models.ContactID{},
 		},
-		{
+		{ // 2
 			recipients: &search.Recipients{
-				ContactIDs:      []models.ContactID{testdata.George.ID, testdata.Bob.ID},
+				ContactIDs:      []models.ContactID{testdata.Bob.ID},
 				ExcludeGroupIDs: []models.GroupID{group2.ID},
 			},
-			expectedIDs: []models.ContactID{testdata.Bob.ID},
+			limit: -1,
+			expectedElastic: `{
+				"_source": false,
+				"query": {
+					"bool": {
+						"must": [
+							{"term": {"org_id": 1}},
+							{"term": {"is_active": true}},
+							{"term": {"status": "A"}},
+							{
+								"bool": {
+									"must": [
+										{"term": {"uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"}},
+										{
+											"bool": {
+												"must_not": {
+													"term": {"group_ids": 30001}
+												}
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			expectedCreatedIDs: []models.ContactID{},
 		},
-		{
+		{ // 3
 			recipients: &search.Recipients{
 				ContactIDs: []models.ContactID{testdata.Bob.ID},
 				URNs:       []urns.URN{"tel:+1234567890", "tel:+1234567891"},
 			},
-			expectedIDs: []models.ContactID{testdata.Bob.ID, 30000, 30001},
+			limit: -1,
+			expectedElastic: `{
+				"_source": false,
+				"query": {
+					"bool": {
+						"must": [
+							{"term": {"org_id": 1}}, 
+							{"term": {"is_active": true}}, 
+							{"term": {"status": "A"}}, 
+							{"term": {"uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"}}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			expectedCreatedIDs: []models.ContactID{30000, 30001},
 		},
-		{
+		{ // 4
 			recipients: &search.Recipients{
-				Query:      `name = "Cathy" OR name = "Bob"`,
-				QueryLimit: 1,
+				Query: `name = "Cathy" OR name = "Bob"`,
 			},
-			expectedIDs: []models.ContactID{testdata.Cathy.ID},
+			limit: 1,
+			expectedElastic: `{
+				"_source": false,
+				"from": 0,
+				"query": {
+					"bool": {
+						"must": [
+							{"term": {"org_id": 1}}, 
+							{"term": {"is_active": true}}, 
+							{"term": {"status": "A"}}, 
+							{
+								"bool": {
+									"should": [
+										{"term": {"name.keyword": "Cathy"}}, 
+										{"term": {"name.keyword": "Bob"}}
+									]
+								}
+							}
+						]
+					}
+				},
+				"size": 1
+			}`,
+			expectedCreatedIDs: []models.ContactID{},
 		},
 	}
 
 	for i, tc := range tcs {
-		actualIDs, err := search.ResolveRecipients(ctx, rt, oa, tc.recipients)
+		var flow *models.Flow
+		if tc.flow != nil {
+			flow = tc.flow.Load(rt, oa)
+		}
+
+		mocks.ES.AddResponse() // only created ids will be returned (those don't go thru ES)
+
+		actualIDs, err := search.ResolveRecipients(ctx, rt, oa, flow, tc.recipients, tc.limit)
 		assert.NoError(t, err)
-		assert.ElementsMatch(t, tc.expectedIDs, actualIDs, "contact ids mismatch in %d", i)
+
+		fmt.Println(mocks.ES.LastRequestBody)
+
+		if tc.expectedElastic != "" {
+			assert.JSONEq(t, tc.expectedElastic, mocks.ES.LastRequestBody, "%d: elastic request mismatch", i)
+		} else {
+			assert.Equal(t, "", mocks.ES.LastRequestBody)
+		}
+		assert.ElementsMatch(t, tc.expectedCreatedIDs, actualIDs, "%d: contact ids mismatch", i)
+
+		mocks.ES.LastRequestBody = ""
 	}
 }

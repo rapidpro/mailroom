@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
@@ -56,7 +55,6 @@ type previewStartRequest struct {
 	Include struct {
 		GroupUUIDs   []assets.GroupUUID  `json:"group_uuids"`
 		ContactUUIDs []flows.ContactUUID `json:"contact_uuids"`
-		URNs         []urns.URN          `json:"urns"`
 		Query        string              `json:"query"`
 	} `json:"include"   validate:"required"`
 	Exclude    models.Exclusions `json:"exclude"`
@@ -89,7 +87,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewStar
 		}
 	}
 
-	query, err := search.BuildStartQuery(oa, flow, groups, r.Include.ContactUUIDs, r.Include.URNs, r.Include.Query, r.Exclude)
+	query, err := search.BuildStartQuery(oa, flow, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude, nil)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
