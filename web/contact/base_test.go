@@ -38,6 +38,16 @@ func TestCreate(t *testing.T) {
 	testsuite.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
+func TestBulkCreate(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	rt.DB.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/bulk_create.json", nil)
+}
+
 func TestInspect(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
