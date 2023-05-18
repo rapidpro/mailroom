@@ -419,7 +419,7 @@ UPDATE tickets_ticket
  WHERE id = ANY($1)`
 
 // TicketsAssign assigns the passed in tickets
-func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -444,7 +444,7 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 			t.ModifiedOn = now
 			t.LastActivityOn = now
 
-			e := NewTicketAssignedEvent(ticket, userID, assigneeID, note)
+			e := NewTicketAssignedEvent(ticket, userID, assigneeID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}

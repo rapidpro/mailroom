@@ -87,7 +87,7 @@ func TestTicketNotifications(t *testing.T) {
 	rt.DB.MustExec(`UPDATE notifications_notification SET is_seen = TRUE`)
 
 	// now have a user assign existing tickets to another user
-	_, err = models.TicketsAssign(ctx, rt.DB, oa, testdata.Admin.ID, []*models.Ticket{ticket1, ticket2}, testdata.Agent.ID, "")
+	_, err = models.TicketsAssign(ctx, rt.DB, oa, testdata.Admin.ID, []*models.Ticket{ticket1, ticket2}, testdata.Agent.ID)
 	require.NoError(t, err)
 
 	// check that the assigned user gets a ticket activity notification
@@ -99,7 +99,7 @@ func TestTicketNotifications(t *testing.T) {
 	rt.DB.MustExec(`UPDATE notifications_notification SET is_seen = TRUE`)
 
 	// and finally a user assigning a ticket to themselves
-	_, err = models.TicketsAssign(ctx, rt.DB, oa, testdata.Editor.ID, []*models.Ticket{ticket3}, testdata.Editor.ID, "")
+	_, err = models.TicketsAssign(ctx, rt.DB, oa, testdata.Editor.ID, []*models.Ticket{ticket3}, testdata.Editor.ID)
 	require.NoError(t, err)
 
 	// no notifications for self-assignment

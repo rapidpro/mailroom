@@ -29,10 +29,9 @@ func TestTicketEvents(t *testing.T) {
 	assert.Equal(t, null.NullString, e1.Note())
 	assert.Equal(t, testdata.Admin.ID, e1.CreatedByID())
 
-	e2 := models.NewTicketAssignedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID, "please handle")
+	e2 := models.NewTicketAssignedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID)
 	assert.Equal(t, models.TicketEventTypeAssigned, e2.EventType())
 	assert.Equal(t, testdata.Agent.ID, e2.AssigneeID())
-	assert.Equal(t, null.String("please handle"), e2.Note())
 	assert.Equal(t, testdata.Admin.ID, e2.CreatedByID())
 
 	e3 := models.NewTicketNoteAddedEvent(modelTicket, testdata.Agent.ID, "please handle")
@@ -57,6 +56,5 @@ func TestTicketEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent`).Returns(5)
-	assertdb.Query(t, rt.DB, `SELECT assignee_id, note FROM tickets_ticketevent WHERE id = $1`, e2.ID()).
-		Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID), "note": "please handle"})
+	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticketevent WHERE id = $1`, e2.ID()).Columns(map[string]any{"assignee_id": int64(testdata.Agent.ID)})
 }
