@@ -11,8 +11,7 @@
                 2,
                 3
             ],
-            "assignee_id": 6,
-            "note": "please handle"
+            "assignee_id": 6
         },
         "status": 200,
         "response": {
@@ -27,7 +26,7 @@
                 "count": 3
             },
             {
-                "query": "SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND created_by_id = 3 AND note = 'please handle'",
+                "query": "SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND created_by_id = 3",
                 "count": 2
             }
         ]

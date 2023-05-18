@@ -212,7 +212,7 @@ func TestTicketsAssign(t *testing.T) {
 
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 
-	evts, err := models.TicketsAssign(ctx, rt.DB, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Agent.ID, "please handle these")
+	evts, err := models.TicketsAssign(ctx, rt.DB, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Agent.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 3, len(evts))
 	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket1].EventType())
@@ -225,7 +225,7 @@ func TestTicketsAssign(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket3.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
 
 	// and there are new assigned events with notifications
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(3)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A'`).Returns(3)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
 
 	// and daily counts (we only count first assignments of a ticket)
