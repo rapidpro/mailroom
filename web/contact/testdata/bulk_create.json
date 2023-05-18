@@ -1,0 +1,161 @@
+[
+    {
+        "label": "error if specs not provided",
+        "method": "POST",
+        "path": "/mr/contact/bulk_create",
+        "body": {
+            "org_id": 1,
+            "user_id": 3
+        },
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'specs' is required"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "create 2 empty contacs",
+        "method": "POST",
+        "path": "/mr/contact/bulk_create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "specs": [
+                {},
+                {}
+            ]
+        },
+        "status": 200,
+        "response": {
+            "created": {
+                "0": {
+                    "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5",
+                    "id": 30000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:01.123457Z"
+                },
+                "1": {
+                    "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716",
+                    "id": 30001,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:02.123457Z"
+                }
+            },
+            "errored": {}
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE name IS NULL AND language IS NULL AND created_by_id != 2",
+                "count": 2
+            }
+        ]
+    },
+    {
+        "label": "create a contact with all properties",
+        "method": "POST",
+        "path": "/mr/contact/bulk_create",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "specs": [
+                {
+                    "name": "José",
+                    "language": "spa",
+                    "urns": [
+                        "tel:+16055700001"
+                    ],
+                    "fields": {
+                        "gender": "M",
+                        "age": "39"
+                    },
+                    "groups": [
+                        "c153e265-f7c9-4539-9dbc-9b358714b638"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "created": {
+                "0": {
+                    "uuid": "8720f157-ca1c-432f-9c0b-2014ddc77094",
+                    "id": 30002,
+                    "name": "José",
+                    "language": "spa",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+16055700001?id=30000&priority=1000"
+                    ],
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
+                    "fields": {
+                        "age": {
+                            "text": "39",
+                            "number": 39
+                        },
+                        "gender": {
+                            "text": "M"
+                        }
+                    }
+                }
+            },
+            "errored": {}
+        }
+    },
+    {
+        "label": "error if try to create contact with invalid language",
+        "method": "POST",
+        "path": "/mr/contact/bulk_create",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "specs": [
+                {
+                    "name": "María",
+                    "language": "xyz"
+                }
+            ]
+        },
+        "status": 400,
+        "response": {
+            "error": "invalid language: unrecognized language code: xyz"
+        }
+    },
+    {
+        "label": "error if try to create contact with taken URN",
+        "method": "POST",
+        "path": "/mr/contact/bulk_create",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "specs": [
+                {
+                    "name": "María",
+                    "urns": [
+                        "tel:+16055700001"
+                    ]
+                }
+            ]
+        },
+        "status": 207,
+        "response": {
+            "created": {},
+            "errored": {
+                "0": "URNs in use by other contacts"
+            }
+        }
+    }
+]
