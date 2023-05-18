@@ -1,3 +1,8 @@
+v8.1.49 (2023-05-18)
+-------------------------
+ * Remove support for ticket assignment with a note
+ * Add contact/bulk_create endpoint
+
 v8.1.48 (2023-05-15)
 -------------------------
  * Fix loading of scheduled triggers
