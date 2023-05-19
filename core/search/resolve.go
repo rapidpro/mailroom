@@ -60,7 +60,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 
 	// if we have a query, add the contacts that match that as well
 	if recipients.Query != "" {
-		matches, err := GetContactIDsForQuery(ctx, rt.ES, oa, recipients.Query, recipients.QueryLimit)
+		matches, err := GetContactIDsForQuery(ctx, rt, oa, recipients.Query, recipients.QueryLimit)
 		if err != nil {
 			return nil, errors.Wrap(err, "error performing contact search")
 		}
