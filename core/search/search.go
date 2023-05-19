@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/contactql/es"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -67,13 +68,14 @@ func BuildElasticQuery(oa *models.OrgAssets, group *models.Group, status models.
 }
 
 // GetContactIDsForQueryPage returns a page of contact ids for the given query and sort
-func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *models.OrgAssets, group *models.Group, excludeIDs []models.ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []models.ContactID, int64, error) {
+func GetContactIDsForQueryPage(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, group *models.Group, excludeIDs []models.ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []models.ContactID, int64, error) {
 	env := oa.Env()
+	index := rt.Config.ElasticContactsIndex
 	start := time.Now()
 	var parsed *contactql.ContactQuery
 	var err error
 
-	if client == nil {
+	if rt.ES == nil {
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
@@ -91,7 +93,7 @@ func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
 
-	s := client.Search("contacts").TrackTotalHits(true).Routing(strconv.FormatInt(int64(oa.OrgID()), 10))
+	s := rt.ES.Search(index).TrackTotalHits(true).Routing(strconv.FormatInt(int64(oa.OrgID()), 10))
 	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
 
 	results, err := s.Do(ctx)
@@ -117,11 +119,12 @@ func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *
 }
 
 // GetContactIDsForQuery returns up to limit the contact ids that match the given query without sorting. Limit of -1 means return all.
-func GetContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *models.OrgAssets, query string, limit int) ([]models.ContactID, error) {
+func GetContactIDsForQuery(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, query string, limit int) ([]models.ContactID, error) {
 	env := oa.Env()
+	index := rt.Config.ElasticContactsIndex
 	start := time.Now()
 
-	if client == nil {
+	if rt.ES == nil {
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
 
@@ -137,7 +140,7 @@ func GetContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *mode
 
 	// if limit provided that can be done with regular search, do that
 	if limit >= 0 && limit <= 10000 {
-		results, err := client.Search("contacts").Routing(routing).From(0).Size(limit).Query(eq).FetchSource(false).Do(ctx)
+		results, err := rt.ES.Search(index).Routing(routing).From(0).Size(limit).Query(eq).FetchSource(false).Do(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +149,7 @@ func GetContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *mode
 
 	// for larger limits, use scroll service
 	// note that this is no longer recommended, see https://www.elastic.co/guide/en/elasticsearch/reference/current/scroll-api.html
-	scroll := client.Scroll("contacts").Routing(routing).KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
+	scroll := rt.ES.Scroll(index).Routing(routing).KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
 	for {
 		results, err := scroll.Do(ctx)
 		if err == io.EOF {

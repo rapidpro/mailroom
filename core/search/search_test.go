@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -175,7 +174,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		group := oa.GroupByID(tc.Group.ID)
 
-		_, ids, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		_, ids, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)
@@ -196,9 +195,6 @@ func TestGetContactIDsForQuery(t *testing.T) {
 	mocks.ES.AddResponse(testdata.George.ID)
 	mocks.ES.AddResponse()
 	mocks.ES.AddResponse(testdata.George.ID)
-
-	es, err := elastic.NewClient(elastic.SetURL(mocks.ES.URL()), elastic.SetHealthcheck(false), elastic.SetSniff(false))
-	require.NoError(t, err)
 
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
@@ -334,7 +330,7 @@ func TestGetContactIDsForQuery(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		ids, err := search.GetContactIDsForQuery(ctx, es, oa, tc.query, tc.limit)
+		ids, err := search.GetContactIDsForQuery(ctx, rt, oa, tc.query, tc.limit)
 
 		if tc.expectedError != "" {
 			assert.EqualError(t, err, tc.expectedError)

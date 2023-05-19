@@ -101,7 +101,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewStar
 		return &previewStartResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, r.SampleSize)
+	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, nil, nil, query, "", 0, r.SampleSize)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error querying preview")
 	}
