@@ -21,11 +21,17 @@ import (
 )
 
 func TestIVR(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt, mocks, close := testsuite.RuntimeWithSearch()
+	defer close()
+
 	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
+
+	mocks.ES.AddResponse(testdata.Cathy.ID)
+	mocks.ES.AddResponse(testdata.Cathy.ID)
+	mocks.ES.AddResponse(testdata.Cathy.ID)
 
 	// register our mock client
 	ivr.RegisterServiceType(models.ChannelType("ZZ"), NewMockProvider)

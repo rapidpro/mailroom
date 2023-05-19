@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStartTasks(t *testing.T) {
@@ -30,9 +29,7 @@ func TestStartTasks(t *testing.T) {
 	sID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
 	testdata.InsertFlowRun(rt, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
-	var doctorIDs []models.ContactID
-	err := rt.DB.Select(&doctorIDs, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, testdata.DoctorsGroup.ID)
-	require.NoError(t, err)
+	doctorIDs := testdata.DoctorsGroup.ContactIDs(rt)
 
 	tcs := []struct {
 		label                    string

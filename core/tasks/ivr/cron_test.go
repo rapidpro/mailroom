@@ -17,11 +17,15 @@ import (
 )
 
 func TestRetries(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
+	defer close()
+
 	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
+
+	mocks.ES.AddResponse(testdata.Cathy.ID)
 
 	// register our mock client
 	ivr.RegisterServiceType(models.ChannelType("ZZ"), NewMockProvider)
