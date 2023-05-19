@@ -19,6 +19,13 @@ jobs:
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      elastic:
+          image: elasticsearch:7.17.9
+          ports:
+            - 9200:9200
+            - 9300:9300
+          env:
+            discovery.type: single-node
   
     steps:
       - name: Checkout code

@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/test"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
@@ -116,8 +115,11 @@ func TestInterrupt(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
-	defer close()
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetElastic)
+
+	testsuite.ReindexElastic(rt)
 
 	wg := &sync.WaitGroup{}
 
@@ -133,7 +135,6 @@ func TestSearch(t *testing.T) {
 		method               string
 		url                  string
 		body                 string
-		mockResult           []models.ContactID
 		expectedStatus       int
 		expectedError        string
 		expectedHits         []models.ContactID
@@ -142,33 +143,31 @@ func TestSearch(t *testing.T) {
 		expectedFields       []*assets.FieldReference
 		expectedSchemes      []string
 		expectedAllowAsGroup bool
-		expectedESRequest    string
 	}{
-		{
+		{ // 0
 			method:         "GET",
 			url:            "/mr/contact/search",
 			expectedStatus: 405,
 			expectedError:  "illegal method: GET",
 		},
-		{
+		{ // 1
 			method:         "POST",
 			url:            "/mr/contact/search",
 			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
 			expectedStatus: 400,
 			expectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
-		{
+		{ // 2
 			method:         "POST",
 			url:            "/mr/contact/search",
 			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
 			expectedStatus: 400,
 			expectedError:  "can't convert 'tomorrow' to a number",
 		},
-		{
+		{ // 3
 			method:               "POST",
 			url:                  "/mr/contact/search",
 			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_id": %d}`, testdata.ActiveGroup.ID),
-			mockResult:           []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.Cathy.ID},
 			expectedQuery:        `name ~ "Cathy"`,
@@ -177,75 +176,24 @@ func TestSearch(t *testing.T) {
 			expectedSchemes:      []string{},
 			expectedAllowAsGroup: true,
 		},
-		{
+		{ // 4
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_id": %d, "exclude_ids": [%d, %d]}`, testdata.ActiveGroup.ID, testdata.Bob.ID, testdata.George.ID),
-			mockResult:           []models.ContactID{testdata.George.ID},
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy OR George", "group_id": %d, "exclude_ids": [%d, %d]}`, testdata.ActiveGroup.ID, testdata.Bob.ID, testdata.George.ID),
 			expectedStatus:       200,
-			expectedHits:         []models.ContactID{testdata.George.ID},
-			expectedQuery:        `name ~ "Cathy"`,
+			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedQuery:        `name ~ "Cathy" OR name ~ "George"`,
 			expectedAttributes:   []string{"name"},
 			expectedFields:       []*assets.FieldReference{},
 			expectedSchemes:      []string{},
 			expectedAllowAsGroup: true,
-			expectedESRequest: `{
-				"_source": false,
-				"from": 0,
-				"query": {
-					"bool": {
-						"must": [
-							{
-								"term": {
-									"org_id": 1
-								}
-							},
-							{
-								"term": {
-									"is_active": true
-								}
-							},
-							{
-								"term": {
-									"group_ids": 1
-								}
-							},
-							{
-								"match": {
-									"name": {
-										"query": "cathy"
-									}
-								}
-							}
-						],
-						"must_not": {
-							"ids": {
-								"type": "_doc",
-								"values": [
-									"10001", "10002"
-								]
-							}
-						}
-					}
-				},
-				"size": 50,
-				"sort": [
-					{
-						"id": {
-							"order": "desc"
-						}
-					}
-				],
-				"track_total_hits": true
-			}`,
 		},
-		{
+		{ // 5
 			method:             "POST",
 			url:                "/mr/contact/search",
 			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_id": %d}`, testdata.ActiveGroup.ID),
-			mockResult:         []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:     200,
-			expectedHits:       []models.ContactID{testdata.Cathy.ID},
+			expectedHits:       []models.ContactID{},
 			expectedQuery:      `age = 10 AND gender = "M"`,
 			expectedAttributes: []string{},
 			expectedFields: []*assets.FieldReference{
@@ -255,13 +203,12 @@ func TestSearch(t *testing.T) {
 			expectedSchemes:      []string{},
 			expectedAllowAsGroup: true,
 		},
-		{
+		{ // 6
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_id": %d}`, testdata.ActiveGroup.ID),
-			mockResult:           []models.ContactID{testdata.Cathy.ID},
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_id": %d}`, testdata.TestersGroup.ID),
 			expectedStatus:       200,
-			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedHits:         []models.ContactID{10013, 10012, 10011, 10010, 10009, 10008, 10007, 10006, 10005, 10004},
 			expectedQuery:        ``,
 			expectedAttributes:   []string{},
 			expectedFields:       []*assets.FieldReference{},
@@ -271,10 +218,6 @@ func TestSearch(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		if tc.mockResult != nil {
-			mocks.ES.AddResponse(tc.mockResult...)
-		}
-
 		var body io.Reader
 		if tc.body != "" {
 			body = bytes.NewReader([]byte(tc.body))
@@ -296,18 +239,14 @@ func TestSearch(t *testing.T) {
 			r := &contact.SearchResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedHits, r.ContactIDs)
-			assert.Equal(t, tc.expectedQuery, r.Query)
+			assert.Equal(t, tc.expectedHits, r.ContactIDs, "%d: hits mismatch", i)
+			assert.Equal(t, tc.expectedQuery, r.Query, "%d: query mismatch", i)
 
 			if len(tc.expectedAttributes) > 0 || len(tc.expectedFields) > 0 || len(tc.expectedSchemes) > 0 {
 				assert.Equal(t, tc.expectedAttributes, r.Metadata.Attributes)
 				assert.Equal(t, tc.expectedFields, r.Metadata.Fields)
 				assert.Equal(t, tc.expectedSchemes, r.Metadata.Schemes)
 				assert.Equal(t, tc.expectedAllowAsGroup, r.Metadata.AllowAsGroup)
-			}
-
-			if tc.expectedESRequest != "" {
-				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(mocks.ES.LastRequestBody), "elastic request mismatch")
 			}
 		} else {
 			r := &web.ErrorResponse{}
