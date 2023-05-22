@@ -88,9 +88,11 @@ func Runtime() (context.Context, *runtime.Runtime) {
 	return context.Background(), rt
 }
 
-func ReindexElastic(rt *runtime.Runtime) {
-	contactsIndexer := indexers.NewContactIndexer(elasticURL, rt.Config.ElasticContactsIndex, 1, 1, 100)
-	contactsIndexer.Index(rt.DB.DB, false, false)
+func ReindexElastic() {
+	db := getDB()
+
+	contactsIndexer := indexers.NewContactIndexer(elasticURL, elasticContactsIndex, 1, 1, 100)
+	contactsIndexer.Index(db.DB, false, false)
 
 	time.Sleep(1 * time.Second)
 }
@@ -193,7 +195,7 @@ func resetStorage() {
 	must(os.RemoveAll(SessionStorageDir))
 }
 
-// clears any data that's been indexed to elastic
+// delete
 func resetElastic(ctx context.Context) {
 	es, err := elastic.NewSimpleClient(elastic.SetURL(elasticURL), elastic.SetSniff(false))
 	noError(err)
@@ -212,6 +214,8 @@ func resetElastic(ctx context.Context) {
 			noError(err)
 		}
 	}
+
+	ReindexElastic()
 }
 
 var sqlResetTestData = `

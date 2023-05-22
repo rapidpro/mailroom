@@ -22,8 +22,6 @@ func TestStartTasks(t *testing.T) {
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testsuite.ReindexElastic(rt)
-
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	rt.DB.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
