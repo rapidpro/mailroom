@@ -7,17 +7,22 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-
-	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/rp-indexer/v8/indexers"
+	"github.com/olivere/elastic/v7"
 	"github.com/sirupsen/logrus"
 )
 
 var _db *sqlx.DB
+
+const elasticURL = "http://localhost:9200"
+const elasticContactsIndex = "test_contacts"
 
 const AttachmentStorageDir = "_test_attachments_storage"
 const SessionStorageDir = "_test_session_storage"
@@ -32,10 +37,13 @@ const (
 	ResetData    = ResetFlag(1 << 2)
 	ResetRedis   = ResetFlag(1 << 3)
 	ResetStorage = ResetFlag(1 << 4)
+	ResetElastic = ResetFlag(1 << 5)
 )
 
 // Reset clears out both our database and redis DB
 func Reset(what ResetFlag) {
+	ctx := context.TODO()
+
 	if what&ResetDB > 0 {
 		resetDB()
 	} else if what&ResetData > 0 {
@@ -47,24 +55,32 @@ func Reset(what ResetFlag) {
 	if what&ResetStorage > 0 {
 		resetStorage()
 	}
+	if what&ResetElastic > 0 {
+		resetElastic(ctx)
+	}
 
 	models.FlushCache()
 }
 
-type Mocks struct {
-	ES *MockElasticServer
-}
-
 // Runtime returns the various runtime things a test might need
 func Runtime() (context.Context, *runtime.Runtime) {
+	es, err := elastic.NewSimpleClient(elastic.SetURL(elasticURL), elastic.SetSniff(false))
+	if err != nil {
+		panic(err)
+	}
+
+	cfg := runtime.NewDefaultConfig()
+	cfg.ElasticContactsIndex = elasticContactsIndex
+
 	db := getDB()
 	rt := &runtime.Runtime{
 		DB:                db,
 		ReadonlyDB:        db,
 		RP:                getRP(),
+		ES:                es,
 		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
 		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
-		Config:            runtime.NewDefaultConfig(),
+		Config:            cfg,
 	}
 
 	logrus.SetLevel(logrus.DebugLevel)
@@ -72,25 +88,11 @@ func Runtime() (context.Context, *runtime.Runtime) {
 	return context.Background(), rt
 }
 
-// RuntimeWithSearch returns the various runtime things a test might need
-func RuntimeWithSearch() (context.Context, *runtime.Runtime, *Mocks, func()) {
-	mockES := NewMockElasticServer()
-	close := func() { mockES.Close() }
+func ReindexElastic(rt *runtime.Runtime) {
+	contactsIndexer := indexers.NewContactIndexer(elasticURL, rt.Config.ElasticContactsIndex, 1, 1, 100)
+	contactsIndexer.Index(rt.DB.DB, false, false)
 
-	db := getDB()
-	rt := &runtime.Runtime{
-		DB:                db,
-		ReadonlyDB:        db,
-		RP:                getRP(),
-		ES:                mockES.Client(),
-		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
-		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
-		Config:            runtime.NewDefaultConfig(),
-	}
-
-	logrus.SetLevel(logrus.DebugLevel)
-
-	return context.Background(), rt, &Mocks{ES: mockES}, close
+	time.Sleep(1 * time.Second)
 }
 
 // returns an open test database pool
@@ -189,6 +191,27 @@ func resetRedis() {
 func resetStorage() {
 	must(os.RemoveAll(AttachmentStorageDir))
 	must(os.RemoveAll(SessionStorageDir))
+}
+
+// clears any data that's been indexed to elastic
+func resetElastic(ctx context.Context) {
+	es, err := elastic.NewSimpleClient(elastic.SetURL(elasticURL), elastic.SetSniff(false))
+	noError(err)
+
+	exists, err := es.IndexExists(elasticContactsIndex).Do(ctx)
+	noError(err)
+
+	if exists {
+		// get any indexes for the contacts alias
+		ar, err := es.Aliases().Index(elasticContactsIndex).Do(ctx)
+		noError(err)
+
+		// and delete them
+		for _, index := range ar.IndicesByAlias(elasticContactsIndex) {
+			_, err := es.DeleteIndex(index).Do(ctx)
+			noError(err)
+		}
+	}
 }
 
 var sqlResetTestData = `

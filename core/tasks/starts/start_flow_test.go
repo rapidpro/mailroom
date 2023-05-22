@@ -16,12 +16,13 @@ import (
 )
 
 func TestStartTasks(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
-	defer close()
+	ctx, rt := testsuite.Runtime()
 
 	rc := rt.RP.Get()
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
+
+	testsuite.ReindexElastic(rt)
 
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	rt.DB.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
@@ -37,7 +38,6 @@ func TestStartTasks(t *testing.T) {
 		contactIDs               []models.ContactID
 		createContact            bool
 		query                    string
-		queryResult              []models.ContactID
 		excludeInAFlow           bool
 		excludeStartedPreviously bool
 		queue                    string
@@ -154,7 +154,6 @@ func TestStartTasks(t *testing.T) {
 			label:                    "Query start",
 			flowID:                   testdata.Favorites.ID,
 			query:                    "bob",
-			queryResult:              []models.ContactID{testdata.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
@@ -231,10 +230,6 @@ func TestStartTasks(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		if tc.queryResult != nil {
-			mocks.ES.AddResponse(tc.queryResult...)
-		}
-
 		// handle our start task
 		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID).
 			WithGroupIDs(tc.groupIDs).
