@@ -16,12 +16,13 @@ import (
 )
 
 func TestStartTasks(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
-	defer close()
+	ctx, rt := testsuite.Runtime()
 
 	rc := rt.RP.Get()
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
+
+	testsuite.ReindexElastic(rt)
 
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	rt.DB.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
@@ -29,11 +30,9 @@ func TestStartTasks(t *testing.T) {
 	sID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
 	testdata.InsertFlowRun(rt, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
-	doctorIDs := testdata.DoctorsGroup.ContactIDs(rt)
-
 	tcs := []struct {
 		label                    string
-		flow                     *testdata.Flow
+		flowID                   models.FlowID
 		groupIDs                 []models.GroupID
 		excludeGroupIDs          []models.GroupID
 		contactIDs               []models.ContactID
@@ -42,7 +41,6 @@ func TestStartTasks(t *testing.T) {
 		excludeInAFlow           bool
 		excludeStartedPreviously bool
 		queue                    string
-		elasticResult            []models.ContactID
 		expectedContactCount     int
 		expectedBatchCount       int
 		expectedTotalCount       int
@@ -51,7 +49,7 @@ func TestStartTasks(t *testing.T) {
 	}{
 		{
 			label:                    "Empty flow start",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
 			queue:                    queue.BatchQueue,
@@ -63,12 +61,11 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Single group",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			groupIDs:                 []models.GroupID{testdata.DoctorsGroup.ID},
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
 			queue:                    queue.BatchQueue,
-			elasticResult:            doctorIDs,
 			expectedContactCount:     121,
 			expectedBatchCount:       2,
 			expectedTotalCount:       121,
@@ -77,27 +74,25 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Group and Contact (but all already active)",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			groupIDs:                 []models.GroupID{testdata.DoctorsGroup.ID},
 			contactIDs:               []models.ContactID{testdata.Cathy.ID},
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
 			queue:                    queue.BatchQueue,
-			elasticResult:            []models.ContactID{},
-			expectedContactCount:     0,
-			expectedBatchCount:       0,
+			expectedContactCount:     121,
+			expectedBatchCount:       2,
 			expectedTotalCount:       0,
 			expectedStatus:           models.StartStatusComplete,
 			expectedActiveRuns:       map[models.FlowID]int{testdata.Favorites.ID: 122, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                    "Contact restart",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			contactIDs:               []models.ContactID{testdata.Cathy.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{testdata.Cathy.ID},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -106,13 +101,11 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Previous group and one new contact",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			groupIDs:                 []models.GroupID{testdata.DoctorsGroup.ID},
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
-			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
 			queue:                    queue.BatchQueue,
-			elasticResult:            append([]models.ContactID{testdata.Bob.ID}, doctorIDs...),
 			expectedContactCount:     122,
 			expectedBatchCount:       2,
 			expectedTotalCount:       1,
@@ -121,40 +114,36 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Single contact, no restart",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
-			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{},
-			expectedContactCount:     0,
-			expectedBatchCount:       0,
+			expectedContactCount:     1,
+			expectedBatchCount:       1,
 			expectedTotalCount:       0,
 			expectedStatus:           models.StartStatusComplete,
 			expectedActiveRuns:       map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                    "Single contact, include active, but no restart",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{},
-			expectedContactCount:     0,
-			expectedBatchCount:       0,
+			expectedContactCount:     1,
+			expectedBatchCount:       1,
 			expectedTotalCount:       0,
 			expectedStatus:           models.StartStatusComplete,
 			expectedActiveRuns:       map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                    "Single contact, include active and restart",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{testdata.Bob.ID},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -163,12 +152,11 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Query start",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			query:                    "bob",
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{testdata.Bob.ID},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -177,12 +165,11 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Query start with invalid query",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			query:                    "xyz = 45",
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{},
 			expectedContactCount:     0,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -191,7 +178,7 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                "New Contact",
-			flow:                 testdata.Favorites,
+			flowID:               testdata.Favorites.ID,
 			createContact:        true,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
@@ -202,26 +189,24 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Other messaging flow",
-			flow:                     testdata.PickANumber,
+			flowID:                   testdata.PickANumber.ID,
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{testdata.Bob.ID},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
 			expectedStatus:           models.StartStatusComplete,
 			expectedActiveRuns:       map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 1, testdata.SingleMessage.ID: 0},
 		},
-		/*{
+		{
 			label:                    "Background flow",
-			flow:                     testdata.SingleMessage,
+			flowID:                   testdata.SingleMessage.ID,
 			contactIDs:               []models.ContactID{testdata.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{testdata.Bob.ID},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -230,34 +215,29 @@ func TestStartTasks(t *testing.T) {
 		},
 		{
 			label:                    "Exclude group",
-			flow:                     testdata.Favorites,
+			flowID:                   testdata.Favorites.ID,
 			contactIDs:               []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID},
 			excludeGroupIDs:          []models.GroupID{testdata.DoctorsGroup.ID}, // should exclude Cathy
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
 			queue:                    queue.HandlerQueue,
-			elasticResult:            []models.ContactID{},
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
 			expectedStatus:           models.StartStatusComplete,
 			expectedActiveRuns:       map[models.FlowID]int{testdata.Favorites.ID: 124, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
-		},*/
+		},
 	}
 
 	for _, tc := range tcs {
-		if tc.elasticResult != nil {
-			mocks.ES.AddResponse(tc.elasticResult...)
-		}
-
 		// handle our start task
-		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flow.ID).
+		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID).
 			WithGroupIDs(tc.groupIDs).
+			WithExcludeGroupIDs(tc.excludeGroupIDs).
 			WithContactIDs(tc.contactIDs).
 			WithQuery(tc.query).
 			WithExcludeInAFlow(tc.excludeInAFlow).
 			WithExcludeStartedPreviously(tc.excludeStartedPreviously).
-			WithExcludeGroupIDs(tc.excludeGroupIDs).
 			WithCreateContact(tc.createContact)
 
 		err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
@@ -272,14 +252,15 @@ func TestStartTasks(t *testing.T) {
 		assert.Equal(t, tc.expectedBatchCount, taskCounts["start_flow_batch"], "unexpected batch count in '%s'", tc.label)
 
 		// assert our count of total flow runs created
-		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flow.ID, start.ID).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
 
 		// assert final status
 		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID, tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
 
 		// assert final contact count
 		if tc.expectedStatus != models.StartStatusFailed {
-			assertdb.Query(t, rt.DB, `SELECT contact_count FROM flows_flowstart where id = $1`, start.ID).Returns(tc.expectedContactCount, "contact count mismatch in '%s'", tc.label)
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
+				[]interface{}{start.ID, tc.expectedContactCount}, 1, "contact count mismatch in '%s'", tc.label)
 		}
 
 		// assert count of active runs by flow

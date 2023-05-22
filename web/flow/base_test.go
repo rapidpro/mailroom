@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestServer(t *testing.T) {
@@ -17,13 +16,11 @@ func TestServer(t *testing.T) {
 }
 
 func TestPreviewStart(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
-	defer close()
+	ctx, rt := testsuite.Runtime()
 
-	mocks.ES.AddResponse(testdata.Cathy.ID)
-	mocks.ES.AddResponse(testdata.Bob.ID)
-	mocks.ES.AddResponse(testdata.George.ID)
-	mocks.ES.AddResponse(testdata.Alexandria.ID)
+	defer testsuite.Reset(testsuite.ResetElastic)
+
+	testsuite.ReindexElastic(rt)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
 }
