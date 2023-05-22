@@ -16,8 +16,6 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetElastic)
 
-	testsuite.ReindexElastic(rt)
-
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
@@ -83,8 +81,6 @@ func TestGetContactIDsForQuery(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetElastic)
-
-	testsuite.ReindexElastic(rt)
 
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
