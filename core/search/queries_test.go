@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
@@ -31,7 +30,6 @@ func TestBuildStartQuery(t *testing.T) {
 	tcs := []struct {
 		groups        []*models.Group
 		contactUUIDs  []flows.ContactUUID
-		urns          []urns.URN
 		userQuery     string
 		exclusions    models.Exclusions
 		excludeGroups []*models.Group

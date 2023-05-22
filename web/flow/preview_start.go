@@ -26,7 +26,6 @@ func init() {
 //	  "include": {
 //	    "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
 //	    "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
-//	    "urns": ["tel:+1234567890"],
 //	    "query": ""
 //	  },
 //	  "exclude": {
@@ -39,7 +38,7 @@ func init() {
 //	}
 //
 //	{
-//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
+//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b") AND history != \"Registration\"",
 //	  "total": 567,
 //	  "sample": [12, 34, 56, 67, 78],
 //	  "metadata": {
