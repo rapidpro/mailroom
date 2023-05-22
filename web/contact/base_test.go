@@ -119,8 +119,6 @@ func TestSearch(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetElastic)
 
-	testsuite.ReindexElastic(rt)
-
 	wg := &sync.WaitGroup{}
 
 	server := web.NewServer(ctx, rt, wg)

@@ -77,6 +77,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 
 		var clonedMocks *httpx.MockRequestor
 		if tc.HTTPMocks != nil {
+			tc.HTTPMocks.SetIgnoreLocal(true)
 			httpx.SetRequestor(tc.HTTPMocks)
 			clonedMocks = tc.HTTPMocks.Clone()
 		} else {
