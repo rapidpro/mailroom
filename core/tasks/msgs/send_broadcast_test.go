@@ -14,6 +14,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -41,10 +42,7 @@ func TestBroadcastEvents(t *testing.T) {
 	}
 
 	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
-	doctorsOnly := []*assets.GroupReference{doctors}
-
 	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
-	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
 	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
@@ -55,24 +53,104 @@ func TestBroadcastEvents(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations flows.BroadcastTranslations
-		BaseLanguage envs.Language
-		Groups       []*assets.GroupReference
-		Contacts     []*flows.ContactReference
-		URNs         []urns.URN
-		Queue        string
-		BatchCount   int
-		MsgCount     int
-		MsgText      string
+		translations       flows.BroadcastTranslations
+		baseLanguage       envs.Language
+		groups             []*assets.GroupReference
+		contacts           []*flows.ContactReference
+		urns               []urns.URN
+		queue              string
+		expectedBatchCount int
+		expectedMsgCount   int
+		expectedMsgText    string
 	}{
-		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 122, "hello world"},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{ // 0
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           nil,
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   121,
+			expectedMsgText:    "hello world",
+		},
+		{ // 1
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           georgeOnly,
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   122,
+			expectedMsgText:    "hello world",
+		},
+		{ // 2
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           georgeOnly,
+			urns:               nil,
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 3
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   121,
+			expectedMsgText:    "hello world",
+		},
+		{ // 4
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               nil,
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 5
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               []urns.URN{urns.URN("tel:+12065551212")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 6
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               []urns.URN{urns.URN("tel:+250700000001")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   2,
+			expectedMsgText:    "hello world",
+		},
+		{ // 7
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           nil,
+			urns:               []urns.URN{urns.URN("tel:+250700000001")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
 	}
 
 	lastNow := time.Now()
@@ -80,39 +158,21 @@ func TestBroadcastEvents(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, "", tc.URNs)
+		event := events.NewBroadcastCreated(tc.translations, tc.baseLanguage, tc.groups, tc.contacts, "", tc.urns)
 		bcast, err := models.NewBroadcastFromEvent(ctx, rt.DB, oa, event)
 		assert.NoError(t, err)
 
-		err = (&msgs.SendBroadcastTask{Broadcast: bcast}).Perform(ctx, rt, testdata.Org1.ID)
+		err = tasks.Queue(rc, tc.queue, testdata.Org1.ID, &msgs.SendBroadcastTask{Broadcast: bcast}, queue.DefaultPriority)
 		assert.NoError(t, err)
 
-		// pop all our tasks and execute them
-		var task *queue.Task
-		count := 0
-		for {
-			task, err = queue.PopNextTask(rc, tc.Queue)
-			assert.NoError(t, err)
-			if task == nil {
-				break
-			}
-
-			count++
-			assert.Equal(t, "send_broadcast_batch", task.Type)
-			taskObj := &msgs.SendBroadcastBatchTask{}
-			err = json.Unmarshal(task.Task, taskObj)
-			assert.NoError(t, err)
-
-			err = taskObj.Perform(ctx, rt, testdata.Org1.ID)
-			assert.NoError(t, err)
-		}
+		taskCounts := testsuite.FlushTasks(t, rt)
 
 		// assert our count of batches
-		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
+		assert.Equal(t, tc.expectedBatchCount, taskCounts["send_broadcast_batch"], "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
-			Returns(tc.MsgCount, "%d: unexpected msg count", i)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.expectedMsgText).
+			Returns(tc.expectedMsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)

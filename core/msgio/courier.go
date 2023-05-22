@@ -204,7 +204,7 @@ func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.
 			if err != nil {
 				return err
 			}
-			logrus.WithFields(logrus.Fields{"msgs": len(batch), "contact_id": contactID, "channel_uuid": channel.UUID(), "elapsed": time.Since(start)}).Info("msgs queued to courier")
+			logrus.WithFields(logrus.Fields{"msgs": len(batch), "contact_id": contactID, "channel_uuid": channel.UUID(), "elapsed": time.Since(start)}).Debug("msgs queued to courier")
 		}
 		return nil
 	}
