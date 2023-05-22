@@ -44,19 +44,19 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 		createdContacts = createdByURN
 	}
 
-	includeGroups := make([]*models.Group, len(recipients.GroupIDs))
-	excludeGroups := make([]*models.Group, len(recipients.ExcludeGroupIDs))
+	includeGroups := make([]*models.Group, 0, len(recipients.GroupIDs))
+	excludeGroups := make([]*models.Group, 0, len(recipients.ExcludeGroupIDs))
 
-	for i, groupID := range recipients.GroupIDs {
+	for _, groupID := range recipients.GroupIDs {
 		group := oa.GroupByID(groupID)
 		if group != nil {
-			includeGroups[i] = group
+			includeGroups = append(includeGroups, group)
 		}
 	}
-	for i, groupID := range recipients.ExcludeGroupIDs {
+	for _, groupID := range recipients.ExcludeGroupIDs {
 		group := oa.GroupByID(groupID)
 		if group != nil {
-			excludeGroups[i] = group
+			excludeGroups = append(excludeGroups, group)
 		}
 	}
 

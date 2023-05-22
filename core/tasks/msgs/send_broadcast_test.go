@@ -176,6 +176,11 @@ func TestBroadcastEvents(t *testing.T) {
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
+
+		// if we potentially created new contacts, re-index..
+		if len(tc.urns) > 0 {
+			testsuite.ReindexElastic()
+		}
 	}
 }
 
