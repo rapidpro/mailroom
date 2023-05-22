@@ -40,12 +40,6 @@ func (g *Group) Add(rt *runtime.Runtime, contacts ...*Contact) {
 	}
 }
 
-func (g *Group) ContactIDs(rt *runtime.Runtime) []models.ContactID {
-	var ids []models.ContactID
-	must(rt.DB.Select(&ids, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, g.ID))
-	return ids
-}
-
 type Field struct {
 	ID   models.FieldID
 	UUID assets.FieldUUID
