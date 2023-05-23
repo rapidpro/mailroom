@@ -1,3 +1,8 @@
+v8.1.50 (2023-05-23)
+-------------------------
+ * Remove support for passing URNs to flow/preview_start as that's not a thing we do
+ * Make the name of the ES index for contacts configurable
+
 v8.1.49 (2023-05-18)
 -------------------------
  * Remove support for ticket assignment with a note

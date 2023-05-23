@@ -179,7 +179,7 @@ func TestBroadcastEvents(t *testing.T) {
 
 		// if we potentially created new contacts, re-index..
 		if len(tc.urns) > 0 {
-			testsuite.ReindexElastic()
+			testsuite.ReindexElastic(ctx)
 		}
 	}
 }
