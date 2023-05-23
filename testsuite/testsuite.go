@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -88,13 +87,15 @@ func Runtime() (context.Context, *runtime.Runtime) {
 	return context.Background(), rt
 }
 
-func ReindexElastic() {
+// reindexes data changes to Elastic
+func ReindexElastic(ctx context.Context) {
 	db := getDB()
+	es := getES()
 
 	contactsIndexer := indexers.NewContactIndexer(elasticURL, elasticContactsIndex, 1, 1, 100)
 	contactsIndexer.Index(db.DB, false, false)
 
-	time.Sleep(1 * time.Second)
+	es.Refresh(elasticContactsIndex).Do(ctx)
 }
 
 // returns an open test database pool
@@ -133,6 +134,13 @@ func getRC() redis.Conn {
 	_, err = conn.Do("SELECT", 0)
 	noError(err)
 	return conn
+}
+
+// returns an Elastic client
+func getES() *elastic.Client {
+	es, err := elastic.NewSimpleClient(elastic.SetURL(elasticURL), elastic.SetSniff(false))
+	noError(err)
+	return es
 }
 
 // resets our database to our base state from our RapidPro dump
@@ -195,10 +203,9 @@ func resetStorage() {
 	must(os.RemoveAll(SessionStorageDir))
 }
 
-// delete
+// clears indexed data in Elastic
 func resetElastic(ctx context.Context) {
-	es, err := elastic.NewSimpleClient(elastic.SetURL(elasticURL), elastic.SetSniff(false))
-	noError(err)
+	es := getES()
 
 	exists, err := es.IndexExists(elasticContactsIndex).Do(ctx)
 	noError(err)
@@ -215,7 +222,7 @@ func resetElastic(ctx context.Context) {
 		}
 	}
 
-	ReindexElastic()
+	ReindexElastic(ctx)
 }
 
 var sqlResetTestData = `

@@ -30,7 +30,7 @@ func TestSmartGroups(t *testing.T) {
 		testdata.Bob.ID,
 	)
 
-	testsuite.ReindexElastic()
+	testsuite.ReindexElastic(ctx)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
