@@ -74,8 +74,6 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, models.StartTypeManual, batch.StartType)
 	assert.Equal(t, testdata.SingleMessage.ID, batch.FlowID)
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, batch.ContactIDs)
-	assert.False(t, batch.Exclusions.StartedPreviously)
-	assert.False(t, batch.Exclusions.InAFlow)
 	assert.Equal(t, testdata.Admin.ID, batch.CreatedByID)
 	assert.False(t, batch.IsLast)
 	assert.Equal(t, 3, batch.TotalContacts)

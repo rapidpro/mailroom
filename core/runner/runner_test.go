@@ -191,8 +191,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	}
 
 	options := &runner.StartOptions{
-		ExcludeStartedPreviously: false,
-		ExcludeInAFlow:           false,
+		ExcludeInAFlow: false,
 		TriggerBuilder: func(contact *flows.Contact) flows.Trigger {
 			return triggers.NewBuilder(oa.Env(), flowRef, contact).Manual().Build()
 		},

@@ -262,7 +262,6 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 		FlowID:         s.FlowID,
 		FlowType:       s.FlowType,
 		ContactIDs:     contactIDs,
-		Exclusions:     s.Exclusions,
 		ParentSummary:  s.ParentSummary,
 		SessionHistory: s.SessionHistory,
 		Params:         s.Params,
@@ -281,7 +280,6 @@ type FlowStartBatch struct {
 	FlowID      FlowID      `json:"flow_id"`
 	FlowType    FlowType    `json:"flow_type"`
 	ContactIDs  []ContactID `json:"contact_ids"`
-	Exclusions  Exclusions  `json:"exclusions"`
 
 	Params         null.JSON `json:"params,omitempty"`
 	ParentSummary  null.JSON `json:"parent_summary,omitempty"`
