@@ -133,10 +133,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 }
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
-func StartFlowBatch(
-	ctx context.Context, rt *runtime.Runtime,
-	batch *models.FlowStartBatch) ([]*models.Session, error) {
-
+func StartFlowBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) ([]*models.Session, error) {
 	start := time.Now()
 
 	// if this is our last start, no matter what try to set the start as complete as a last step

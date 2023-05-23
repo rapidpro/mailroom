@@ -2,9 +2,7 @@ package runner_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -25,74 +23,58 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBatchStart(t *testing.T) {
+func TestStartFlowBatch(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
-	testdata.InsertFlowStart(rt, testdata.Org1, testdata.SingleMessage, nil)
+	start1 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, testdata.SingleMessage.ID).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID})
+	err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start1})
+	require.NoError(t, err)
 
-	// and our batch object
-	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
+	batch1 := start1.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 4)
+	batch2 := start1.CreateBatch([]models.ContactID{testdata.George.ID, testdata.Alexandria.ID}, true, 4)
 
-	tcs := []struct {
-		Flow                     models.FlowID
-		ExcludeStartedPreviously bool
-		ExcludeInAFlow           bool
-		Params                   json.RawMessage
-		Msg                      string
-		Count                    int
-		TotalCount               int
-	}{
-		{testdata.SingleMessage.ID, false, false, nil, "Hey, how are you?", 2, 2},
-		{testdata.SingleMessage.ID, true, false, nil, "Hey, how are you?", 0, 2},
-		{testdata.SingleMessage.ID, true, true, nil, "Hey, how are you?", 0, 2},
-		{testdata.SingleMessage.ID, false, true, nil, "Hey, how are you?", 2, 4},
-		{
-			Flow:                     testdata.IncomingExtraFlow.ID,
-			ExcludeStartedPreviously: false,
-			ExcludeInAFlow:           true,
-			Params:                   json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
-			Msg:                      "Great to meet you Fred. Your age is 33.",
-			Count:                    2,
-			TotalCount:               2,
-		},
-	}
+	// start the first batch...
+	sessions, err := runner.StartFlowBatch(ctx, rt, batch1)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 2)
 
-	last := time.Now()
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
+		AND status = 'C' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NOT NULL`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})).
+		Returns(2)
 
-	for i, tc := range tcs {
-		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, tc.Flow).
-			WithContactIDs(contactIDs).
-			WithExcludeInAFlow(tc.ExcludeInAFlow).
-			WithExcludeStartedPreviously(tc.ExcludeStartedPreviously).
-			WithParams(tc.Params)
-		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2 AND responded = FALSE AND org_id = 1 AND status = 'C'
+		AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}), testdata.SingleMessage.ID).
+		Returns(2)
 
-		sessions, err := runner.StartFlowBatch(ctx, rt, batch)
-		require.NoError(t, err)
-		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = 'Hey, how are you?' AND org_id = 1 AND status = 'Q' 
+		AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T' AND channel_id = $2`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}), testdata.TwilioChannel.ID).
+		Returns(2)
 
-		assertdb.Query(t, rt.DB,
-			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-			AND status = 'C' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
-			Returns(tc.Count, "%d: unexpected number of sessions", i)
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowstart WHERE id = $1`, start1.ID).Returns("P")
 
-		assertdb.Query(t, rt.DB,
-			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND responded = FALSE AND org_id = 1 AND status = 'C'
-			AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
-			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
+	// start the second batch...
+	sessions, err = runner.StartFlowBatch(ctx, rt, batch2)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 2)
 
-		assertdb.Query(t, rt.DB,
-			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
-			AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T' AND channel_id = $3`,
-			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
-			Returns(tc.TotalCount, "%d: unexpected number of messages", i)
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowstart WHERE id = $1`, start1.ID).Returns("C")
 
-		last = time.Now()
-	}
+	// create a start object with params
+	testdata.InsertFlowStart(rt, testdata.Org1, testdata.IncomingExtraFlow, nil)
+	start2 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, testdata.IncomingExtraFlow.ID).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID}).
+		WithParams([]byte(`{"name":"Fred", "age":33}`))
+	batch3 := start2.CreateBatch([]models.ContactID{testdata.Cathy.ID}, true, 1)
+
+	sessions, err = runner.StartFlowBatch(ctx, rt, batch3)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1)
+
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE text = 'Great to meet you Fred. Your age is 33.'`).Returns(1)
 }
 
 func TestResume(t *testing.T) {

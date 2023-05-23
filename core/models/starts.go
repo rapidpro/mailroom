@@ -265,9 +265,9 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 		ParentSummary:  s.ParentSummary,
 		SessionHistory: s.SessionHistory,
 		Params:         s.Params,
+		CreatedByID:    s.CreatedByID,
 		IsLast:         last,
 		TotalContacts:  totalContacts,
-		CreatedByID:    s.CreatedByID,
 	}
 }
 

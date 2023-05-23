@@ -89,6 +89,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 			GroupIDs:        start.GroupIDs,
 			URNs:            start.URNs,
 			Query:           string(start.Query),
+			Exclusions:      start.Exclusions,
 			ExcludeGroupIDs: start.ExcludeGroupIDs,
 		}, limit)
 		if err != nil {
