@@ -390,6 +390,10 @@ func GetContactIDsFromReferences(ctx context.Context, db Queryer, orgID OrgID, r
 
 // gets the contact IDs for the passed in org and set of UUIDs
 func getContactIDsFromUUIDs(ctx context.Context, db Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+
 	ids, err := queryContactIDs(ctx, db, `SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`, orgID, pq.Array(uuids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contact ids by UUID")

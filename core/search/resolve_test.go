@@ -23,19 +23,24 @@ func TestResolveRecipients(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshGroups)
 	require.NoError(t, err)
 
-	testsuite.ReindexElastic()
-
 	tcs := []struct {
 		flow        *testdata.Flow
 		recipients  *search.Recipients
 		limit       int
 		expectedIDs []models.ContactID
 	}{
-		{ // 0
+		{ // 0 nobody
 			recipients:  &search.Recipients{},
 			expectedIDs: []models.ContactID{},
 		},
-		{ // 1
+		{ // 1 only explicit contacts
+			recipients: &search.Recipients{
+				ContactIDs: []models.ContactID{testdata.Bob.ID, testdata.Alexandria.ID},
+			},
+			limit:       -1,
+			expectedIDs: []models.ContactID{testdata.Bob.ID, testdata.Alexandria.ID},
+		},
+		{ // 2 explicit contacts, group and query
 			recipients: &search.Recipients{
 				ContactIDs: []models.ContactID{testdata.Bob.ID},
 				GroupIDs:   []models.GroupID{group1.ID},
@@ -44,7 +49,7 @@ func TestResolveRecipients(t *testing.T) {
 			limit:       -1,
 			expectedIDs: []models.ContactID{testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID, testdata.Cathy.ID},
 		},
-		{ // 2
+		{ // 3 exclude group
 			recipients: &search.Recipients{
 				ContactIDs:      []models.ContactID{testdata.George.ID, testdata.Bob.ID},
 				ExcludeGroupIDs: []models.GroupID{group2.ID},
@@ -52,24 +57,42 @@ func TestResolveRecipients(t *testing.T) {
 			limit:       -1,
 			expectedIDs: []models.ContactID{testdata.Bob.ID},
 		},
-		{ // 3
-			recipients: &search.Recipients{
-				ContactIDs: []models.ContactID{testdata.Bob.ID},
-				URNs:       []urns.URN{"tel:+1234567890", "tel:+1234567891"},
-			},
-			limit:       -1,
-			expectedIDs: []models.ContactID{testdata.Bob.ID, 30000, 30001},
-		},
-		{ // 4
+		{ // 4 limit number returned
 			recipients: &search.Recipients{
 				Query: `name = "Cathy" OR name = "Bob"`,
 			},
 			limit:       1,
 			expectedIDs: []models.ContactID{testdata.Cathy.ID},
 		},
+		{ // 5 create new contacts from URNs
+			recipients: &search.Recipients{
+				ContactIDs: []models.ContactID{testdata.Bob.ID},
+				URNs:       []urns.URN{"tel:+1234000001", "tel:+1234000002"},
+				Exclusions: models.Exclusions{InAFlow: true},
+			},
+			limit:       -1,
+			expectedIDs: []models.ContactID{testdata.Bob.ID, 30000, 30001},
+		},
+		{ // 6 new contacts not included if excluding based on last seen
+			recipients: &search.Recipients{
+				URNs:       []urns.URN{"tel:+1234000003"},
+				Exclusions: models.Exclusions{NotSeenSinceDays: 10},
+			},
+			limit:       -1,
+			expectedIDs: []models.ContactID{},
+		},
+		{ // 7 new contacts is now an existing contact that can be searched
+			recipients: &search.Recipients{
+				URNs: []urns.URN{"tel:+1234000001"},
+			},
+			limit:       -1,
+			expectedIDs: []models.ContactID{30000},
+		},
 	}
 
 	for i, tc := range tcs {
+		testsuite.ReindexElastic()
+
 		var flow *models.Flow
 		if tc.flow != nil {
 			flow = tc.flow.Load(rt, oa)
