@@ -22,12 +22,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBroadcastEvents(t *testing.T) {
+func TestSendBroadcastTask(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
-	rc := rt.RP.Get()
-	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
+
+	rc := rt.RP.Get()
+	defer rc.Close()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -157,6 +158,8 @@ func TestBroadcastEvents(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	for i, tc := range tcs {
+		testsuite.ReindexElastic(ctx)
+
 		// handle our start task
 		event := events.NewBroadcastCreated(tc.translations, tc.baseLanguage, tc.groups, tc.contacts, "", tc.urns)
 		bcast, err := models.NewBroadcastFromEvent(ctx, rt.DB, oa, event)
@@ -176,11 +179,6 @@ func TestBroadcastEvents(t *testing.T) {
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
-
-		// if we potentially created new contacts, re-index..
-		if len(tc.urns) > 0 {
-			testsuite.ReindexElastic(ctx)
-		}
 	}
 }
 
