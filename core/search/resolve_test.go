@@ -83,10 +83,10 @@ func TestResolveRecipients(t *testing.T) {
 		},
 		{ // 7 new contacts is now an existing contact that can be searched
 			recipients: &search.Recipients{
-				URNs: []urns.URN{"tel:+1234000001"},
+				URNs: []urns.URN{"tel:+1234000003"},
 			},
 			limit:       -1,
-			expectedIDs: []models.ContactID{30000},
+			expectedIDs: []models.ContactID{30002},
 		},
 	}
 
