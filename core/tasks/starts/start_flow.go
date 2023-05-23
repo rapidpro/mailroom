@@ -61,6 +61,11 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 		return errors.Wrap(err, "error loading org assets")
 	}
 
+	flow, err := oa.FlowByID(start.FlowID)
+	if err != nil {
+		return errors.Wrap(err, "error loading flow")
+	}
+
 	var contactIDs []models.ContactID
 
 	if start.CreateContact {
@@ -74,19 +79,18 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 		// otherwise resolve recipients across contacts, groups, urns etc
 
 		// queries in start_session flow actions only match a single contact
-		queryLimit := -1
-		if start.StartType == models.StartTypeFlowAction {
-			queryLimit = 1
+		limit := -1
+		if string(start.Query) != "" && start.StartType == models.StartTypeFlowAction {
+			limit = 1
 		}
 
-		contactIDs, err = search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+		contactIDs, err = search.ResolveRecipients(ctx, rt, oa, flow, &search.Recipients{
 			ContactIDs:      start.ContactIDs,
 			GroupIDs:        start.GroupIDs,
 			URNs:            start.URNs,
 			Query:           string(start.Query),
-			QueryLimit:      queryLimit,
 			ExcludeGroupIDs: start.ExcludeGroupIDs,
-		})
+		}, limit)
 		if err != nil {
 			return errors.Wrap(err, "error resolving start recipients")
 		}

@@ -70,6 +70,7 @@ func InsertContactGroup(rt *runtime.Runtime, org *Org, uuid assets.GroupUUID, na
 
 	for _, contact := range contacts {
 		rt.DB.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, id, contact.ID)
+		rt.DB.MustExec(`UPDATE contacts_contact SET modified_on = NOW() WHERE id = $1`, contact.ID)
 	}
 
 	return &Group{id, uuid}

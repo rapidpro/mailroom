@@ -86,7 +86,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewStar
 		}
 	}
 
-	query, err := search.BuildStartQuery(oa, flow, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude)
+	query, err := search.BuildStartQuery(oa, flow, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude, nil)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {

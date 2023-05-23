@@ -255,6 +255,10 @@ func LoadContact(ctx context.Context, db Queryer, oa *OrgAssets, id ContactID) (
 // LoadContacts loads a set of contacts for the passed in ids. Note that the order of the returned contacts
 // won't necessarily match the order of the ids.
 func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactID) ([]*Contact, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
 	start := time.Now()
 
 	rows, err := db.QueryxContext(ctx, sqlSelectContact, pq.Array(ids), oa.OrgID())
@@ -386,6 +390,10 @@ func GetContactIDsFromReferences(ctx context.Context, db Queryer, orgID OrgID, r
 
 // gets the contact IDs for the passed in org and set of UUIDs
 func getContactIDsFromUUIDs(ctx context.Context, db Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+
 	ids, err := queryContactIDs(ctx, db, `SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`, orgID, pq.Array(uuids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contact ids by UUID")
@@ -647,34 +655,40 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 	return contact, flowContact, created, nil
 }
 
-// GetOrCreateContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
-// the passed in URNs with the ids of the contacts.
-func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+// GetOrCreateContactsFromURNs will fetch or create the contacts for the passed in URNs, returning a map of the fetched
+// contacts and another map of the created contacts.
+func GetOrCreateContactsFromURNs(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]*Contact, map[urns.URN]*Contact, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
 	}
 
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	owners, err := contactsFromURNs(ctx, db, oa, urnz)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up contacts for URNs")
+		return nil, nil, errors.Wrap(err, "error looking up contacts for URNs")
 	}
+
+	fetched := make(map[urns.URN]*Contact, len(urnz))
+	created := make(map[urns.URN]*Contact, len(urnz))
 
 	// create any contacts that are missing
-	for urn, contactID := range owners {
-		if contactID == NilContactID {
+	for urn, contact := range owners {
+		if contact == nil {
 			contact, _, _, err := GetOrCreateContact(ctx, db, oa, []urns.URN{urn}, NilChannelID)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error creating contact")
+				return nil, nil, errors.Wrapf(err, "error creating contact")
 			}
-			owners[urn] = contact.ID()
+			created[urn] = contact
+		} else {
+			fetched[urn] = contact
 		}
 	}
-	return owners, nil
+
+	return fetched, created, nil
 }
 
-// looks up the contacts who own the given urns (which should be normalized by the caller) and returns that information as a map
+// looks up the contact IDs who own the given urns (which should be normalized by the caller) and returns that information as a map
 func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urns.URN) (map[urns.URN]ContactID, error) {
 	identityToOriginal := make(map[urns.URN]urns.URN, len(urnz))
 	identities := make([]urns.URN, len(urnz))
@@ -703,6 +717,39 @@ func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urn
 	}
 
 	return owners, nil
+}
+
+// like contactIDsFromURNs but fetches the contacts
+func contactsFromURNs(ctx context.Context, db Queryer, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]*Contact, error) {
+	ids, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the ids of the contacts that exist
+	existingIDs := make([]ContactID, 0, len(ids))
+	for _, id := range ids {
+		if id != NilContactID {
+			existingIDs = append(existingIDs, id)
+		}
+	}
+
+	fetched, err := LoadContacts(ctx, db, oa, existingIDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error loading contacts")
+	}
+
+	// and transform those into a map by URN
+	fetchedByID := make(map[ContactID]*Contact, len(fetched))
+	for _, c := range fetched {
+		fetchedByID[c.ID()] = c
+	}
+	byURN := make(map[urns.URN]*Contact, len(ids))
+	for urn, id := range ids {
+		byURN[urn] = fetchedByID[id]
+	}
+
+	return byURN, nil
 }
 
 func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN, channelID ChannelID) (ContactID, bool, error) {

@@ -62,14 +62,13 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	contactIDs, err := search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+	contactIDs, err := search.ResolveRecipients(ctx, rt, oa, nil, &search.Recipients{
 		ContactIDs:      bcast.ContactIDs,
 		GroupIDs:        bcast.GroupIDs,
 		URNs:            bcast.URNs,
 		Query:           string(bcast.Query),
-		QueryLimit:      -1,
 		ExcludeGroupIDs: nil,
-	})
+	}, -1)
 	if err != nil {
 		return errors.Wrap(err, "error resolving broadcast recipients")
 	}

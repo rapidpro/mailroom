@@ -55,6 +55,9 @@ type Exclusions struct {
 	NotSeenSinceDays  int  `json:"not_seen_since_days"` // contacts who have not been seen for more than this number of days
 }
 
+// NoExclusions is a constant for the empty value
+var NoExclusions = Exclusions{}
+
 // Scan supports reading exclusion values from JSON in database
 func (e *Exclusions) Scan(value any) error {
 	if value == nil {
