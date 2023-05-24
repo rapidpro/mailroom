@@ -227,8 +227,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			'T' as start_type,
 			t.flow_id as flow_id,
 			f.flow_type as flow_type,
-			TRUE as restart_participants,
-			TRUE as include_active,
+			'{}'::jsonb AS exclusions,
 			(SELECT ARRAY_AGG(tc.contact_id) FROM (
 				SELECT
 					tc.contact_id

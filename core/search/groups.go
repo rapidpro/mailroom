@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -13,8 +13,8 @@ import (
 
 // PopulateSmartGroup calculates which members should be part of a group and populates the contacts
 // for that group by performing the minimum number of inserts / deletes.
-func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa *models.OrgAssets, groupID models.GroupID, query string) (int, error) {
-	err := models.UpdateGroupStatus(ctx, db, groupID, models.GroupStatusEvaluating)
+func PopulateSmartGroup(ctx context.Context, rt *runtime.Runtime, es *elastic.Client, oa *models.OrgAssets, groupID models.GroupID, query string) (int, error) {
+	err := models.UpdateGroupStatus(ctx, rt.DB, groupID, models.GroupStatusEvaluating)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error marking dynamic group as evaluating")
 	}
@@ -24,7 +24,7 @@ func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa
 	// we have a bit of a race with the indexer process.. we want to make sure that any contacts that changed
 	// before this group was updated but after the last index are included, so if a contact was modified
 	// more recently than 10 seconds ago, we wait that long before starting in populating our group
-	newest, err := models.GetNewestContactModifiedOn(ctx, db, oa)
+	newest, err := models.GetNewestContactModifiedOn(ctx, rt.DB, oa)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error getting most recent contact modified_on for org: %d", oa.OrgID())
 	}
@@ -40,7 +40,7 @@ func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa
 	}
 
 	// get current set of contacts in our group
-	ids, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{groupID})
+	ids, err := models.ContactIDsForGroupIDs(ctx, rt.DB, []models.GroupID{groupID})
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to look up contact ids for group: %d", groupID)
 	}
@@ -50,7 +50,7 @@ func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa
 	}
 
 	// calculate new set of ids
-	new, err := GetContactIDsForQuery(ctx, es, oa, query, -1)
+	new, err := GetContactIDsForQuery(ctx, rt, oa, query, -1)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
 	}
@@ -71,19 +71,19 @@ func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa
 	}
 
 	// first remove all the contacts
-	err = models.RemoveContactsFromGroupAndCampaigns(ctx, db, oa, groupID, removals)
+	err = models.RemoveContactsFromGroupAndCampaigns(ctx, rt.DB, oa, groupID, removals)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
 	}
 
 	// then add them all
-	err = models.AddContactsToGroupAndCampaigns(ctx, db, oa, groupID, adds)
+	err = models.AddContactsToGroupAndCampaigns(ctx, rt.DB, oa, groupID, adds)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error adding contacts to group: %d", groupID)
 	}
 
 	// mark our group as no longer evaluating
-	err = models.UpdateGroupStatus(ctx, db, groupID, models.GroupStatusReady)
+	err = models.UpdateGroupStatus(ctx, rt.DB, groupID, models.GroupStatusReady)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error marking dynamic group as ready")
 	}
@@ -93,7 +93,7 @@ func PopulateSmartGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa
 	changed = append(changed, adds...)
 	changed = append(changed, removals...)
 
-	err = models.UpdateContactModifiedOn(ctx, db, changed)
+	err = models.UpdateContactModifiedOn(ctx, rt.DB, changed)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error updating contact modified_on after group population")
 	}

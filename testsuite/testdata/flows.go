@@ -16,6 +16,14 @@ type Flow struct {
 	UUID assets.FlowUUID
 }
 
+func (f *Flow) Load(rt *runtime.Runtime, oa *models.OrgAssets) *models.Flow {
+	flow, err := oa.FlowByID(f.ID)
+	if err != nil {
+		panic(err)
+	}
+	return flow
+}
+
 func (f *Flow) Reference() *assets.FlowReference {
 	return &assets.FlowReference{UUID: f.UUID, Name: ""}
 }
@@ -71,8 +79,8 @@ func ImportFlows(rt *runtime.Runtime, org *Org, path string) []*Flow {
 func InsertFlowStart(rt *runtime.Runtime, org *Org, flow *Flow, contacts []*Contact) models.StartID {
 	var id models.StartID
 	must(rt.DB.Get(&id,
-		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, created_on, modified_on, restart_participants, include_active, contact_count, status, created_by_id)
-		 VALUES($1, $2, $3, 'M', NOW(), NOW(), TRUE, TRUE, 2, 'P', 1) RETURNING id`, uuids.New(), org.ID, flow.ID,
+		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, exclusions, created_on, modified_on, contact_count, status, created_by_id)
+		 VALUES($1, $2, $3, 'M', '{}', NOW(), NOW(), 2, 'P', 1) RETURNING id`, uuids.New(), org.ID, flow.ID,
 	))
 
 	for _, c := range contacts {

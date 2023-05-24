@@ -57,15 +57,15 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 			return writeGenericErrorResponse(w, errors.Wrapf(err, "unable to get service for channel: %s", ch.UUID()))
 		}
 
+		recorder, err := httpx.NewRecorder(r, w, true)
+		if err != nil {
+			return svc.WriteErrorResponse(w, errors.Wrapf(err, "error reading request body"))
+		}
+
 		// validate this request's signature
 		err = svc.ValidateRequestSignature(r)
 		if err != nil {
 			return svc.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
-		}
-
-		recorder, err := httpx.NewRecorder(r, w, true)
-		if err != nil {
-			return errors.Wrapf(err, "error reading request body")
 		}
 
 		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))

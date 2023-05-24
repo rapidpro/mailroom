@@ -14,9 +14,9 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -35,9 +35,6 @@ type StartOptions struct {
 	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
 	ExcludeInAFlow bool
 
-	// ExcludeStartedPreviously excludes contacts who have been in this flow previously (at least as long as we have runs for)
-	ExcludeStartedPreviously bool
-
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
 
@@ -51,9 +48,8 @@ type StartOptions struct {
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	return &StartOptions{
-		ExcludeInAFlow:           false,
-		ExcludeStartedPreviously: false,
-		Interrupt:                true,
+		ExcludeInAFlow: false,
+		Interrupt:      true,
 	}
 }
 
@@ -137,10 +133,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 }
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
-func StartFlowBatch(
-	ctx context.Context, rt *runtime.Runtime,
-	batch *models.FlowStartBatch) ([]*models.Session, error) {
-
+func StartFlowBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) ([]*models.Session, error) {
 	start := time.Now()
 
 	// if this is our last start, no matter what try to set the start as complete as a last step
@@ -179,10 +172,10 @@ func StartFlowBatch(
 	}
 
 	var params *types.XObject
-	if !batch.Extra.IsNull() {
-		params, err = types.ReadXObject(batch.Extra)
+	if !batch.Params.IsNull() {
+		params, err = types.ReadXObject(batch.Params)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to read JSON from flow start extra")
+			return nil, errors.Wrap(err, "unable to read JSON from flow start params")
 		}
 	}
 
@@ -208,7 +201,7 @@ func StartFlowBatch(
 		}
 
 		tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual()
-		if batch.Extra != nil {
+		if !batch.Params.IsNull() {
 			tb = tb.WithParams(params)
 		}
 		if batchStart {
@@ -230,8 +223,6 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.ExcludeStartedPreviously = batch.ExcludeStartedPreviously()
-	options.ExcludeInAFlow = batch.ExcludeInAFlow()
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -248,11 +239,8 @@ func StartFlowBatch(
 	return sessions, nil
 }
 
-// StartFlow runs the passed in flow for the passed in contact
-func StartFlow(
-	ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
-	flow *models.Flow, contactIDs []models.ContactID, options *StartOptions) ([]*models.Session, error) {
-
+// StartFlow runs the passed in flow for the passed in contacts
+func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, flow *models.Flow, contactIDs []models.ContactID, options *StartOptions) ([]*models.Session, error) {
 	if len(contactIDs) == 0 {
 		return nil, nil
 	}
@@ -260,19 +248,8 @@ func StartFlow(
 	// figures out which contacts need to be excluded if any
 	exclude := make(map[models.ContactID]bool, 5)
 
-	// filter out anybody who has has a flow run in this flow if appropriate
-	if options.ExcludeStartedPreviously {
-		// find all participants that have been in this flow
-		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error finding others started flow: %d", flow.ID())
-		}
-		for _, c := range started {
-			exclude[c] = true
-		}
-	}
-
 	// filter out our list of contacts to only include those that should be started
+	// TODO this is only needed for campaign events since flow starts apply exclusions when creating batches
 	if options.ExcludeInAFlow {
 		// find all participants active in any flow
 		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
@@ -304,74 +281,55 @@ func StartFlow(
 	remaining := includedContacts
 	start := time.Now()
 
-	// map of locks we've released
-	released := make(map[*redisx.Locker]bool)
-
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
-		locked := make([]models.ContactID, 0, len(remaining))
-		locks := make([]string, 0, len(remaining))
-		skipped := make([]models.ContactID, 0, 5)
-
-		// try up to a second to get a lock for a contact
-		for _, contactID := range remaining {
-			locker := models.GetContactLocker(oa.OrgID(), contactID)
-
-			lock, err := locker.Grab(rt.RP, time.Second)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error attempting to grab lock")
-			}
-			if lock == "" {
-				skipped = append(skipped, contactID)
-				continue
-			}
-			locked = append(locked, contactID)
-			locks = append(locks, lock)
-
-			// defer unlocking if we exit due to error
-			defer func() {
-				if !released[locker] {
-					locker.Release(rt.RP, lock)
-				}
-			}()
-		}
-
-		// load our locked contacts
-		contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, locked)
+		ss, skipped, err := tryToStartWithLock(ctx, rt, oa, flow, remaining, options)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error loading contacts to start")
+			return nil, err
 		}
 
-		// ok, we've filtered our contacts, build our triggers
-		triggers := make([]flows.Trigger, 0, len(locked))
-		for _, c := range contacts {
-			contact, err := c.FlowContact(oa)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error creating flow contact")
-			}
-			trigger := options.TriggerBuilder(contact)
-			triggers = append(triggers, trigger)
-		}
-
-		ss, err := StartFlowForContacts(ctx, rt, oa, flow, contacts, triggers, options.CommitHook, options.Interrupt)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error starting flow for contacts")
-		}
-
-		// append all the sessions that were started
 		sessions = append(sessions, ss...)
-
-		// release all our locks
-		for i := range locked {
-			locker := models.GetContactLocker(oa.OrgID(), locked[i])
-			locker.Release(rt.RP, locks[i])
-			released[locker] = true
-		}
-
-		// skipped are now our remaining
-		remaining = skipped
+		remaining = skipped // skipped are now our remaining
 	}
 
 	return sessions, nil
+}
+
+// tries to start the given contacts, returning sessions for those we could, and the ids that were skipped because we
+// couldn't get their locks
+func tryToStartWithLock(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, flow *models.Flow, ids []models.ContactID, options *StartOptions) ([]*models.Session, []models.ContactID, error) {
+	// try to get locks for these contacts, waiting for up to a second for each contact
+	locks, skipped, err := models.LockContacts(ctx, rt, oa.OrgID(), ids, time.Second)
+	if err != nil {
+		return nil, nil, err
+	}
+	locked := maps.Keys(locks)
+
+	// whatever happens, we need to unlock the contacts
+	defer models.UnlockContacts(rt, oa.OrgID(), locks)
+
+	// load our locked contacts
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, locked)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error loading contacts to start")
+	}
+
+	// build our triggers
+	triggers := make([]flows.Trigger, 0, len(locked))
+	for _, c := range contacts {
+		contact, err := c.FlowContact(oa)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "error creating flow contact")
+		}
+		trigger := options.TriggerBuilder(contact)
+		triggers = append(triggers, trigger)
+	}
+
+	ss, err := StartFlowForContacts(ctx, rt, oa, flow, contacts, triggers, options.CommitHook, options.Interrupt)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error starting flow for contacts")
+	}
+
+	return ss, skipped, nil
 }
 
 // StartFlowForContacts runs the passed in flow for the passed in contact

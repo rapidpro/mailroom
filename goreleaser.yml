@@ -8,9 +8,14 @@ build:
     - amd64
     - arm64
 
+changelog:
+  filters:
+    exclude:
+      - "^Update CHANGELOG.md"
+
 archives:
   - files:
-    - LICENSE
-    - README.md
-    - docs/*
-    - docs/**/*
+      - LICENSE
+      - README.md
+      - docs/*
+      - docs/**/*

@@ -1,3 +1,119 @@
+v8.1.52 (2023-05-24)
+-------------------------
+ * Update to latest goflow
+
+v8.1.51 (2023-05-24)
+-------------------------
+ * Remove applying started-previously exclusion in runner now that it's applied at batch creation stage
+ * Refresh elastic indexes after changes in tests instead of waiting for a second
+ * Optimize case when recipients is only specific contacts and no exclusions
+ * Rework ResolveRecipients to use elastic
+
+v8.1.50 (2023-05-23)
+-------------------------
+ * Remove support for passing URNs to flow/preview_start as that's not a thing we do
+ * Make the name of the ES index for contacts configurable
+
+v8.1.49 (2023-05-18)
+-------------------------
+ * Remove support for ticket assignment with a note
+ * Add contact/bulk_create endpoint
+
+v8.1.48 (2023-05-15)
+-------------------------
+ * Fix loading of scheduled triggers
+ * Update test database
+
+v8.1.47 (2023-05-11)
+-------------------------
+ * Still queue a courier message even if fetching the flow fails
+ * Stop writing old FlowStart fields
+
+v8.1.46 (2023-05-10)
+-------------------------
+ * Update to latest null library
+ * Read from new flow start fields
+
+v8.1.45 (2023-05-09)
+-------------------------
+ * Always write new FlowStart fields
+ * Flow start batches should read from exclusions and remove legacy fields
+
+v8.1.44 (2023-05-08)
+-------------------------
+ * Start writing exclusions blob on start batch tasks
+
+v8.1.43 (2023-05-08)
+-------------------------
+ * Add contact locking to ticket/reopen endpoint
+
+v8.1.42 (2023-05-03)
+-------------------------
+ * Update to latest goflow which fixes parsing locations with non-ASCII chars
+
+v8.1.41 (2023-05-01)
+-------------------------
+ * Add contact locking to modify endpoint
+
+v8.1.40 (2023-05-01)
+-------------------------
+ * Add context paramter to LockContacts so it can error if context is done
+
+v8.1.39 (2023-04-27)
+-------------------------
+ * Refactor how we lock and unlock contacts
+
+v8.1.38 (2023-04-27)
+-------------------------
+ * Handled incoming messages should be associated with any open ticket
+ * Only load the last opened open ticket for a contact
+
+v8.1.37 (2023-04-20)
+-------------------------
+ * Add contact/inspect endpoint to return all URNs with channel if there is one
+
+v8.1.36 (2023-04-19)
+-------------------------
+ * Fix not queuing chat messages as high priority and add contact_last_seen_on
+ * Use services for github actions
+
+v8.1.35 (2023-04-18)
+-------------------------
+ * Fix goreleaser changelog generation and use latest action
+
+v8.1.34 (2023-04-17)
+-------------------------
+ * Add ticket_id to msg and use to set origin on messages queued to courier
+ * Remove fields from courier payload that it doesn't use
+
+v8.1.33 (2023-04-13)
+-------------------------
+ * Use envelope struct for marshalling courier messages and remove unused fields
+
+v8.1.32 (2023-04-03)
+-------------------------
+ * Fix not logging bodies of incoming IVR requests
+
+v8.1.31 (2023-03-16)
+-------------------------
+ * Remove no longer used exit type constants
+ * Remove support for broadcasts with an associated ticket
+
+v8.1.30 (2023-03-14)
+-------------------------
+ * Bump courier http client timeout
+ * Use Org.config and Channel.config as JSONB columns
+ * Fix YYYY-MM-DD date formats
+
+v8.1.29 (2023-03-13)
+-------------------------
+ * Don't set msg_type when handling messages as courier is already setting it
+
+v8.1.28 (2023-03-08)
+-------------------------
+ * Remove msg_type values INBOX and FLOW
+ * Re-organize web endpoints so each endpoint is in its own file
+
 v8.1.27 (2023-03-06)
 -------------------------
  * Add Msg.created_by and populate for chat and broadcast messages

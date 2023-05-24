@@ -4,19 +4,14 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
-
-	"github.com/stretchr/testify/require"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestTicketOpened(t *testing.T) {
@@ -43,13 +38,6 @@ func TestTicketOpened(t *testing.T) {
 			}`)),
 		},
 	}))
-
-	oa := testdata.Org1.Load(rt)
-
-	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", testdata.DefaultTopic.ID, "Who?", models.NilUserID, nil)
-	err := models.InsertTickets(ctx, rt.DB, oa, []*models.Ticket{cathyTicket})
-	require.NoError(t, err)
 
 	tcs := []handlers.TestCase{
 		{
@@ -79,7 +67,7 @@ func TestTicketOpened(t *testing.T) {
 				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{testdata.Cathy.ID, testdata.Mailgun.ID},
-					Count: 2,
+					Count: 1,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",

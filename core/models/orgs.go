@@ -252,8 +252,8 @@ const selectOrgByID = `
 SELECT ROW_TO_JSON(o) FROM (SELECT
 	id,
 	is_suspended,
-	COALESCE(o.config::json,'{}'::json) AS config,
-	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
+	o.config AS config,
+	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' ELSE 'YYYY-MM-DD' END) AS date_format, 
 	'tt:mm' AS time_format,
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,

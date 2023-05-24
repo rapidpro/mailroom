@@ -2,19 +2,16 @@ package models_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -35,7 +32,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	blakeURNID := testdata.InsertContactURN(rt, testdata.Org1, blake, "tel:++250700000007", 1)
 
 	tcs := []struct {
-		ChannelUUID  assets.ChannelUUID
+		Channel      *testdata.Channel
 		Text         string
 		Contact      *testdata.Contact
 		URN          urns.URN
@@ -55,7 +52,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		ExpectedPriority     bool
 	}{
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "missing urn id",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN("tel:+250700000001"),
@@ -69,7 +66,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     true,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "test outgoing",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -84,7 +81,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "test outgoing",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -98,7 +95,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "suspended org",
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
@@ -112,8 +109,8 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:                 "missing URN",
+			Channel:              nil,
+			Text:                 "no destination",
 			Contact:              testdata.Cathy,
 			URN:                  urns.NilURN,
 			URNID:                models.URNID(0),
@@ -126,21 +123,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:          "",
-			Text:                 "missing Channel",
-			Contact:              testdata.Cathy,
-			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
-			URNID:                testdata.Cathy.URNID,
-			Unsendable:           flows.UnsendableReasonNoDestination,
-			Flow:                 testdata.Favorites,
-			ExpectedStatus:       models.MsgStatusFailed,
-			ExpectedFailedReason: models.MsgFailedNoDestination,
-			ExpectedMetadata:     map[string]interface{}{},
-			ExpectedMsgCount:     1,
-			ExpectedPriority:     false,
-		},
-		{
-			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Channel:              testdata.TwilioChannel,
 			Text:                 "blocked contact",
 			Contact:              blake,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000007?id=%d", blakeURNID)),
@@ -164,7 +147,15 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 		require.NoError(t, err)
 
-		channel := oa.ChannelByUUID(tc.ChannelUUID)
+		var ch *models.Channel
+		var chRef *assets.ChannelReference
+		expectedChannelID := models.NilChannelID
+		if tc.Channel != nil {
+			ch = oa.ChannelByUUID(tc.Channel.UUID)
+			chRef = ch.ChannelReference()
+			expectedChannelID = ch.ID()
+		}
+
 		flow, _ := oa.FlowByID(tc.Flow.ID)
 
 		session := insertTestSession(t, ctx, rt, testdata.Org1, tc.Contact, testdata.Favorites)
@@ -172,8 +163,8 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			session.SetIncomingMsg(tc.ResponseTo, null.NullString)
 		}
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
-		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
+		flowMsg := flows.NewMsgOut(tc.URN, chRef, tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
+		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), ch, session, flow, flowMsg, now)
 
 		assert.NoError(t, err)
 
@@ -190,8 +181,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, expectedAttachments, msg.Attachments())
 		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
-		assert.Equal(t, channel, msg.Channel())
-		assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
+		assert.Equal(t, expectedChannelID, msg.ChannelID())
 		assert.Equal(t, tc.URN, msg.URN())
 		if tc.URNID != models.NilURNID {
 			assert.Equal(t, tc.URNID, *msg.ContactURNID())
@@ -211,7 +201,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(4)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
 
 	// ensure org is unsuspended
 	rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
@@ -246,169 +236,6 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, models.MsgStatusQueued, msg.Status())
 		assert.Equal(t, models.NilMsgFailedReason, msg.FailedReason())
 	}
-}
-
-func TestMarshalMsg(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-
-	defer testsuite.Reset(testsuite.ResetData)
-
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
-
-	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	require.NoError(t, err)
-	require.False(t, oa.Org().Suspended())
-
-	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
-	flow, _ := oa.FlowByID(testdata.Favorites.ID)
-	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
-	flowMsg1 := flows.NewMsgOut(
-		urn,
-		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
-		"Hi there",
-		[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
-		[]string{"yes", "no"},
-		flows.NewMsgTemplating(assets.NewTemplateReference("4474d39c-ac2c-486d-bceb-8a774a515299", "tpl"), []string{"name"}, "tpls"),
-		flows.MsgTopicPurchase,
-		envs.Locale(`eng-US`),
-		flows.NilUnsendableReason,
-	)
-
-	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
-	session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
-	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
-	require.NoError(t, err)
-
-	cathy := session.Contact()
-
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg1})
-	require.NoError(t, err)
-
-	marshaled, err := json.Marshal(msg1)
-	assert.NoError(t, err)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"attachments": [
-			"image/jpeg:https://dl-foo.com/image.jpg"
-		],
-		"channel_id": 10000,
-		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact_id": 10000,
-		"contact_urn_id": 10000,
-		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
-		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
-		"high_priority": false,
-		"id": %d,
-		"locale": "eng-US",
-		"metadata": {
-			"templating": {
-				"namespace": "tpls",
-				"template": {"name": "tpl", "uuid": "4474d39c-ac2c-486d-bceb-8a774a515299"},
-				"variables": ["name"]
-			},
-			"topic": "purchase"
-		},
-		"modified_on": %s,
-		"next_attempt": null,
-		"org_id": 1,
-		"queued_on": %s,
-		"quick_replies": [
-			"yes",
-			"no"
-		],
-		"sent_on": null,
-		"session_id": %d,
-		"session_status": "W",
-		"status": "Q",
-		"text": "Hi there",
-		"tps_cost": 2,
-		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s"
-	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
-
-	// create a priority flow message.. i.e. the session is responding to an incoming message
-	flowMsg2 := flows.NewMsgOut(
-		urn,
-		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
-		"Hi there",
-		nil, nil, nil,
-		flows.NilMsgTopic,
-		envs.NilLocale,
-		flows.NilUnsendableReason,
-	)
-	in1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
-	session.SetIncomingMsg(models.MsgID(in1.ID()), null.String("EX123"))
-	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
-	require.NoError(t, err)
-
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
-	require.NoError(t, err)
-
-	marshaled, err = json.Marshal(msg2)
-	assert.NoError(t, err)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"channel_id": 10000,
-		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact_id": 10000,
-		"contact_urn_id": 10000,
-		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
-		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
-		"response_to_external_id": "EX123",
-		"high_priority": true,
-		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
-		"org_id": 1,
-		"queued_on": %s,
-		"sent_on": null,
-		"session_id": %d,
-		"session_status": "W",
-		"status": "Q",
-		"text": "Hi there",
-		"tps_cost": 1,
-		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s"
-	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
-
-	// try a broadcast message which won't have session and flow fields set
-	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
-	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), &models.BroadcastBatch{BroadcastID: bcastID, CreatedByID: testdata.Admin.ID})
-	require.NoError(t, err)
-
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg2})
-	require.NoError(t, err)
-
-	marshaled, err = json.Marshal(msg3)
-	assert.NoError(t, err)
-
-	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"broadcast_id": %d,
-		"channel_id": 10000,
-		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact_id": 10000,
-		"contact_urn_id": 10000,
-		"created_on": "2021-11-09T14:03:30Z",
-		"direction": "O",
-		"error_count": 0,
-		"high_priority": false,
-		"id": %d,
-		"modified_on": %s,
-		"next_attempt": null,
-		"org_id": 1,
-		"queued_on": %s,
-		"sent_on": null,
-		"status": "Q",
-		"text": "Blast",
-		"tps_cost": 1,
-		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s"
-	}`, bcastID, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
 }
 
 func TestGetMessagesByID(t *testing.T) {
@@ -483,11 +310,11 @@ func TestResendMessages(t *testing.T) {
 	assert.Len(t, resent, 3) // only #1, #2 and #3 can be resent
 
 	// both messages should now have a channel and be marked for resending
-	assert.True(t, resent[0].IsResend())
+	assert.True(t, resent[0].IsResend)
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[0].ChannelID())
-	assert.True(t, resent[1].IsResend())
+	assert.True(t, resent[1].IsResend)
 	assert.Equal(t, testdata.VonageChannel.ID, resent[1].ChannelID()) // channel changed
-	assert.True(t, resent[2].IsResend())
+	assert.True(t, resent[2].IsResend)
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[2].ChannelID()) // channel added
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'Q' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)

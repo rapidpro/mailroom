@@ -74,7 +74,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 	}
 
 	// perform our search
-	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)
+	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)

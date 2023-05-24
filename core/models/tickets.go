@@ -172,60 +172,66 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, oa *O
 	return err
 }
 
-const sqlSelectOpenTickets = `
+const sqlSelectLastOpenTicket = `
 SELECT
-  t.id,
-  t.uuid,
-  t.org_id,
-  t.contact_id,
-  t.ticketer_id,
-  t.external_id,
-  t.status,
-  t.topic_id,
-  t.body,
-  t.assignee_id,
-  t.config,
-  t.opened_on,
-  t.opened_by_id,
-  t.opened_in_id,
-  t.replied_on,
-  t.modified_on,
-  t.closed_on,
-  t.last_activity_on
-FROM
-  tickets_ticket t
-WHERE
-  t.contact_id = $1 AND t.status = 'O'`
+  id,
+  uuid,
+  org_id,
+  contact_id,
+  ticketer_id,
+  external_id,
+  status,
+  topic_id,
+  body,
+  assignee_id,
+  config,
+  opened_on,
+  opened_by_id,
+  opened_in_id,
+  replied_on,
+  modified_on,
+  closed_on,
+  last_activity_on
+    FROM tickets_ticket
+   WHERE contact_id = $1 AND status = 'O'
+ORDER BY opened_on DESC
+   LIMIT 1`
 
-// LoadOpenTicketsForContact looks up the open tickets for the passed in contact
-func LoadOpenTicketsForContact(ctx context.Context, db Queryer, contact *Contact) ([]*Ticket, error) {
-	return loadTickets(ctx, db, sqlSelectOpenTickets, contact.ID())
+// LoadOpenTicketForContact looks up the last opened open ticket for the passed in contact
+func LoadOpenTicketForContact(ctx context.Context, db Queryer, contact *Contact) (*Ticket, error) {
+	tickets, err := loadTickets(ctx, db, sqlSelectLastOpenTicket, contact.ID())
+	if err != nil {
+		return nil, err
+	}
+	if len(tickets) > 0 {
+		return tickets[0], nil
+	}
+	return nil, nil
 }
 
 const sqlSelectTicketsByID = `
 SELECT
-  t.id,
-  t.uuid,
-  t.org_id,
-  t.contact_id,
-  t.ticketer_id,
-  t.external_id,
-  t.status,
-  t.topic_id,
-  t.body,
-  t.assignee_id,
-  t.config,
-  t.opened_on,
-  t.opened_by_id,
-  t.opened_in_id,
-  t.replied_on,
-  t.modified_on,
-  t.closed_on,
-  t.last_activity_on
-FROM
-  tickets_ticket t
-WHERE
-  t.id = ANY($1)`
+  id,
+  uuid,
+  org_id,
+  contact_id,
+  ticketer_id,
+  external_id,
+  status,
+  topic_id,
+  body,
+  assignee_id,
+  config,
+  opened_on,
+  opened_by_id,
+  opened_in_id,
+  replied_on,
+  modified_on,
+  closed_on,
+  last_activity_on
+    FROM tickets_ticket
+   WHERE id = ANY($1)
+ORDER BY opened_on DESC`
 
 // LoadTickets loads all of the tickets with the given ids
 func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
@@ -413,7 +419,7 @@ UPDATE tickets_ticket
  WHERE id = ANY($1)`
 
 // TicketsAssign assigns the passed in tickets
-func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -438,7 +444,7 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 			t.ModifiedOn = now
 			t.LastActivityOn = now
 
-			e := NewTicketAssignedEvent(ticket, userID, assigneeID, note)
+			e := NewTicketAssignedEvent(ticket, userID, assigneeID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -901,4 +907,35 @@ func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDa
 
 func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
 	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, duration)
+}
+
+func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID TicketID, userID UserID) error {
+	firstReplyTime, err := TicketRecordReplied(ctx, db, ticketID, dates.Now())
+	if err != nil {
+		return err
+	}
+
+	// record reply counts for org, user and team
+	replyCounts := map[string]int{scopeOrg(oa): 1}
+
+	if userID != NilUserID {
+		user := oa.UserByID(userID)
+		if user != nil {
+			replyCounts[scopeUser(oa, user)] = 1
+			if user.Team() != nil {
+				replyCounts[scopeTeam(user.Team())] = 1
+			}
+		}
+	}
+
+	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
+		return err
+	}
+
+	if firstReplyTime >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
+			return err
+		}
+	}
+	return nil
 }

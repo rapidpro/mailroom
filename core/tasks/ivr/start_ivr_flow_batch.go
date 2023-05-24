@@ -33,46 +33,11 @@ func (t *StartIVRFlowBatchTask) Timeout() time.Duration {
 }
 
 func (t *StartIVRFlowBatchTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	return HandleFlowStartBatch(ctx, rt, t.FlowStartBatch)
+	return handleFlowStartBatch(ctx, rt, t.FlowStartBatch)
 }
 
-// HandleFlowStartBatch starts a batch of contacts in an IVR flow
-func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
-	// contacts we will exclude either because they are in a flow or have already been in this one
-	exclude := make(map[models.ContactID]bool, 5)
-
-	// filter out anybody who has has a flow run in this flow if appropriate
-	if batch.ExcludeStartedPreviously() {
-		// find all participants that have been in this flow
-		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, batch.FlowID, batch.ContactIDs)
-		if err != nil {
-			return errors.Wrapf(err, "error finding others started flow: %d", batch.FlowID)
-		}
-		for _, c := range started {
-			exclude[c] = true
-		}
-	}
-
-	// filter out our list of contacts to only include those that should be started
-	if batch.ExcludeInAFlow() {
-		// find all participants active in other sessions
-		active, err := models.FilterByWaitingSession(ctx, rt.DB, batch.ContactIDs)
-		if err != nil {
-			return errors.Wrapf(err, "error finding other active sessions: %d", batch.FlowID)
-		}
-		for _, c := range active {
-			exclude[c] = true
-		}
-	}
-
-	// filter into our final list of contacts
-	contactIDs := make([]models.ContactID, 0, len(batch.ContactIDs))
-	for _, c := range batch.ContactIDs {
-		if !exclude[c] {
-			contactIDs = append(contactIDs, c)
-		}
-	}
-
+// starts a batch of contacts in an IVR flow
+func handleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID)
 	if err != nil {
@@ -80,7 +45,7 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 	}
 
 	// ok, we can initiate calls for the remaining contacts
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, contactIDs)
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, batch.ContactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contacts")
 	}

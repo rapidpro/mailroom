@@ -3,6 +3,7 @@ package msg_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -14,9 +15,13 @@ func TestSend(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/send.json", nil)
+	cathyTicket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "help", "", time.Date(2015, 1, 1, 12, 30, 45, 0, time.UTC), nil)
 
-	testsuite.AssertCourierQueues(t, map[string][]int{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1, 1}})
+	testsuite.RunWebTests(t, ctx, rt, "testdata/send.json", map[string]string{
+		"cathy_ticket_id": fmt.Sprintf("%d", cathyTicket.ID),
+	})
+
+	testsuite.AssertCourierQueues(t, map[string][]int{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1, 1, 1}})
 }
 
 func TestResend(t *testing.T) {
@@ -39,13 +44,7 @@ func TestResend(t *testing.T) {
 }
 
 func TestPreviewBroadcast(t *testing.T) {
-	ctx, rt, mocks, close := testsuite.RuntimeWithSearch()
-	defer close()
-
-	mocks.ES.AddResponse(testdata.Cathy.ID)
-	mocks.ES.AddResponse(testdata.Bob.ID)
-	mocks.ES.AddResponse(testdata.George.ID)
-	mocks.ES.AddResponse(testdata.Alexandria.ID)
+	ctx, rt := testsuite.Runtime()
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_broadcast.json", nil)
 }

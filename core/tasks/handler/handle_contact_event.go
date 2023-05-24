@@ -41,16 +41,14 @@ func (t *HandleContactEventTask) Timeout() time.Duration {
 // Perform is called when an event comes in for a contact. To make sure we don't get into a situation of being off by one,
 // this task ingests and handles all the events for a contact, one by one.
 func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	// acquire the lock for this contact
-	locker := models.GetContactLocker(orgID, t.ContactID)
-
-	lock, err := locker.Grab(rt.RP, time.Second*10)
+	// try to get the lock for this contact, waiting up to 10 seconds
+	locks, _, err := models.LockContacts(ctx, rt, orgID, []models.ContactID{t.ContactID}, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", t.ContactID)
 	}
 
-	// we didn't get the lock within our timeout, skip and requeue for later
-	if lock == "" {
+	// we didn't get the lock.. requeue for later
+	if len(locks) == 0 {
 		rc := rt.RP.Get()
 		defer rc.Close()
 		err = tasks.Queue(rc, queue.HandlerQueue, orgID, &HandleContactEventTask{ContactID: t.ContactID}, queue.DefaultPriority)
@@ -60,7 +58,8 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 		logrus.WithFields(logrus.Fields{"org_id": orgID, "contact_id": t.ContactID}).Info("failed to get lock for contact, requeued and skipping")
 		return nil
 	}
-	defer locker.Release(rt.RP, lock)
+
+	defer models.UnlockContacts(rt, orgID, locks)
 
 	// read all the events for this contact, one by one
 	contactQ := fmt.Sprintf("c:%d:%d", orgID, t.ContactID)

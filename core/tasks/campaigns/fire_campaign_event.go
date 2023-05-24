@@ -171,18 +171,16 @@ func FireCampaignEvents(
 
 	// our start options are based on the start mode for our event
 	options := runner.NewStartOptions()
+
 	switch dbEvent.StartMode() {
 	case models.StartModeInterrupt:
 		options.ExcludeInAFlow = false
-		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	case models.StartModePassive:
 		options.ExcludeInAFlow = false
-		options.ExcludeStartedPreviously = false
 		options.Interrupt = false
 	case models.StartModeSkip:
 		options.ExcludeInAFlow = true
-		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())

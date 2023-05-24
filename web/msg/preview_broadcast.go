@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
@@ -26,7 +25,6 @@ func init() {
 //	  "include": {
 //	    "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
 //	    "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
-//	    "urns": ["tel:+1234567890"],
 //	    "user_query": ""
 //	  },
 //	  "exclude": {
@@ -38,7 +36,7 @@ func init() {
 //	}
 //
 //	{
-//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
+//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b") AND history != \"Registration\"",
 //	  "total": 567,
 //	  "sample": [12, 34, 56, 67, 78],
 //	  "metadata": {
@@ -53,10 +51,9 @@ type previewRequest struct {
 	Include struct {
 		GroupUUIDs   []assets.GroupUUID  `json:"group_uuids"`
 		ContactUUIDs []flows.ContactUUID `json:"contact_uuids"`
-		URNs         []urns.URN          `json:"urns"`
 		Query        string              `json:"query"`
 	} `json:"include"   validate:"required"`
-	Exclude    search.Exclusions `json:"exclude"`
+	Exclude    models.Exclusions `json:"exclude"`
 	SampleSize int               `json:"sample_size"  validate:"required"`
 }
 
@@ -81,7 +78,7 @@ func handlePreviewBroadcast(ctx context.Context, rt *runtime.Runtime, r *preview
 		}
 	}
 
-	query, err := search.BuildStartQuery(oa, nil, groups, r.Include.ContactUUIDs, r.Include.URNs, r.Include.Query, r.Exclude)
+	query, err := search.BuildStartQuery(oa, nil, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude, nil)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
@@ -93,7 +90,7 @@ func handlePreviewBroadcast(ctx context.Context, rt *runtime.Runtime, r *preview
 		return &previewResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, r.SampleSize)
+	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, nil, nil, query, "", 0, r.SampleSize)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error querying preview")
 	}

@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -15,9 +16,11 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/test"
+	"github.com/nyaruka/redisx/assertredis"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func TestContacts(t *testing.T) {
@@ -25,9 +28,11 @@ func TestContacts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	// for now it's still possible to have more than one open ticket in the database
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", time.Now(), testdata.Agent)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", time.Now(), nil)
+
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", time.Now(), testdata.Editor)
 
 	// delete mailgun ticketer
@@ -60,13 +65,11 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, len(cathy.URNs()), 1)
 	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
 	assert.Equal(t, 1, cathy.Groups().Count())
-	assert.Equal(t, 2, cathy.Tickets().Count())
+	assert.NotNil(t, cathy.Ticket())
 
-	cathyTickets := cathy.Tickets().All()
-	assert.Equal(t, "Support", cathyTickets[0].Topic().Name())
-	assert.Equal(t, "agent1@nyaruka.com", cathyTickets[0].Assignee().Email())
-	assert.Equal(t, "Sales", cathyTickets[1].Topic().Name())
-	assert.Nil(t, cathyTickets[1].Assignee())
+	cathyTicket := cathy.Ticket()
+	assert.Equal(t, "Sales", cathyTicket.Topic().Name())
+	assert.Nil(t, cathyTicket.Assignee())
 
 	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
 	assert.Equal(t, "Dokshi", cathy.Fields()["ward"].QueryValue())
@@ -79,13 +82,13 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "tel:+16055742222?id=10001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
 	assert.Equal(t, 0, bob.Groups().Count())
-	assert.Equal(t, 0, bob.Tickets().Count()) // because ticketer no longer exists
+	assert.Nil(t, bob.Ticket()) // because ticketer no longer exists
 
 	assert.Equal(t, "George", george.Name())
 	assert.Equal(t, decimal.RequireFromString("30"), george.Fields()["age"].QueryValue())
 	assert.Equal(t, 0, len(george.URNs()))
 	assert.Equal(t, 0, george.Groups().Count())
-	assert.Equal(t, 0, george.Tickets().Count())
+	assert.Nil(t, george.Ticket())
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(testdata.TwilioChannel.ID)
@@ -355,59 +358,61 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	assert.NoError(t, err)
+
 	// add an orphaned URN
 	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
-	contactIDSeq := models.ContactID(30000)
-	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
-	prevContact := func() models.ContactID { return contactIDSeq - 1 }
-
-	org, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	tcs := []struct {
-		OrgID      models.OrgID
-		URNs       []urns.URN
-		ContactIDs map[urns.URN]models.ContactID
+		orgID   models.OrgID
+		urns    []urns.URN
+		fetched map[urns.URN]*models.Contact
+		created []urns.URN
 	}{
 		{
-			testdata.Org1.ID,
-			[]urns.URN{testdata.Cathy.URN},
-			map[urns.URN]models.ContactID{testdata.Cathy.URN: testdata.Cathy.ID},
-		},
-		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
-			map[urns.URN]models.ContactID{urns.URN(testdata.Cathy.URN.String() + "?foo=bar"): testdata.Cathy.ID},
-		},
-		{
-			testdata.Org1.ID,
-			[]urns.URN{testdata.Cathy.URN, urns.URN("telegram:100001")},
-			map[urns.URN]models.ContactID{
-				testdata.Cathy.URN:          testdata.Cathy.ID,
-				urns.URN("telegram:100001"): newContact(),
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{testdata.Cathy.URN},
+			fetched: map[urns.URN]*models.Contact{
+				testdata.Cathy.URN: cathy,
 			},
+			created: []urns.URN{},
 		},
 		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN("telegram:100001")},
-			map[urns.URN]models.ContactID{urns.URN("telegram:100001"): prevContact()},
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
+			fetched: map[urns.URN]*models.Contact{
+				urns.URN(testdata.Cathy.URN.String() + "?foo=bar"): cathy,
+			},
+			created: []urns.URN{},
 		},
 		{
-			testdata.Org1.ID,
-			[]urns.URN{urns.URN("telegram:200001")},
-			map[urns.URN]models.ContactID{urns.URN("telegram:200001"): newContact()}, // new contact assigned orphaned URN
+			orgID: testdata.Org1.ID,
+			urns:  []urns.URN{testdata.Cathy.URN, urns.URN("telegram:100001")},
+			fetched: map[urns.URN]*models.Contact{
+				testdata.Cathy.URN: cathy,
+			},
+			created: []urns.URN{"telegram:100001"},
+		},
+		{
+			orgID:   testdata.Org1.ID,
+			urns:    []urns.URN{urns.URN("telegram:200001")},
+			fetched: map[urns.URN]*models.Contact{},
+			created: []urns.URN{"telegram:200001"}, // new contact assigned orphaned URN
 		},
 	}
 
 	for i, tc := range tcs {
-		ids, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, org, tc.URNs)
+		fetched, created, err := models.GetOrCreateContactsFromURNs(ctx, rt.DB, oa, tc.urns)
 		assert.NoError(t, err, "%d: error getting contact ids", i)
-		assert.Equal(t, tc.ContactIDs, ids, "%d: mismatch in contact ids", i)
+		assert.Equal(t, tc.fetched, fetched, "%d: fetched contacts mismatch", i)
+		assert.Equal(t, tc.created, maps.Keys(created), "%d: created contacts mismatch", i)
 	}
 }
 
-func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
+func TestGetOrCreateContactsFromURNsRace(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
@@ -424,13 +429,13 @@ func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
 		return nil
 	})
 
-	var contacts [2]models.ContactID
+	var contacts [2]*models.Contact
 	var errs [2]error
 
 	test.RunConcurrently(2, func(i int) {
-		var cmap map[urns.URN]models.ContactID
-		cmap, errs[i] = models.GetOrCreateContactIDsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
-		contacts[i] = cmap[urns.URN("telegram:100007")]
+		var created map[urns.URN]*models.Contact
+		_, created, errs[i] = models.GetOrCreateContactsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+		contacts[i] = created[urns.URN("telegram:100007")]
 	})
 
 	require.NoError(t, errs[0])
@@ -606,4 +611,50 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
+}
+
+func TestLockContacts(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetRedis)
+
+	// grab lock for contact 102
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{102}, time.Second)
+
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+
+	// try to get locks for 101, 102, 103
+	locks, skipped, err := models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{101, 102, 103}, time.Second)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []models.ContactID{101, 103}, maps.Keys(locks))
+	assert.Equal(t, []models.ContactID{102}, skipped) // because it's already locked
+
+	assertredis.Exists(t, rt.RP, "lock:c:1:101")
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+	assertredis.Exists(t, rt.RP, "lock:c:1:103")
+
+	err = models.UnlockContacts(rt, testdata.Org1.ID, locks)
+	assert.NoError(t, err)
+
+	assertredis.NotExists(t, rt.RP, "lock:c:1:101")
+	assertredis.Exists(t, rt.RP, "lock:c:1:102")
+	assertredis.NotExists(t, rt.RP, "lock:c:1:103")
+
+	// lock contacts 103, 104, 105 so only 101 is unlocked
+	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{103}, time.Second)
+
+	// create a new context with a 2 second timelimit
+	ctx2, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	start := time.Now()
+
+	_, _, err = models.LockContacts(ctx2, rt, testdata.Org1.ID, []models.ContactID{101, 102, 103, 104}, time.Second)
+	assert.EqualError(t, err, "context deadline exceeded")
+
+	// call should have completed in just over the context deadline
+	assert.Less(t, time.Since(start), time.Second*3)
+
+	// since we errored, any locks we grabbed before the error, should have been released
+	assertredis.NotExists(t, rt.RP, "lock:c:1:101")
 }

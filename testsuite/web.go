@@ -77,6 +77,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 
 		var clonedMocks *httpx.MockRequestor
 		if tc.HTTPMocks != nil {
+			tc.HTTPMocks.SetIgnoreLocal(true)
 			httpx.SetRequestor(tc.HTTPMocks)
 			clonedMocks = tc.HTTPMocks.Clone()
 		} else {
@@ -119,13 +120,12 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 		actual := tc
 		actual.Status = resp.StatusCode
 		actual.HTTPMocks = clonedMocks
+		actual.actualResponse, err = io.ReadAll(resp.Body)
 
-		tc.HTTPMocks = clonedMocks
-		tc.actualResponse, err = io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
 		// some timestamps come from db NOW() which we can't mock, so we replace them with $recent_timestamp$
-		tc.actualResponse = overwriteRecentTimestamps(tc.actualResponse)
+		actual.actualResponse = overwriteRecentTimestamps(actual.actualResponse)
 
 		if !test.UpdateSnapshots {
 			assert.Equal(t, tc.Status, actual.Status, "%s: unexpected status", tc.Label)
@@ -143,9 +143,9 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 			}
 
 			if expectedIsJSON {
-				test.AssertEqualJSON(t, expectedResponse, tc.actualResponse, "%s: unexpected JSON response", tc.Label)
+				test.AssertEqualJSON(t, expectedResponse, actual.actualResponse, "%s: unexpected JSON response", tc.Label)
 			} else {
-				assert.Equal(t, string(expectedResponse), string(tc.actualResponse), "%s: unexpected response", tc.Label)
+				assert.Equal(t, string(expectedResponse), string(actual.actualResponse), "%s: unexpected response", tc.Label)
 			}
 
 			for _, dba := range tc.DBAssertions {
@@ -159,12 +159,12 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 
 	// update if we are meant to
 	if test.UpdateSnapshots {
-		for _, tc := range tcs {
-			if tc.ResponseFile != "" {
-				err = os.WriteFile(tc.ResponseFile, tc.actualResponse, 0644)
+		for i := range tcs {
+			if tcs[i].ResponseFile != "" {
+				err = os.WriteFile(tcs[i].ResponseFile, tcs[i].actualResponse, 0644)
 				require.NoError(t, err, "failed to update response file")
 			} else {
-				tc.Response = tc.actualResponse
+				tcs[i].Response = tcs[i].actualResponse
 			}
 		}
 
@@ -180,7 +180,6 @@ var isoTimestampRegex = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\
 
 func overwriteRecentTimestamps(resp []byte) []byte {
 	return isoTimestampRegex.ReplaceAllFunc(resp, func(b []byte) []byte {
-		fmt.Printf("found timestamp %s\n", b)
 		t, _ := time.Parse(time.RFC3339, string(b))
 		if time.Since(t) < time.Second*10 {
 			return []byte(`$recent_timestamp$`)

@@ -17,10 +17,11 @@ require (
 	github.com/lib/pq v1.10.7
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.35.0
-	github.com/nyaruka/goflow v0.184.4
+	github.com/nyaruka/goflow v0.186.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
-	github.com/nyaruka/null/v2 v2.0.2
+	github.com/nyaruka/null/v2 v2.0.3
 	github.com/nyaruka/redisx v0.2.2
+	github.com/nyaruka/rp-indexer/v8 v8.0.3
 	github.com/olivere/elastic/v7 v7.0.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
@@ -40,13 +41,12 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
-	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
+	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect

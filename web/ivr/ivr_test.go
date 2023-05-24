@@ -72,7 +72,7 @@ func TestTwilioIVR(t *testing.T) {
 	defer server.Stop()
 
 	// set callback domain and enable machine detection
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090", "machine_detection": true}'::jsonb WHERE id = $1`, testdata.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8090", "machine_detection": true}'::jsonb WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy bob, and george
 	parentSummary := json.RawMessage(`{
@@ -375,7 +375,7 @@ func TestVonageIVR(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// update callback domain and role
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config::jsonb || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8090"}'::jsonb, role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(mockVonageHandler))
@@ -392,10 +392,13 @@ func TestVonageIVR(t *testing.T) {
 	// create a flow start for cathy and george
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
-		WithExtra(json.RawMessage(`{"ref_id":"123"}`))
+		WithParams(json.RawMessage(`{"ref_id":"123"}`))
 
 	err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
 	require.NoError(t, err)
+
+	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowstart`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowstart WHERE params ->> 'ref_id' = '123'`).Returns(1)
 
 	err = tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
 	require.NoError(t, err)
