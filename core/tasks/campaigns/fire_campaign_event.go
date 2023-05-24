@@ -114,7 +114,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 	return nil
 }
 
-// FireCampaignEvents tries to handle the given event fires, returning those that were handled (i.e. skipped or fired)
+// FireCampaignEvents tries to handle the given event fires, returning those that were handled (i.e. skipped, fired or deleted)
 func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID, campaign *triggers.CampaignReference, eventUUID triggers.CampaignEventUUID) ([]*models.EventFire, error) {
 	start := time.Now()
 
@@ -131,7 +131,7 @@ func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime, orgID models.O
 		if err != nil {
 			return nil, errors.Wrap(err, "error deleting fires for inactive campaign event")
 		}
-		return nil, nil
+		return fires, nil
 	}
 
 	// get the flow it references
@@ -141,7 +141,7 @@ func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime, orgID models.O
 		if err != nil {
 			return nil, errors.Wrapf(err, "error deleting fires for inactive flow")
 		}
-		return nil, nil
+		return fires, nil
 	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading campaign event flow: %s", flowUUID)

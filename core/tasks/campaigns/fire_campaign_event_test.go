@@ -1,6 +1,7 @@
 package campaigns_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,13 +11,18 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/redisx"
+	"github.com/nyaruka/redisx/assertredis"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFireCampaignEvents(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	rc := rt.RP.Get()
+	defer rc.Close()
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
@@ -30,7 +36,23 @@ func TestFireCampaignEvents(t *testing.T) {
 	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilCallID, time.Now(), time.Now(), false, nil)
 	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
 
-	fires := []*models.EventFire{
+	fireFires := func(fs []*models.EventFire, flow *testdata.Flow, ce *testdata.CampaignEvent) {
+		marker := redisx.NewIntervalSet("campaign_event", time.Hour*24, 2)
+		for _, f := range fs {
+			marker.Add(rc, fmt.Sprintf("%d", f.FireID))
+		}
+
+		handled, err := campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fs, flow.UUID, campaign, triggers.CampaignEventUUID(ce.UUID))
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, fs, handled) // all fires fired, skipped or deleted
+
+		// and left in redis marker
+		for _, f := range fs {
+			assertredis.SIsMember(t, rt.RP, fmt.Sprintf("campaign_event:%s", time.Now().Format("2006-01-02")), fmt.Sprintf("%d", f.FireID), true)
+		}
+	}
+
+	fireFires([]*models.EventFire{
 		{
 			FireID:    fire1ID,
 			EventID:   testdata.RemindersEvent3.ID,
@@ -49,10 +71,7 @@ func TestFireCampaignEvents(t *testing.T) {
 			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
-	}
-	handled, err := campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, fires, handled)
+	}, testdata.PickANumber, testdata.RemindersEvent3)
 
 	// cathy has her existing waiting session because event skipped her
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -78,7 +97,7 @@ func TestFireCampaignEvents(t *testing.T) {
 	fire5ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent2, now)
 	fire6ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent2, now)
 
-	fires = []*models.EventFire{
+	fireFires([]*models.EventFire{
 		{
 			FireID:    fire4ID,
 			EventID:   testdata.RemindersEvent2.ID,
@@ -97,11 +116,7 @@ func TestFireCampaignEvents(t *testing.T) {
 			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
-	}
-
-	handled, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, fires, handled)
+	}, testdata.CampaignFlow, testdata.RemindersEvent2)
 
 	// cathy still has her existing waiting session and now a completed one
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -124,7 +139,7 @@ func TestFireCampaignEvents(t *testing.T) {
 	fire8ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent1, now)
 	fire9ID := testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent1, now)
 
-	fires = []*models.EventFire{
+	fireFires([]*models.EventFire{
 		{
 			FireID:    fire7ID,
 			EventID:   testdata.RemindersEvent1.ID,
@@ -143,11 +158,7 @@ func TestFireCampaignEvents(t *testing.T) {
 			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
-	}
-
-	handled, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.Favorites.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent1.UUID))
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, fires, handled)
+	}, testdata.Favorites, testdata.RemindersEvent1)
 
 	// cathy's existing waiting session should now be interrupted and now she has a waiting session in the Favorites flow
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'I'`, testdata.Cathy.ID).Returns(1)
@@ -166,4 +177,38 @@ func TestFireCampaignEvents(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Alexandria.ID).Returns(1)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W' AND current_flow_id = $2`, testdata.Alexandria.ID, testdata.Favorites.ID).Returns(1)
 	assertdb.Query(t, rt.DB, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Alexandria.ID, testdata.RemindersEvent1.ID).Returns("F")
+
+	// test handling fires for a deleted campaign event
+	rt.DB.MustExec(`UPDATE campaigns_campaignevent SET is_active = FALSE WHERE id = $1`, testdata.RemindersEvent1.ID)
+	models.FlushCache()
+
+	fire10ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent1, now)
+	fireFires([]*models.EventFire{
+		{
+			FireID:    fire10ID,
+			EventID:   testdata.RemindersEvent1.ID,
+			ContactID: testdata.Cathy.ID,
+			Scheduled: now,
+		},
+	}, testdata.Favorites, testdata.RemindersEvent1)
+
+	// event fire should be deleted
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM campaigns_eventfire WHERE id = $1`, fire10ID).Returns(0)
+
+	// test handling fires for a deleted flow
+	rt.DB.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.PickANumber.ID)
+	models.FlushCache()
+
+	fire11ID := testdata.InsertEventFire(rt, testdata.Cathy, testdata.RemindersEvent3, now)
+	fireFires([]*models.EventFire{
+		{
+			FireID:    fire11ID,
+			EventID:   testdata.RemindersEvent3.ID,
+			ContactID: testdata.Cathy.ID,
+			Scheduled: now,
+		},
+	}, testdata.PickANumber, testdata.RemindersEvent3)
+
+	// event fire should be deleted
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM campaigns_eventfire WHERE id = $1`, fire11ID).Returns(0)
 }
