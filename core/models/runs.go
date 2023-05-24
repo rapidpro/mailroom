@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -141,23 +140,3 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 
 	return run, nil
 }
-
-// FindFlowStartedOverlap returns the list of contact ids which overlap with those passed in and which
-// have been in the flow passed in.
-func FindFlowStartedOverlap(ctx context.Context, db *sqlx.DB, flowID FlowID, contacts []ContactID) ([]ContactID, error) {
-	var overlap []ContactID
-	err := db.SelectContext(ctx, &overlap, flowStartedOverlapSQL, pq.Array(contacts), flowID)
-	return overlap, err
-}
-
-// TODO: no perfect index, will probably use contact index flows_flowrun_contact_id_985792a9
-// could be slow in the cases of contacts having many distinct runs
-const flowStartedOverlapSQL = `
-SELECT
-	DISTINCT(contact_id)
-FROM
-	flows_flowrun
-WHERE
-	contact_id = ANY($1) AND
-	flow_id = $2
-`

@@ -35,9 +35,6 @@ type StartOptions struct {
 	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
 	ExcludeInAFlow bool
 
-	// ExcludeStartedPreviously excludes contacts who have been in this flow previously (at least as long as we have runs for)
-	ExcludeStartedPreviously bool
-
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
 
@@ -51,9 +48,8 @@ type StartOptions struct {
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	return &StartOptions{
-		ExcludeInAFlow:           false,
-		ExcludeStartedPreviously: false,
-		Interrupt:                true,
+		ExcludeInAFlow: false,
+		Interrupt:      true,
 	}
 }
 
@@ -137,10 +133,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 }
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
-func StartFlowBatch(
-	ctx context.Context, rt *runtime.Runtime,
-	batch *models.FlowStartBatch) ([]*models.Session, error) {
-
+func StartFlowBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) ([]*models.Session, error) {
 	start := time.Now()
 
 	// if this is our last start, no matter what try to set the start as complete as a last step
@@ -230,8 +223,6 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.ExcludeStartedPreviously = batch.Exclusions.StartedPreviously
-	options.ExcludeInAFlow = batch.Exclusions.InAFlow
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -257,19 +248,8 @@ func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, f
 	// figures out which contacts need to be excluded if any
 	exclude := make(map[models.ContactID]bool, 5)
 
-	// filter out anybody who has has a flow run in this flow if appropriate
-	if options.ExcludeStartedPreviously {
-		// find all participants that have been in this flow
-		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error finding others started flow: %d", flow.ID())
-		}
-		for _, c := range started {
-			exclude[c] = true
-		}
-	}
-
 	// filter out our list of contacts to only include those that should be started
+	// TODO this is only needed for campaign events since flow starts apply exclusions when creating batches
 	if options.ExcludeInAFlow {
 		// find all participants active in any flow
 		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
