@@ -1,3 +1,7 @@
+v8.1.52 (2023-05-24)
+-------------------------
+ * Update to latest goflow
+
 v8.1.51 (2023-05-24)
 -------------------------
  * Remove applying started-previously exclusion in runner now that it's applied at batch creation stage
