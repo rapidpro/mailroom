@@ -50,9 +50,9 @@ func TestFireCampaignEvents(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	startedIDs, err := campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
+	handled, err := campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, []models.ContactID{testdata.Bob.ID}, startedIDs)
+	assert.ElementsMatch(t, fires, handled)
 
 	// cathy has her existing waiting session because event skipped her
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -99,9 +99,9 @@ func TestFireCampaignEvents(t *testing.T) {
 		},
 	}
 
-	startedIDs, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
+	handled, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID}, startedIDs)
+	assert.ElementsMatch(t, fires, handled)
 
 	// cathy still has her existing waiting session and now a completed one
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -145,9 +145,9 @@ func TestFireCampaignEvents(t *testing.T) {
 		},
 	}
 
-	startedIDs, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.Favorites.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent1.UUID))
+	handled, err = campaigns.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.Favorites.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent1.UUID))
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID}, startedIDs)
+	assert.ElementsMatch(t, fires, handled)
 
 	// cathy's existing waiting session should now be interrupted and now she has a waiting session in the Favorites flow
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'I'`, testdata.Cathy.ID).Returns(1)
