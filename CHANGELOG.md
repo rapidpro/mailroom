@@ -1,3 +1,10 @@
+v8.1.51 (2023-05-24)
+-------------------------
+ * Remove applying started-previously exclusion in runner now that it's applied at batch creation stage
+ * Refresh elastic indexes after changes in tests instead of waiting for a second
+ * Optimize case when recipients is only specific contacts and no exclusions
+ * Rework ResolveRecipients to use elastic
+
 v8.1.50 (2023-05-23)
 -------------------------
  * Remove support for passing URNs to flow/preview_start as that's not a thing we do
