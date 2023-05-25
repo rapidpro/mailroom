@@ -18,7 +18,5 @@ func TestServer(t *testing.T) {
 func TestPreviewStart(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetElastic)
-
 	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
 }

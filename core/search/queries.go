@@ -46,7 +46,7 @@ func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.G
 	if excs.InAFlow {
 		exclusions = append(exclusions, contactql.NewCondition("flow", contactql.PropertyTypeAttribute, contactql.OpEqual, ""))
 	}
-	if excs.StartedPreviously {
+	if excs.StartedPreviously && flow != nil {
 		exclusions = append(exclusions, contactql.NewCondition("history", contactql.PropertyTypeAttribute, contactql.OpNotEqual, flow.Name()))
 	}
 	if excs.NotSeenSinceDays > 0 {

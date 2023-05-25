@@ -42,3 +42,9 @@ func TestResend(t *testing.T) {
 		"george_msgout_id": fmt.Sprintf("%d", georgeOut.ID()),
 	})
 }
+
+func TestPreviewBroadcast(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_broadcast.json", nil)
+}
