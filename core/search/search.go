@@ -67,6 +67,39 @@ func BuildElasticQuery(oa *models.OrgAssets, group *models.Group, status models.
 	return eq
 }
 
+// GetContactTotal returns the total count of matching contacts for the given query
+func GetContactTotal(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, query string) (*contactql.ContactQuery, int64, error) {
+	env := oa.Env()
+	var parsed *contactql.ContactQuery
+	var err error
+
+	if rt.ES == nil {
+		return nil, 0, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	if query != "" {
+		parsed, err = contactql.ParseQuery(env, query, oa.SessionAssets())
+		if err != nil {
+			return nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+		}
+	}
+
+	eq := BuildElasticQuery(oa, nil, models.NilContactStatus, nil, parsed)
+
+	count, err := rt.ES.Count(rt.Config.ElasticContactsIndex).Routing(strconv.FormatInt(int64(oa.OrgID()), 10)).Query(eq).Do(ctx)
+	if err != nil {
+		// Get *elastic.Error which contains additional information
+		ee, ok := err.(*elastic.Error)
+		if !ok {
+			return nil, 0, errors.Wrap(err, "error performing query")
+		}
+
+		return nil, 0, errors.Wrapf(err, "error performing query: %s", ee.Details.Reason)
+	}
+
+	return parsed, count, nil
+}
+
 // GetContactIDsForQueryPage returns a page of contact ids for the given query and sort
 func GetContactIDsForQueryPage(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, group *models.Group, excludeIDs []models.ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []models.ContactID, int64, error) {
 	env := oa.Env()
