@@ -15,7 +15,7 @@
         "body": {},
         "status": 400,
         "response": {
-            "error": "request failed validation: field 'org_id' is required, field 'sample_size' is required"
+            "error": "request failed validation: field 'org_id' is required"
         }
     },
     {
@@ -24,14 +24,12 @@
         "path": "/mr/msg/preview_broadcast",
         "body": {
             "org_id": 1,
-            "include": {},
-            "sample_size": 3
+            "include": {}
         },
         "status": 200,
         "response": {
             "query": "",
-            "total": 0,
-            "sample_ids": []
+            "total": 0
         }
     },
     {
@@ -50,37 +48,12 @@
                     "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
                 ],
                 "query": ""
-            },
-            "sample_size": 3
+            }
         },
         "status": 200,
         "response": {
             "query": "group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\"",
-            "total": 121,
-            "sample_ids": [
-                10123,
-                10122,
-                10121
-            ],
-            "metadata": {
-                "attributes": [
-                    "group",
-                    "uuid"
-                ],
-                "schemes": [],
-                "fields": [],
-                "groups": [
-                    {
-                        "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                        "name": "Doctors"
-                    },
-                    {
-                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
-                        "name": "Testers"
-                    }
-                ],
-                "allow_as_group": false
-            }
+            "total": 121
         }
     },
     {
@@ -93,26 +66,12 @@
                 "group_uuids": [],
                 "contact_uuids": [],
                 "query": "gender = M"
-            },
-            "sample_size": 3
+            }
         },
         "status": 200,
         "response": {
             "query": "gender = \"M\"",
-            "total": 0,
-            "sample_ids": [],
-            "metadata": {
-                "attributes": [],
-                "schemes": [],
-                "fields": [
-                    {
-                        "key": "gender",
-                        "name": "Gender"
-                    }
-                ],
-                "groups": [],
-                "allow_as_group": true
-            }
+            "total": 0
         }
     },
     {
@@ -140,36 +99,12 @@
                 "non_active": true,
                 "in_a_flow": true,
                 "not_seen_since_days": 90
-            },
-            "sample_size": 3
+            }
         },
         "status": 200,
         "response": {
             "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\") AND status = \"active\" AND flow = \"\" AND last_seen_on > \"07-04-2018\"",
-            "total": 0,
-            "sample_ids": [],
-            "metadata": {
-                "attributes": [
-                    "flow",
-                    "group",
-                    "last_seen_on",
-                    "status",
-                    "uuid"
-                ],
-                "schemes": [],
-                "fields": [],
-                "groups": [
-                    {
-                        "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                        "name": "Doctors"
-                    },
-                    {
-                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
-                        "name": "Testers"
-                    }
-                ],
-                "allow_as_group": false
-            }
+            "total": 0
         }
     },
     {
@@ -185,30 +120,12 @@
                 "non_active": true,
                 "in_a_flow": true,
                 "not_seen_since_days": 90
-            },
-            "sample_size": 3
+            }
         },
         "status": 200,
         "response": {
             "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND last_seen_on > \"07-04-2018\"",
-            "total": 0,
-            "sample_ids": [],
-            "metadata": {
-                "attributes": [
-                    "flow",
-                    "last_seen_on",
-                    "status"
-                ],
-                "schemes": [],
-                "fields": [
-                    {
-                        "key": "gender",
-                        "name": "Gender"
-                    }
-                ],
-                "groups": [],
-                "allow_as_group": false
-            }
+            "total": 0
         }
     },
     {
@@ -220,8 +137,7 @@
             "include": {
                 "query": "gender ="
             },
-            "exclude": {},
-            "sample_size": 3
+            "exclude": {}
         },
         "status": 400,
         "response": {
@@ -241,8 +157,7 @@
             "include": {
                 "query": "goats > 10"
             },
-            "exclude": {},
-            "sample_size": 3
+            "exclude": {}
         },
         "status": 400,
         "response": {

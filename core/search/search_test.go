@@ -11,10 +11,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetContactIDsForQueryPage(t *testing.T) {
+func TestGetContactTotal(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetElastic)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		query         string
+		expectedTotal int64
+		expectedError string
+	}{
+		{query: "george OR bob", expectedTotal: 2},
+		{query: "george", expectedTotal: 1},
+		{query: "age >= 30", expectedTotal: 1},
+		{
+			query:         "goats > 2", // no such contact field
+			expectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
+		},
+	}
+
+	for i, tc := range tcs {
+		_, total, err := search.GetContactTotal(ctx, rt, oa, tc.query)
+
+		if tc.expectedError != "" {
+			assert.EqualError(t, err, tc.expectedError)
+		} else {
+			assert.NoError(t, err, "%d: error encountered performing query", i)
+			assert.Equal(t, tc.expectedTotal, total, "%d: total mismatch", i)
+		}
+	}
+}
+
+func TestGetContactIDsForQueryPage(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -30,9 +60,9 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	}{
 		{ // 0
 			group:            testdata.ActiveGroup,
-			query:            "george",
-			expectedContacts: []models.ContactID{testdata.George.ID},
-			expectedTotal:    1,
+			query:            "george OR bob",
+			expectedContacts: []models.ContactID{testdata.George.ID, testdata.Bob.ID},
+			expectedTotal:    2,
 		},
 		{ // 1
 			group:            testdata.BlockedGroup,
@@ -80,8 +110,6 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 func TestGetContactIDsForQuery(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetElastic)
-
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
 
@@ -92,9 +120,9 @@ func TestGetContactIDsForQuery(t *testing.T) {
 		expectedError    string
 	}{
 		{
-			query:            "george",
+			query:            "george OR bob",
 			limit:            -1,
-			expectedContacts: []models.ContactID{testdata.George.ID},
+			expectedContacts: []models.ContactID{testdata.George.ID, testdata.Bob.ID},
 		}, {
 			query:            "nobody",
 			limit:            -1,
@@ -119,7 +147,7 @@ func TestGetContactIDsForQuery(t *testing.T) {
 			assert.EqualError(t, err, tc.expectedError)
 		} else {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
-			assert.Equal(t, tc.expectedContacts, ids, "%d: ids mismatch", i)
+			assert.ElementsMatch(t, tc.expectedContacts, ids, "%d: ids mismatch", i)
 		}
 	}
 }

@@ -33,20 +33,12 @@ func init() {
 //	    "in_a_flow": false,
 //	    "started_previously": true,
 //	    "not_seen_since_days": 90
-//	  },
-//	  "sample_size": 5
+//	  }
 //	}
 //
 //	{
-//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b") AND history != \"Registration\"",
-//	  "total": 567,
-//	  "sample": [12, 34, 56, 67, 78],
-//	  "metadata": {
-//	    "fields": [
-//	      {"key": "age", "name": "Age"}
-//	    ],
-//	    "allow_as_group": true
-//	  }
+//	  "query": "(group = \"No Age\" OR group = \"No Name\" OR uuid = \"e5bb9e6f-7703-4ba1-afba-0b12791de38b\") AND history != \"Registration\"",
+//	  "total": 567
 //	}
 type previewRequest struct {
 	OrgID   models.OrgID  `json:"org_id"    validate:"required"`
@@ -56,15 +48,12 @@ type previewRequest struct {
 		ContactUUIDs []flows.ContactUUID `json:"contact_uuids"`
 		Query        string              `json:"query"`
 	} `json:"include"   validate:"required"`
-	Exclude    models.Exclusions `json:"exclude"`
-	SampleSize int               `json:"sample_size"  validate:"required"`
+	Exclude models.Exclusions `json:"exclude"`
 }
 
 type previewResponse struct {
-	Query     string                `json:"query"`
-	Total     int                   `json:"total"`
-	SampleIDs []models.ContactID    `json:"sample_ids"`
-	Metadata  *contactql.Inspection `json:"metadata,omitempty"`
+	Query string `json:"query"`
+	Total int    `json:"total"`
 }
 
 func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewRequest) (any, int, error) {
@@ -95,20 +84,13 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *previewRequ
 		return nil, 0, err
 	}
 	if query == "" {
-		return &previewResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
+		return &previewResponse{Query: "", Total: 0}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, nil, nil, query, "", 0, r.SampleSize)
+	parsedQuery, total, err := search.GetContactTotal(ctx, rt, oa, query)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "error querying preview")
 	}
 
-	inspection := contactql.Inspect(parsedQuery)
-
-	return &previewResponse{
-		Query:     parsedQuery.String(),
-		Total:     int(total),
-		SampleIDs: sampleIDs,
-		Metadata:  inspection,
-	}, http.StatusOK, nil
+	return &previewResponse{Query: parsedQuery.String(), Total: int(total)}, http.StatusOK, nil
 }
