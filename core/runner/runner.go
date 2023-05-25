@@ -30,11 +30,11 @@ var startTypeToOrigin = map[models.StartType]string{
 	models.StartTypeAPIZapier: "zapier",
 }
 
+// TriggerBuilder defines the interface for building a trigger for the passed in contact
+type TriggerBuilder func(contact *flows.Contact) flows.Trigger
+
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
-	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
-	ExcludeInAFlow bool
-
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
 
@@ -44,17 +44,6 @@ type StartOptions struct {
 	// TriggerBuilder is the builder that will be used to build a trigger for each contact started in the flow
 	TriggerBuilder TriggerBuilder
 }
-
-// NewStartOptions creates and returns the default start options to be used for flow starts
-func NewStartOptions() *StartOptions {
-	return &StartOptions{
-		ExcludeInAFlow: false,
-		Interrupt:      true,
-	}
-}
-
-// TriggerBuilder defines the interface for building a trigger for the passed in contact
-type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // ResumeFlow resumes the passed in session using the passed in session
 func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, session *models.Session, contact *models.Contact, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
@@ -221,11 +210,11 @@ func StartFlowBatch(ctx context.Context, rt *runtime.Runtime, batch *models.Flow
 		return nil
 	}
 
-	// options for our flow start
-	options := NewStartOptions()
-	options.Interrupt = flow.FlowType().Interrupts()
-	options.TriggerBuilder = triggerBuilder
-	options.CommitHook = updateStartID
+	options := &StartOptions{
+		Interrupt:      flow.FlowType().Interrupts(),
+		TriggerBuilder: triggerBuilder,
+		CommitHook:     updateStartID,
+	}
 
 	sessions, err := StartFlow(ctx, rt, oa, flow, batch.ContactIDs, options)
 	if err != nil {
@@ -245,40 +234,11 @@ func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, f
 		return nil, nil
 	}
 
-	// figures out which contacts need to be excluded if any
-	exclude := make(map[models.ContactID]bool, 5)
-
-	// filter out our list of contacts to only include those that should be started
-	// TODO this is only needed for campaign events since flow starts apply exclusions when creating batches
-	if options.ExcludeInAFlow {
-		// find all participants active in any flow
-		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
-		}
-		for _, c := range active {
-			exclude[c] = true
-		}
-	}
-
-	// filter into our final list of contacts
-	includedContacts := make([]models.ContactID, 0, len(contactIDs))
-	for _, c := range contactIDs {
-		if !exclude[c] {
-			includedContacts = append(includedContacts, c)
-		}
-	}
-
-	// no contacts left? we are done
-	if len(includedContacts) == 0 {
-		return nil, nil
-	}
-
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
 	// same time we try to grab locks for up to five minutes, but do it in batches where we wait for one
 	// second per contact to prevent deadlocks
-	sessions := make([]*models.Session, 0, len(includedContacts))
-	remaining := includedContacts
+	sessions := make([]*models.Session, 0, len(contactIDs))
+	remaining := contactIDs
 	start := time.Now()
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {

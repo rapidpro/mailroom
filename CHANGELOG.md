@@ -1,3 +1,7 @@
+v8.1.53 (2023-05-25)
+-------------------------
+ * Rework firing campaign events so that skipping happens outside of runner
+
 v8.1.52 (2023-05-24)
 -------------------------
  * Update to latest goflow
