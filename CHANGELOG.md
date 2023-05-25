@@ -1,3 +1,7 @@
+v8.1.54 (2023-05-25)
+-------------------------
+ * Add endpoint to generate broadcast preview
+
 v8.1.53 (2023-05-25)
 -------------------------
  * Rework firing campaign events so that skipping happens outside of runner
