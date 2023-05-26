@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BuildStartQuery builds a start query for the given flow and start options
-func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery string, excs models.Exclusions, excGroups []*models.Group) (string, error) {
+// BuildRecipientsQuery builds a query from a set of inclusions/exclusions (i.e. a flow start or broadcast)
+func BuildRecipientsQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery string, excs models.Exclusions, excGroups []*models.Group) (string, error) {
 	var parsedQuery *contactql.ContactQuery
 	var err error
 
@@ -23,10 +23,10 @@ func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groups []*models.G
 		}
 	}
 
-	return contactql.Stringify(buildStartQuery(oa.Env(), flow, groups, contactUUIDs, parsedQuery, excs, excGroups)), nil
+	return contactql.Stringify(buildRecipientsQuery(oa.Env(), flow, groups, contactUUIDs, parsedQuery, excs, excGroups)), nil
 }
 
-func buildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery *contactql.ContactQuery, excs models.Exclusions, excGroups []*models.Group) contactql.QueryNode {
+func buildRecipientsQuery(env envs.Environment, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, userQuery *contactql.ContactQuery, excs models.Exclusions, excGroups []*models.Group) contactql.QueryNode {
 	inclusions := make([]contactql.QueryNode, 0, 10)
 
 	for _, group := range groups {

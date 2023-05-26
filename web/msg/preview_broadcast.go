@@ -67,7 +67,7 @@ func handlePreviewBroadcast(ctx context.Context, rt *runtime.Runtime, r *preview
 		}
 	}
 
-	query, err := search.BuildStartQuery(oa, nil, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude, nil)
+	query, err := search.BuildRecipientsQuery(oa, nil, groups, r.Include.ContactUUIDs, r.Include.Query, r.Exclude, nil)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {

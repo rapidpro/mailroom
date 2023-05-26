@@ -88,7 +88,7 @@ func ResolveRecipients(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 			includeContactUUIDs[i] = contact.UUID()
 		}
 
-		query, err := BuildStartQuery(oa, flow, includeGroups, includeContactUUIDs, recipients.Query, recipients.Exclusions, excludeGroups)
+		query, err := BuildRecipientsQuery(oa, flow, includeGroups, includeContactUUIDs, recipients.Query, recipients.Exclusions, excludeGroups)
 		if err != nil {
 			return nil, errors.Wrap(err, "error building query")
 		}

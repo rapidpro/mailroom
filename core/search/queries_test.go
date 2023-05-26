@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildStartQuery(t *testing.T) {
+func TestBuildRecipientsQuery(t *testing.T) {
 	_, rt := testsuite.Runtime()
 
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2022, 4, 20, 15, 30, 45, 0, time.UTC)))
@@ -109,7 +109,7 @@ func TestBuildStartQuery(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		actual, err := search.BuildStartQuery(oa, flow, tc.groups, tc.contactUUIDs, tc.userQuery, tc.exclusions, tc.excludeGroups)
+		actual, err := search.BuildRecipientsQuery(oa, flow, tc.groups, tc.contactUUIDs, tc.userQuery, tc.exclusions, tc.excludeGroups)
 		if tc.err != "" {
 			assert.Equal(t, "", actual)
 			assert.EqualError(t, err, tc.err)
