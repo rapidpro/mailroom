@@ -120,7 +120,6 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, call *models.Call) (*m
 	}
 
 	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, svc.RedactValues(channel))
-	clog.SetCall(call)
 	defer clog.End()
 
 	// try to request our call hangup
@@ -253,7 +252,6 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 	}
 
 	clog := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, svc.RedactValues(channel))
-	clog.SetCall(call)
 	defer clog.End()
 
 	// try to request our call start

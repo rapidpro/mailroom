@@ -322,7 +322,7 @@ func TestTwilioIVR(t *testing.T) {
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE call_id = 1 AND channel_id = $1`, testdata.TwilioChannel.ID).Returns(9)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE channel_id = $1`, testdata.TwilioChannel.ID).Returns(17)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%sesame%'`).Returns(0) // auth token redacted
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
@@ -616,7 +616,7 @@ func TestVonageIVR(t *testing.T) {
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE call_id = 1 AND channel_id = $1`, testdata.VonageChannel.ID).Returns(10)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE channel_id = $1`, testdata.VonageChannel.ID).Returns(18)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%BEGIN PRIVATE KEY%'`).Returns(0) // private key redacted
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(3)

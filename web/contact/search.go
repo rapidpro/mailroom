@@ -66,12 +66,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	var group *models.Group
-	if r.GroupID != 0 {
-		group = oa.GroupByID(r.GroupID)
-	} else if r.GroupUUID != "" {
-		group = oa.GroupByUUID(r.GroupUUID)
-	}
+	group := oa.GroupByID(r.GroupID)
 
 	// perform our search
 	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)

@@ -72,7 +72,6 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 
 		call, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
 		if call != nil {
-			clog.SetCall(call)
 			if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
 				logrus.WithError(err).WithField("http_request", r).Error("error attaching ivr channel log")
 			}
