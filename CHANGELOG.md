@@ -1,3 +1,8 @@
+v8.1.55 (2023-06-05)
+-------------------------
+ * Stop writing ChannelLog.call
+ * Stop returning sample contacts on preview endpoints which now only need to return total count
+
 v8.1.54 (2023-05-25)
 -------------------------
  * Add endpoint to generate broadcast preview
