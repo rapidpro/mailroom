@@ -43,7 +43,6 @@ type ChannelLog struct {
 	uuid      ChannelLogUUID
 	type_     ChannelLogType
 	channel   *Channel
-	call      *Call
 	httpLogs  []*httpx.Log
 	errors    []ChannelError
 	createdOn time.Time
@@ -77,10 +76,6 @@ func newChannelLog(t ChannelLogType, ch *Channel, r *httpx.Recorder, redactVals 
 
 func (l *ChannelLog) UUID() ChannelLogUUID { return l.uuid }
 
-func (l *ChannelLog) SetCall(c *Call) {
-	l.call = c
-}
-
 func (l *ChannelLog) HTTP(t *httpx.Trace) {
 	l.httpLogs = append(l.httpLogs, l.traceToLog(t))
 }
@@ -103,15 +98,14 @@ func (l *ChannelLog) traceToLog(t *httpx.Trace) *httpx.Log {
 }
 
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( uuid,  channel_id,  call_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
-                         VALUES(:uuid, :channel_id, :call_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
+INSERT INTO channels_channellog( uuid,  channel_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
+                         VALUES(:uuid, :channel_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
 type dbChannelLog struct {
 	ID        ChannelLogID    `db:"id"`
 	UUID      ChannelLogUUID  `db:"uuid"`
 	ChannelID ChannelID       `db:"channel_id"`
-	CallID    CallID          `db:"call_id"`
 	Type      ChannelLogType  `db:"log_type"`
 	HTTPLogs  json.RawMessage `db:"http_logs"`
 	Errors    json.RawMessage `db:"errors"`
@@ -144,9 +138,6 @@ func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) erro
 			IsError:   isError,
 			CreatedOn: time.Now(),
 			ElapsedMS: int(l.elapsed / time.Millisecond),
-		}
-		if l.call != nil {
-			v.CallID = l.call.ID()
 		}
 		vs[i] = v
 	}
