@@ -1,3 +1,8 @@
+v8.1.56 (2023-06-08)
+-------------------------
+ * Support importing of contacts with non-active statuses
+ * Use the user that created an import when applying its modifiers
+
 v8.1.55 (2023-06-05)
 -------------------------
  * Stop writing ChannelLog.call
