@@ -188,6 +188,8 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 		addError := func(s string, args ...interface{}) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
 		spec := imp.spec
 
+		isActive := spec.Status == "" || spec.Status == flows.ContactStatusActive
+
 		uuid := spec.UUID
 		if uuid != "" {
 			imp.contact = contactsByUUID[uuid]
@@ -227,6 +229,13 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 				addModifier(modifiers.NewLanguage(lang))
 			}
 		}
+		if !isActive {
+			if spec.Status == flows.ContactStatusArchived || spec.Status == flows.ContactStatusBlocked || spec.Status == flows.ContactStatusStopped {
+				addModifier(modifiers.NewStatus(spec.Status))
+			} else {
+				addError("'%s' is not a valid status", spec.Status)
+			}
+		}
 
 		for key, value := range spec.Fields {
 			field := sa.Fields().Get(key)
@@ -237,7 +246,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			}
 		}
 
-		if len(spec.Groups) > 0 {
+		if len(spec.Groups) > 0 && isActive {
 			groups := make([]*flows.Group, 0, len(spec.Groups))
 			for _, uuid := range spec.Groups {
 				group := sa.Groups().Get(uuid)
@@ -362,12 +371,13 @@ func LoadContactImportBatch(ctx context.Context, db Queryer, id ContactImportBat
 
 // ContactSpec describes a contact to be updated or created
 type ContactSpec struct {
-	UUID     flows.ContactUUID  `json:"uuid"`
-	Name     *string            `json:"name"`
-	Language *string            `json:"language"`
-	URNs     []urns.URN         `json:"urns"`
-	Fields   map[string]string  `json:"fields"`
-	Groups   []assets.GroupUUID `json:"groups"`
+	UUID     flows.ContactUUID   `json:"uuid"`
+	Name     *string             `json:"name"`
+	Language *string             `json:"language"`
+	Status   flows.ContactStatus `json:"status"`
+	URNs     []urns.URN          `json:"urns"`
+	Fields   map[string]string   `json:"fields"`
+	Groups   []assets.GroupUUID  `json:"groups"`
 
 	ImportRow int `json:"_import_row"`
 }
