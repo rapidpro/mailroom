@@ -1,3 +1,7 @@
+v8.1.57 (2023-06-20)
+-------------------------
+ * Fix redaction of twiml IVR channel logs
+
 v8.1.56 (2023-06-08)
 -------------------------
  * Support importing of contacts with non-active statuses
