@@ -530,5 +530,8 @@ func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es [
 }
 
 func (s *service) RedactValues(ch *models.Channel) []string {
-	return []string{ch.ConfigValue(authTokenConfig, "")}
+	return []string{
+		httpx.BasicAuth(ch.ConfigValue(accountSIDConfig, ""), ch.ConfigValue(authTokenConfig, "")),
+		ch.ConfigValue(authTokenConfig, ""),
+	}
 }

@@ -144,5 +144,5 @@ func TestRedactValues(t *testing.T) {
 	ch := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 	svc, _ := ivr.GetService(ch)
 
-	assert.Equal(t, []string{"sesame"}, svc.RedactValues(ch))
+	assert.Equal(t, []string{"U0lEMTIzNDU2Nzg5OnNlc2FtZQ==", "sesame"}, svc.RedactValues(ch))
 }
