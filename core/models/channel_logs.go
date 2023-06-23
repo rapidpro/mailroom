@@ -50,6 +50,7 @@ type ChannelLog struct {
 
 	recorder *httpx.Recorder
 	redactor stringsx.Redactor
+	attached bool
 }
 
 // NewChannelLog creates a new channel log with the given type and channel
@@ -97,6 +98,21 @@ func (l *ChannelLog) traceToLog(t *httpx.Trace) *httpx.Log {
 	return httpx.NewLog(t, 2048, 50000, l.redactor)
 }
 
+// if we have an error or a non 2XX/3XX http response then log is considered an error
+func (l *ChannelLog) isError() bool {
+	if len(l.errors) > 0 {
+		return true
+	}
+
+	for _, l := range l.httpLogs {
+		if l.StatusCode < 200 || l.StatusCode >= 400 {
+			return true
+		}
+	}
+
+	return false
+}
+
 const sqlInsertChannelLog = `
 INSERT INTO channels_channellog( uuid,  channel_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
                          VALUES(:uuid, :channel_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
@@ -114,34 +130,56 @@ type dbChannelLog struct {
 	CreatedOn time.Time       `db:"created_on"`
 }
 
+type s3ChannelLog struct {
+	UUID      ChannelLogUUID `json:"uuid"`
+	Type      ChannelLogType `json:"type"`
+	HTTPLogs  []*httpx.Log   `json:"http_logs"`
+	Errors    []ChannelError `json:"errors"`
+	ElapsedMS int            `json:"elapsed_ms"`
+	CreatedOn time.Time      `json:"created_on"`
+}
+
 // InsertChannelLogs writes the given channel logs to the db
 func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
-	vs := make([]*dbChannelLog, len(logs))
-	for i, l := range logs {
-		// if we have an error or a non 2XX/3XX http response then this log is marked as an error
-		isError := len(l.errors) > 0
-		if !isError {
-			for _, l := range l.httpLogs {
-				if l.StatusCode < 200 || l.StatusCode >= 400 {
-					isError = true
-					break
-				}
-			}
-		}
+	s3Logs := make([]*s3ChannelLog, 0, len(logs))
+	dbLogs := make([]*dbChannelLog, 0, len(logs))
 
-		v := &dbChannelLog{
-			UUID:      ChannelLogUUID(uuids.New()),
-			ChannelID: l.channel.ID(),
-			Type:      l.type_,
-			HTTPLogs:  jsonx.MustMarshal(l.httpLogs),
-			Errors:    jsonx.MustMarshal(l.errors),
-			IsError:   isError,
-			CreatedOn: time.Now(),
-			ElapsedMS: int(l.elapsed / time.Millisecond),
+	for _, l := range logs {
+		if l.attached {
+			// if log is attached to a call or message, only write to storage
+			s3Logs = append(s3Logs, &s3ChannelLog{
+				UUID:      l.uuid,
+				Type:      l.type_,
+				HTTPLogs:  l.httpLogs,
+				Errors:    l.errors,
+				ElapsedMS: int(l.elapsed / time.Millisecond),
+				CreatedOn: l.createdOn,
+			})
+		} else {
+			// otherwise write to database so it's retrievable
+			dbLogs = append(dbLogs, &dbChannelLog{
+				UUID:      ChannelLogUUID(uuids.New()),
+				ChannelID: l.channel.ID(),
+				Type:      l.type_,
+				HTTPLogs:  jsonx.MustMarshal(l.httpLogs),
+				Errors:    jsonx.MustMarshal(l.errors),
+				IsError:   l.isError(),
+				CreatedOn: l.createdOn,
+				ElapsedMS: int(l.elapsed / time.Millisecond),
+			})
 		}
-		vs[i] = v
 	}
 
-	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, vs)
-	return errors.Wrapf(err, "error inserting channel logs")
+	if len(s3Logs) > 0 {
+		// TODO save logs to S3
+	}
+
+	if len(dbLogs) > 0 {
+		err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, dbLogs)
+		if err != nil {
+			return errors.Wrapf(err, "error inserting channel logs")
+		}
+	}
+
+	return nil
 }
