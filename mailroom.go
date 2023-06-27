@@ -131,30 +131,28 @@ func (mr *Mailroom) Start() error {
 		}
 		mr.rt.AttachmentStorage = storage.NewS3(s3Client, mr.rt.Config.S3AttachmentsBucket, c.S3Region, s3.BucketCannedACLPublicRead, 32)
 		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, s3.ObjectCannedACLPrivate, 32)
+		mr.rt.LogStorage = storage.NewS3(s3Client, mr.rt.Config.S3LogsBucket, c.S3Region, s3.ObjectCannedACLPrivate, 32)
 	} else {
-		mr.rt.AttachmentStorage = storage.NewFS("_storage", 0766)
-		mr.rt.SessionStorage = storage.NewFS("_storage", 0766)
+		mr.rt.AttachmentStorage = storage.NewFS("_storage/attachments", 0766)
+		mr.rt.SessionStorage = storage.NewFS("_storage/sessions", 0766)
+		mr.rt.LogStorage = storage.NewFS("_storage/logs", 0766)
 	}
 
-	// test our attachment storage
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	err = mr.rt.AttachmentStorage.Test(ctx)
-	cancel()
-
-	if err != nil {
+	// check our storages
+	if err := checkStorage(mr.rt.AttachmentStorage); err != nil {
 		log.WithError(err).Error(mr.rt.AttachmentStorage.Name() + " attachment storage not available")
 	} else {
 		log.Info(mr.rt.AttachmentStorage.Name() + " attachment storage ok")
 	}
-
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
-	err = mr.rt.SessionStorage.Test(ctx)
-	cancel()
-
-	if err != nil {
-		log.WithError(err).Warn(mr.rt.SessionStorage.Name() + " session storage not available")
+	if err := checkStorage(mr.rt.SessionStorage); err != nil {
+		log.WithError(err).Error(mr.rt.SessionStorage.Name() + " session storage not available")
 	} else {
 		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
+	}
+	if err := checkStorage(mr.rt.LogStorage); err != nil {
+		log.WithError(err).Error(mr.rt.LogStorage.Name() + " log storage not available")
+	} else {
+		log.Info(mr.rt.LogStorage.Name() + " log storage ok")
 	}
 
 	// initialize our elastic client
@@ -287,4 +285,11 @@ func newElasticClient(url string, username string, password string) (*elastic.Cl
 		elastic.SetRetrier(retrier),
 		elastic.SetBasicAuth(username, password),
 	)
+}
+
+func checkStorage(s storage.Storage) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	err := s.Test(ctx)
+	cancel()
+	return err
 }

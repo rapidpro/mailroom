@@ -198,7 +198,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 	// log any error inserting our channel log, but continue
 	if clog != nil {
-		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
 			logrus.WithError(err).Error("error inserting channel log")
 		}
 	}

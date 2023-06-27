@@ -48,7 +48,7 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	clog2.Error(errors.New("oops"))
 	clog2.End()
 
-	err = models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog1, clog2})
+	err = models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog1, clog2})
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog`).Returns(2)

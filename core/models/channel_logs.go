@@ -3,13 +3,18 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"path"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
 
@@ -118,6 +123,7 @@ INSERT INTO channels_channellog( uuid,  channel_id,  log_type,  http_logs,  erro
                          VALUES(:uuid, :channel_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
+// channel log to be inserted into the database
 type dbChannelLog struct {
 	ID        ChannelLogID    `db:"id"`
 	UUID      ChannelLogUUID  `db:"uuid"`
@@ -130,34 +136,41 @@ type dbChannelLog struct {
 	CreatedOn time.Time       `db:"created_on"`
 }
 
-type s3ChannelLog struct {
-	UUID      ChannelLogUUID `json:"uuid"`
-	Type      ChannelLogType `json:"type"`
-	HTTPLogs  []*httpx.Log   `json:"http_logs"`
-	Errors    []ChannelError `json:"errors"`
-	ElapsedMS int            `json:"elapsed_ms"`
-	CreatedOn time.Time      `json:"created_on"`
+// channel log to be written to logs storage
+type stChannelLog struct {
+	UUID        ChannelLogUUID     `json:"uuid"`
+	Type        ChannelLogType     `json:"type"`
+	HTTPLogs    []*httpx.Log       `json:"http_logs"`
+	Errors      []ChannelError     `json:"errors"`
+	ElapsedMS   int                `json:"elapsed_ms"`
+	CreatedOn   time.Time          `json:"created_on"`
+	ChannelUUID assets.ChannelUUID `json:"-"`
+}
+
+func (l *stChannelLog) path() string {
+	return path.Join(string(l.ChannelUUID), string(l.UUID[:4]), fmt.Sprintf("%s.json", l.UUID))
 }
 
 // InsertChannelLogs writes the given channel logs to the db
-func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
-	s3Logs := make([]*s3ChannelLog, 0, len(logs))
-	dbLogs := make([]*dbChannelLog, 0, len(logs))
+func InsertChannelLogs(ctx context.Context, rt *runtime.Runtime, logs []*ChannelLog) error {
+	attached := make([]*stChannelLog, 0, len(logs))
+	unattached := make([]*dbChannelLog, 0, len(logs))
 
 	for _, l := range logs {
 		if l.attached {
 			// if log is attached to a call or message, only write to storage
-			s3Logs = append(s3Logs, &s3ChannelLog{
-				UUID:      l.uuid,
-				Type:      l.type_,
-				HTTPLogs:  l.httpLogs,
-				Errors:    l.errors,
-				ElapsedMS: int(l.elapsed / time.Millisecond),
-				CreatedOn: l.createdOn,
+			attached = append(attached, &stChannelLog{
+				UUID:        l.uuid,
+				Type:        l.type_,
+				HTTPLogs:    l.httpLogs,
+				Errors:      l.errors,
+				ElapsedMS:   int(l.elapsed / time.Millisecond),
+				CreatedOn:   l.createdOn,
+				ChannelUUID: l.channel.UUID(),
 			})
 		} else {
 			// otherwise write to database so it's retrievable
-			dbLogs = append(dbLogs, &dbChannelLog{
+			unattached = append(unattached, &dbChannelLog{
 				UUID:      ChannelLogUUID(uuids.New()),
 				ChannelID: l.channel.ID(),
 				Type:      l.type_,
@@ -170,14 +183,24 @@ func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) erro
 		}
 	}
 
-	if len(s3Logs) > 0 {
-		// TODO save logs to S3
+	if len(attached) > 0 {
+		uploads := make([]*storage.Upload, len(attached))
+		for i, l := range attached {
+			uploads[i] = &storage.Upload{
+				Path:        l.path(),
+				ContentType: "application/json",
+				Body:        jsonx.MustMarshal(l),
+			}
+		}
+		if err := rt.LogStorage.BatchPut(ctx, uploads); err != nil {
+			return errors.Wrapf(err, "error writing attached channel logs to storage")
+		}
 	}
 
-	if len(dbLogs) > 0 {
-		err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, dbLogs)
+	if len(unattached) > 0 {
+		err := BulkQuery(ctx, "insert channel log", rt.DB, sqlInsertChannelLog, unattached)
 		if err != nil {
-			return errors.Wrapf(err, "error inserting channel logs")
+			return errors.Wrapf(err, "error inserting unattached channel logs")
 		}
 	}
 
