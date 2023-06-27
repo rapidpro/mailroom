@@ -3,7 +3,6 @@ name: Build Mailroom in SP, India and Ireland (Push Tag)
 on:
   push:
     tags:
-      - '*.*.*-staging'
       - '*.*.*'
 
 jobs:
