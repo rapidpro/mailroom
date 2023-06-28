@@ -647,7 +647,7 @@ func getCallLogs(t *testing.T, rt *runtime.Runtime, channelUUID assets.ChannelUU
 	logs := make([][]byte, len(logUUIDs))
 
 	for i, logUUID := range logUUIDs {
-		_, body, err := rt.LogStorage.Get(context.Background(), fmt.Sprintf("/%s/%s/%s.json", channelUUID, logUUID[0:4], logUUID))
+		_, body, err := rt.LogStorage.Get(context.Background(), fmt.Sprintf("channels/%s/%s/%s.json", channelUUID, logUUID[0:4], logUUID))
 		require.NoError(t, err)
 		logs[i] = body
 	}
