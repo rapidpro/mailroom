@@ -73,6 +73,8 @@ func newChannelLog(t ChannelLogType, ch *Channel, r *httpx.Recorder, redactVals 
 		uuid:      ChannelLogUUID(uuids.New()),
 		type_:     t,
 		channel:   ch,
+		httpLogs:  []*httpx.Log{},
+		errors:    []ChannelError{},
 		createdOn: dates.Now(),
 
 		recorder: r,
