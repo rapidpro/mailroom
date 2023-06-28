@@ -1,3 +1,8 @@
+v8.1.58 (2023-06-28)
+-------------------------
+ * Rename sessions bucket config setting for clarity and remove unused sessions prefix setting
+ * Write attached call logs only to S3
+
 v8.1.57 (2023-06-20)
 -------------------------
  * Fix redaction of twiml IVR channel logs
