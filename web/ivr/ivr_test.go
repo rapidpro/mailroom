@@ -1,6 +1,7 @@
 package ivr
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,12 +13,14 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/test"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/ivr/twiml"
 	"github.com/nyaruka/mailroom/services/ivr/vonage"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -322,11 +325,15 @@ func TestTwilioIVR(t *testing.T) {
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE channel_id = $1`, testdata.TwilioChannel.ID).Returns(17)
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%sesame%'`).Returns(0) // auth token redacted
-
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
 		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.Bob.ID).Returns(2)
+
+	// check the generated channel logs
+	logs := getCallLogs(t, rt, testdata.TwilioChannel.UUID)
+	assert.Len(t, logs, 17)
+	for _, log := range logs {
+		assert.NotContains(t, string(log), "sesame") // auth token redacted
+	}
 }
 
 func mockVonageHandler(w http.ResponseWriter, r *http.Request) {
@@ -616,10 +623,33 @@ func TestVonageIVR(t *testing.T) {
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE channel_id = $1`, testdata.VonageChannel.ID).Returns(18)
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%BEGIN PRIVATE KEY%'`).Returns(0) // private key redacted
-
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(3)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM ivr_call WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
+
+	// check the generated channel logs
+	logs := getCallLogs(t, rt, testdata.VonageChannel.UUID)
+	assert.Len(t, logs, 16)
+	for _, log := range logs {
+		assert.NotContains(t, string(log), "BEGIN PRIVATE KEY") // private key redacted
+	}
+
+	// and 2 unattached logs in the database
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM channels_channellog WHERE channel_id = $1`, testdata.VonageChannel.ID).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT array_agg(log_type ORDER BY id) FROM channels_channellog WHERE channel_id = $1`, testdata.VonageChannel.ID).Returns([]byte(`{ivr_status,ivr_status}`))
+}
+
+func getCallLogs(t *testing.T, rt *runtime.Runtime, channelUUID assets.ChannelUUID) [][]byte {
+	var logUUIDs []models.ChannelLogUUID
+	err := rt.DB.Select(&logUUIDs, `SELECT unnest(log_uuids) FROM ivr_call ORDER BY id`)
+	require.NoError(t, err)
+
+	logs := make([][]byte, len(logUUIDs))
+
+	for i, logUUID := range logUUIDs {
+		_, body, err := rt.LogStorage.Get(context.Background(), fmt.Sprintf("/%s/%s/%s.json", channelUUID, logUUID[0:4], logUUID))
+		require.NoError(t, err)
+		logs[i] = body
+	}
+	return logs
 }

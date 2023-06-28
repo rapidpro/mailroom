@@ -83,7 +83,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 
 		clog.End()
 
-		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 

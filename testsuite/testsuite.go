@@ -23,8 +23,9 @@ var _db *sqlx.DB
 const elasticURL = "http://localhost:9200"
 const elasticContactsIndex = "test_contacts"
 
-const AttachmentStorageDir = "_test_attachments_storage"
-const SessionStorageDir = "_test_session_storage"
+const attachmentStorageDir = "_test_attachments_storage"
+const sessionStorageDir = "_test_session_storage"
+const logStorageDir = "_test_log_storage"
 
 // Refresh is our type for the pieces of org assets we want fresh (not cached)
 type ResetFlag int
@@ -77,8 +78,9 @@ func Runtime() (context.Context, *runtime.Runtime) {
 		ReadonlyDB:        db,
 		RP:                getRP(),
 		ES:                es,
-		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
-		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
+		AttachmentStorage: storage.NewFS(attachmentStorageDir, 0766),
+		SessionStorage:    storage.NewFS(sessionStorageDir, 0766),
+		LogStorage:        storage.NewFS(logStorageDir, 0766),
 		Config:            cfg,
 	}
 
@@ -199,8 +201,9 @@ func resetRedis() {
 
 // clears our storage for tests
 func resetStorage() {
-	must(os.RemoveAll(AttachmentStorageDir))
-	must(os.RemoveAll(SessionStorageDir))
+	must(os.RemoveAll(attachmentStorageDir))
+	must(os.RemoveAll(sessionStorageDir))
+	must(os.RemoveAll(logStorageDir))
 }
 
 // clears indexed data in Elastic

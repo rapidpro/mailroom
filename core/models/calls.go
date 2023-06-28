@@ -420,7 +420,12 @@ func BulkUpdateCallStatuses(ctx context.Context, db Queryer, callIDs []CallID, s
 
 func (c *Call) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) error {
 	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
-	return errors.Wrap(err, "error attaching log to call")
+	if err != nil {
+		return errors.Wrap(err, "error attaching log to call")
+	}
+
+	clog.attached = true
+	return nil
 }
 
 // ActiveCallCount returns the number of ongoing calls for the passed in channel
