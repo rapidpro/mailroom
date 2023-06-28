@@ -57,8 +57,7 @@ type Config struct {
 	S3Region            string `help:"the S3 region we will write attachments to"`
 	S3AttachmentsBucket string `help:"the S3 bucket we will write attachments to"`
 	S3AttachmentsPrefix string `help:"the prefix that will be added to attachment filenames"`
-	S3SessionBucket     string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix     string `help:"the prefix that will be added to attachment filenames"`
+	S3SessionsBucket    string `help:"the S3 bucket we will write attachments to"`
 	S3LogsBucket        string `help:"the S3 bucket we will write logs to"`
 	S3DisableSSL        bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
 	S3ForcePathStyle    bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
@@ -119,8 +118,7 @@ func NewDefaultConfig() *Config {
 		S3Region:            "us-east-1",
 		S3AttachmentsBucket: "attachments-bucket",
 		S3AttachmentsPrefix: "/attachments/",
-		S3SessionBucket:     "sessions-bucket",
-		S3SessionPrefix:     "/",
+		S3SessionsBucket:    "sessions-bucket",
 		S3LogsBucket:        "logs-bucket",
 		S3DisableSSL:        false,
 		S3ForcePathStyle:    false,
