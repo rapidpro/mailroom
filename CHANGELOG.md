@@ -1,3 +1,7 @@
+v8.1.59 (2023-06-28)
+-------------------------
+ * Update README
+
 v8.1.58 (2023-06-28)
 -------------------------
  * Rename sessions bucket config setting for clarity and remove unused sessions prefix setting
