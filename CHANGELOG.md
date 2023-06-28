@@ -1,3 +1,7 @@
+v8.1.61 (2023-06-28)
+-------------------------
+ * Write channel logs with channels/ key prefex
+
 v8.1.60 (2023-06-28)
 -------------------------
  * Tweak channel log creation to prevent nil slices
