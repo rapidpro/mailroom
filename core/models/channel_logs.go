@@ -150,7 +150,7 @@ type stChannelLog struct {
 }
 
 func (l *stChannelLog) path() string {
-	return path.Join(string(l.ChannelUUID), string(l.UUID[:4]), fmt.Sprintf("%s.json", l.UUID))
+	return path.Join("channels", string(l.ChannelUUID), string(l.UUID[:4]), fmt.Sprintf("%s.json", l.UUID))
 }
 
 // InsertChannelLogs writes the given channel logs to the db
