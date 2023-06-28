@@ -45,14 +45,14 @@ For writing of message attachments, you need an S3 compatible service which you 
 - `MAILROOM_AWS_ACCESS_KEY_ID`: the AWS access key id used to authenticate to AWS
 - `MAILROOM_AWS_SECRET_ACCESS_KEY` the AWS secret access key used to authenticate to AWS
 - `MAILROOM_S3_REGION`: the region for your S3 bucket (ex: `eu-west-1`)
-- `MAILROOM_S3_MEDIA_BUCKET`: the name of your S3 bucket (ex: `dl-mailroom`)
-- `MAILROOM_S3_MEDIA_PREFIX`: the prefix to use for filenames of attachments added to your bucket (ex: `attachments`)
+- `MAILROOM_S3_ATTACHMENTS_BUCKET`: the name of your S3 bucket (ex: `mailroom-attachments`)
+- `MAILROOM_S3_ATTACHMENTS_PREFIX`: the prefix to use for filenames of attachments added to your bucket (ex: `attachments`)
 
-You can optionally use the S3 service for session out storage as well with:
+You can use S3 storage for sessions and logs as well with:
 
 - `MAILROOM_SESSION_STORAGE`: where session output is stored which must be `db` (default) or `s3`
-- `MAILROOM_S3_SESSION_BUCKET`: The name of your S3 bucket (ex: `rp-sessions`)
-- `MAILROOM_S3_SESSION_PREFIX`: The prefix to use for filenames of sessions added to your bucket (ex: ``)
+- `MAILROOM_S3_SESSIONS_BUCKET`: The name of your S3 bucket (ex: `mailroom-sessions`)
+- `MAILROOM_S3_LOGS_BUCKET`: The name of your S3 bucket (ex: `mailroom-logs`)
 
 Flow engine configuration:
 
