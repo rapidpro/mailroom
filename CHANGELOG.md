@@ -1,3 +1,7 @@
+v8.1.60 (2023-06-28)
+-------------------------
+ * Tweak channel log creation to prevent nil slices
+
 v8.1.59 (2023-06-28)
 -------------------------
  * Update README
