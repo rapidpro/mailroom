@@ -1,3 +1,7 @@
+v8.1.62 (2023-06-29)
+-------------------------
+ * Fix session storage path generation
+
 v8.1.61 (2023-06-28)
 -------------------------
  * Write channel logs with channels/ key prefex
