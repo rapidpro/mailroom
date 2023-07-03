@@ -1,3 +1,7 @@
+v8.1.63 (2023-07-03)
+-------------------------
+ * Support requesting recordings for Twilio with basic auth
+
 v8.1.62 (2023-06-29)
 -------------------------
  * Fix session storage path generation
