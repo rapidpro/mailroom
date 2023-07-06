@@ -3,7 +3,8 @@ name: Build Mailroom in SP, India and Ireland (Push Tag)
 on:
   push:
     tags:
-      - '*.*.*'
+      - '*.*.*-india'
+      - '*.*.*-ire'
 
 jobs:
   docker:
@@ -36,12 +37,10 @@ jobs:
             elif [[ "${TAG}" == *"-ire"* ]]; then
               echo "IMAGE_TAG=${{ secrets.ECR_IRE }}/rp-mailroom-rapidpro:${TAG}" | tee -a "${GITHUB_ENV}"
             else
-              echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-mailroom:${TAG}" | tee -a "${GITHUB_ENV}"
+              echo 'Not a valid tag. Skipping...'
+              exit 1
             fi
             echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/mailroom" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_REPOSITORY=Ilhasoft/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_APPLICATION=weni-flows/mailroom" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee -a "${GITHUB_ENV}"
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -69,14 +68,6 @@ jobs:
           registry: ${{ secrets.ECR_IRE }}
           username: ${{ secrets.AWS_ACCESS_KEY_ID_IRE }}      
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_IRE }}
-
-      - name: Login to Registry SP
-        if: ${{ !contains(env.TAG, '-india') && !contains(env.TAG, '-ire') }}
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.ECR_SP }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SP }}      
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SP }}
 
       - name: Build and push - Mailroom Image
         uses: docker/build-push-action@v3
