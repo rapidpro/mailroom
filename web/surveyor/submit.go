@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -17,6 +19,10 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
+)
+
+const (
+	maxSubmissionAge = time.Hour * 24 * 90
 )
 
 func init() {
@@ -70,6 +76,11 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 	fs, err := goflow.Engine(rt.Config).ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "error reading session")
+	}
+
+	// reject any really old sessions as this could create messages/runs outside of the archival period
+	if dates.Since(fs.Trigger().TriggeredOn()) > maxSubmissionAge {
+		return nil, 0, errors.New("session too old to be submitted")
 	}
 
 	// and our events
