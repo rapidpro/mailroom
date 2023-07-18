@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
@@ -41,57 +43,107 @@ func TestSurveyor(t *testing.T) {
 	}
 
 	tcs := []struct {
-		File       string
-		Token      string
-		StatusCode int
-		Contains   string
-		Assertions []Assertion
+		file             string
+		token            string
+		expectedStatus   int
+		expectedContains string
+		assertions       []Assertion
 	}{
-		{"contact_surveyor_submission.json", "", 401, "missing authorization", nil},
-		{"contact_surveyor_submission.json", "invalid", 401, "invalid authorization", []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id`, 0},
-		}},
+		{
+			file:             "valid_submission1.json",
+			token:            "",
+			expectedStatus:   401,
+			expectedContains: "missing authorization",
+		},
+		{
+			file:             "valid_submission1.json",
+			token:            "invalid",
+			expectedStatus:   401,
+			expectedContains: "invalid authorization",
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id`, 0},
+			},
+		},
 		// new contact is created (our test db already has a bob, he should be unaffected)
-		{"contact_surveyor_submission.json", "sesame", 201, `"status": "C"`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id AND status = 'C'`, 1},
-			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND org_id = 1`, 2},
-			{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
-			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
-			{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
-			{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
-			{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 4},
-			{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 3},
-		}},
+		{
+			file:             "valid_submission1.json",
+			token:            "sesame",
+			expectedStatus:   201,
+			expectedContains: `"status": "C"`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id AND status = 'C'`, 1},
+				{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND org_id = 1`, 2},
+				{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
+				{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
+				{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
+				{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
+				{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 4},
+				{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 3},
+			},
+		},
 		// dupe submission should fail due to run UUIDs being duplicated
-		{"contact_surveyor_submission.json", "sesame", 500, `error writing runs`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id`, 1},
-		}},
+		{
+			file:             "valid_submission1.json",
+			token:            "sesame",
+			expectedStatus:   500,
+			expectedContains: `error writing runs`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id`, 1},
+			},
+		},
 		// but submission with new UUIDs should succeed, new run is created but not contact
-		{"contact_surveyor_submission2.json", "sesame", 201, `"status": "C"`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 2},
-			{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
-			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
-			{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
-			{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
-			{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 8},
-			{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 6},
-		}},
+		{
+			file:             "valid_submission2.json",
+			token:            "sesame",
+			expectedStatus:   201,
+			expectedContains: `"status": "C"`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 2},
+				{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
+				{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
+				{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
+				{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
+				{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 8},
+				{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 6},
+			}},
 		// group removal is ONLY in the modifier
-		{"remove_group.json", "sesame", 201, `"status": "C"`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 3},
-			{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
-			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
-			{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
-			{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
-		}},
+		{
+			file:             "remove_group.json",
+			token:            "sesame",
+			expectedStatus:   201,
+			expectedContains: `"status": "C"`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 3},
+				{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
+				{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
+				{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
+				{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
+			},
+		},
 		// new contact, new session, group and field no longer exist
-		{"missing_group_field.json", "sesame", 201, `"status": "C"`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 1},
-			{`SELECT count(*) FROM contacts_contact WHERE uuid = 'c7fa24ca-48f9-45bf-b923-f95aa49c3cd2'`, 0},
-			{`SELECT count(*) FROM contacts_contact WHERE name = 'Fred' AND fields = jsonb_build_object()`, 1},
-			{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123488' AND contact_id = :contact_id`, 1},
-			{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
-		}},
+		{
+			file:             "missing_group_field.json",
+			token:            "sesame",
+			expectedStatus:   201,
+			expectedContains: `"status": "C"`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 1},
+				{`SELECT count(*) FROM contacts_contact WHERE uuid = 'c7fa24ca-48f9-45bf-b923-f95aa49c3cd2'`, 0},
+				{`SELECT count(*) FROM contacts_contact WHERE name = 'Fred' AND fields = jsonb_build_object()`, 1},
+				{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123488' AND contact_id = :contact_id`, 1},
+				{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
+			},
+		},
+		// submission that is too old should fail
+		{
+			file:             "too_old.json",
+			token:            "sesame",
+			expectedStatus:   500,
+			expectedContains: `"error": "session too old to be submitted"`,
+			assertions: []Assertion{
+				{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 0},
+			},
+		},
 	}
 
 	type AssertionArgs struct {
@@ -109,9 +161,12 @@ func TestSurveyor(t *testing.T) {
 		TestersGroupID: testdata.TestersGroup.ID,
 	}
 
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 12, 21, 12, 0, 0, 0, time.UTC)))
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
 	for i, tc := range tcs {
-		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
-		path := filepath.Join("testdata", tc.File)
+		testID := fmt.Sprintf("%s[token=%s]", tc.file, tc.token)
+		path := filepath.Join("testdata", tc.file)
 		submission := testsuite.ReadFile(path)
 
 		url := "http://localhost:8090/mr/surveyor/submit"
@@ -119,22 +174,22 @@ func TestSurveyor(t *testing.T) {
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 
-		if tc.Token != "" {
-			req.Header.Set("Authorization", "Token "+tc.Token)
+		if tc.token != "" {
+			req.Header.Set("Authorization", "Token "+tc.token)
 		}
 
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
-		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
+		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "unexpected status code for %s", testID)
 
 		body, _ := io.ReadAll(resp.Body)
-		assert.Containsf(t, string(body), tc.Contains, "%s does not contain expected body", testID)
+		assert.Containsf(t, string(body), tc.expectedContains, "%s does not contain expected body", testID)
 
 		id, _ := jsonparser.GetInt(body, "contact", "id")
 		args.ContactID = flows.ContactID(id)
 
 		// if we have assertions, check them
-		for ii, assertion := range tc.Assertions {
+		for ii, assertion := range tc.assertions {
 			rows, err := rt.DB.NamedQuery(assertion.Query, args)
 			assert.NoError(t, err, "%d:%d error with named query", i, ii)
 
