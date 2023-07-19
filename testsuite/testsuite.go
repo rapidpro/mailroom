@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -22,6 +21,7 @@ var _db *sqlx.DB
 
 const elasticURL = "http://localhost:9200"
 const elasticContactsIndex = "test_contacts"
+const postgresContainerName = "textit-postgres-1"
 
 const attachmentStorageDir = "_test_attachments_storage"
 const sessionStorageDir = "_test_session_storage"
@@ -162,17 +162,12 @@ func resetDB() {
 }
 
 func loadTestDump() {
-	dir, _ := os.Getwd()
+	dump, err := os.Open(absPath("./mailroom_test.dump"))
+	must(err)
+	defer dump.Close()
 
-	// our working directory is set to the directory of the module being tested, we want to get just
-	// the portion that points to the mailroom directory
-	for !strings.HasSuffix(dir, "mailroom") && dir != "/" {
-		dir = path.Dir(dir)
-	}
-
-	cmd := exec.Command("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "PGPASSWORD=temba")
+	cmd := exec.Command("docker", "exec", "-i", postgresContainerName, "pg_restore", "-d", "mailroom_test", "-U", "mailroom_test")
+	cmd.Stdin = dump
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -184,6 +179,20 @@ func loadTestDump() {
 		_db.Close()
 		_db = nil
 	}
+}
+
+// Converts a project root relative path to an absolute path usable in any test. This is needed because go tests
+// are run with a working directory set to the current module being tested.
+func absPath(p string) string {
+	// start in working directory and go up until we are in a directory containing go.mod
+	dir, _ := os.Getwd()
+	for dir != "/" {
+		dir = path.Dir(dir)
+		if _, err := os.Stat(path.Join(dir, "go.mod")); err == nil {
+			break
+		}
+	}
+	return path.Join(dir, p)
 }
 
 // resets our redis database
