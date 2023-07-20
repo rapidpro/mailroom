@@ -8,7 +8,6 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -209,14 +208,7 @@ func (o *Org) attachmentPath(prefix string, filename string) string {
 	}
 	parts = append(parts, filename)
 
-	path := filepath.Join(parts...)
-
-	// ensure path begins with /
-	if !strings.HasPrefix(path, "/") {
-		path = fmt.Sprintf("/%s", path)
-	}
-
-	return path
+	return filepath.Join(parts...)
 }
 
 // gets the underlying org for the given session assets

@@ -117,7 +117,7 @@ func NewDefaultConfig() *Config {
 		S3Endpoint:          "https://s3.amazonaws.com",
 		S3Region:            "us-east-1",
 		S3AttachmentsBucket: "attachments-bucket",
-		S3AttachmentsPrefix: "/attachments/",
+		S3AttachmentsPrefix: "attachments/",
 		S3SessionsBucket:    "sessions-bucket",
 		S3LogsBucket:        "logs-bucket",
 		S3DisableSSL:        false,
