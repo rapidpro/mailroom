@@ -1,3 +1,7 @@
+v8.1.66 (2023-07-20)
+-------------------------
+ * Update deps including gocommon which changes requirement for storage paths to start with slash
+
 v8.1.65 (2023-07-18)
 -------------------------
  * Limit how old surveyor submissions can be
