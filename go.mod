@@ -39,7 +39,7 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
@@ -66,9 +66,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/gabriel-vasile/mimetype v1.4.1
-
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.22.4-weni
-
-
-replace github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8
