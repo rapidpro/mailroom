@@ -468,10 +468,10 @@ func TestResendMessages(t *testing.T) {
 	// both messages should now have a channel, a topup and be marked for resending
 	assert.True(t, resent[0].IsResend())
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[0].ChannelID())
-	assert.Equal(t, models.TopupID(1), resent[0].TopupID())
+	assert.Equal(t, models.TopupID(0), resent[0].TopupID())
 	assert.True(t, resent[1].IsResend())
 	assert.Equal(t, testdata.VonageChannel.ID, resent[1].ChannelID()) // channel changed
-	assert.Equal(t, models.TopupID(1), resent[1].TopupID())
+	assert.Equal(t, models.TopupID(0), resent[1].TopupID())
 	assert.True(t, resent[2].IsResend())
 	assert.Equal(t, testdata.TwilioChannel.ID, resent[2].ChannelID()) // channel added
 
