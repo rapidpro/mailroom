@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
+	"reflect"
 	"strings"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -24,7 +27,7 @@ const (
 	configOAuthToken = "oauth_token"
 	configPushID     = "push_id"
 	configPushToken  = "push_token"
-	configTargetID   = "target_id"
+	configWebhookID  = "webhook_id"
 	configTriggerID  = "trigger_id"
 
 	statusOpen   = "open"
@@ -44,7 +47,7 @@ type service struct {
 	redactor       utils.Redactor
 	secret         string
 	instancePushID string
-	targetID       string
+	webhookID      string
 	triggerID      string
 }
 
@@ -55,7 +58,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	oAuthToken := config[configOAuthToken]
 	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
-	targetID := config[configTargetID]
+	webhookID := config[configWebhookID]
 	triggerID := config[configTriggerID]
 
 	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
@@ -67,7 +70,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
 			instancePushID: instancePushID,
-			targetID:       targetID,
+			webhookID:      webhookID,
 			triggerID:      triggerID,
 		}, nil
 	}
@@ -81,7 +84,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
-		Message:    body,
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
@@ -89,6 +91,49 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Name:       contactDisplay,
 		},
 		AllowChannelback: true,
+	}
+
+	fieldsValue := []FieldValue{}
+	if !strings.HasPrefix(body, "{") {
+		msg.Message = body
+	} else {
+		extra := &struct {
+			Message      string       `json:"message"`
+			Priority     string       `json:"priority"`
+			Subject      string       `json:"subject"`
+			Description  string       `json:"description"`
+			CustomFields []FieldValue `json:"custom_fields"`
+			Tags         []string     `json:"tags"`
+		}{}
+
+		err := jsonx.Unmarshal([]byte(body), extra)
+		if err != nil {
+			return nil, err
+		}
+
+		v := reflect.ValueOf(extra)
+		fields := reflect.Indirect(v)
+		if fields.NumField() > 0 {
+			for i := 0; i < fields.NumField(); i++ {
+				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
+					for _, cf := range extra.CustomFields {
+						fieldsValue = append(fieldsValue, FieldValue{ID: cf.ID, Value: cf.Value})
+					}
+				} else if fields.Type().Field(i).Tag.Get("json") == "tags" && fields.Field(i).Interface() != nil {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				}
+			}
+			fieldsValue = append(fieldsValue, FieldValue{ID: "external_id", Value: string(ticket.UUID())})
+			msg.Fields = fieldsValue
+		}
+
+		if extra.Message != "" {
+			msg.Message = extra.Message
+		} else {
+			msg.Message = extra.Subject
+		}
 	}
 
 	if err := s.push(msg, logHTTP); err != nil {
@@ -105,6 +150,14 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	fileURLs, err := s.convertAttachments(attachments)
 	if err != nil {
 		return errors.Wrap(err, "error converting attachments")
+	}
+
+	if text == "" && len(fileURLs) > 0 {
+		parsedURL, err := url.Parse(fileURLs[0])
+		if err != nil {
+			return err
+		}
+		text = path.Base(parsedURL.Path)
 	}
 
 	msg := &ExternalResource{
@@ -149,21 +202,31 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-// AddStatusCallback adds a target and trigger to callback to us when ticket status is changed
+// AddStatusCallback adds a webhook and trigger to callback to us when ticket status is changed
 func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) (map[string]string, error) {
-	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/target/%s", domain, s.ticketer.UUID())
+	webhookURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/webhook/%s", domain, s.ticketer.UUID())
 
-	target := &Target{
-		Type:        "http_target",
-		Title:       fmt.Sprintf("%s Tickets", name),
-		TargetURL:   targetURL,
-		Method:      "POST",
-		Username:    "zendesk",
-		Password:    s.secret,
-		ContentType: "application/json",
+	webhook := &Webhook{
+		Authentication: struct {
+			AddPosition string "json:\"add_position\""
+			Data        struct {
+				Password string "json:\"password\""
+				Username string "json:\"username\""
+			} "json:\"data\""
+			Type string "json:\"type\""
+		}{AddPosition: "header", Data: struct {
+			Password string "json:\"password\""
+			Username string "json:\"username\""
+		}{Password: s.secret, Username: "zendesk"}, Type: "basic_auth"},
+		Endpoint:      webhookURL,
+		HttpMethod:    "POST",
+		Name:          fmt.Sprintf("%s Tickets", name),
+		RequestFormat: "json",
+		Status:        "active",
+		Subscriptions: []string{"conditional_ticket_events"},
 	}
 
-	target, trace, err := s.restClient.CreateTarget(target)
+	webhook, trace, err := s.restClient.CreateWebhook(webhook)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -186,7 +249,7 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 			},
 		},
 		Actions: []Action{
-			{Field: "notification_target", Value: []string{fmt.Sprintf("%d", target.ID), string(payload)}},
+			{Field: "notification_webhook", Value: []string{fmt.Sprintf("%s", webhook.ID), string(payload)}},
 		},
 	}
 
@@ -199,7 +262,7 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 	}
 
 	return map[string]string{
-		configTargetID:  NumericIDToString(target.ID),
+		configWebhookID: webhook.ID,
 		configTriggerID: NumericIDToString(trigger.ID),
 	}, nil
 }
@@ -215,9 +278,9 @@ func (s *service) RemoveStatusCallback(logHTTP flows.HTTPLogCallback) error {
 			return err
 		}
 	}
-	if s.targetID != "" {
-		id, _ := ParseNumericID(s.targetID)
-		trace, err := s.restClient.DeleteTarget(id)
+	if s.webhookID != "" {
+		id, _ := ParseNumericID(s.webhookID)
+		trace, err := s.restClient.DeleteWebhook(id)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
@@ -249,7 +312,6 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
-//
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
 	prefix := s.rtConfig.S3MediaPrefix
 	if !strings.HasPrefix(prefix, "/") {
@@ -265,7 +327,9 @@ func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, 
 		path := strings.TrimPrefix(u.Path, prefix)
 		path = strings.TrimPrefix(path, "/")
 
-		fileURLs[i] = "file/" + path
+		domain := s.rtConfig.S3MediaPrefixZendesk
+
+		fileURLs[i] = "https://" + domain + "/api/v2/file/" + path
 	}
 	return fileURLs, nil
 }

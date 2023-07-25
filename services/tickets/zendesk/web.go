@@ -26,7 +26,7 @@ func init() {
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterJSONRoute(http.MethodPost, base+`/webhook/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerWebhook))
 }
 
 type integrationMetadata struct {
@@ -186,7 +186,7 @@ func processChannelEvent(ctx context.Context, rt *runtime.Runtime, event *channe
 				return err
 			}
 
-			// save away the target and trigger zendesk ids
+			// save away the webhook and trigger zendesk ids
 			if err := ticketer.UpdateConfig(ctx, rt.DB, newConfig, nil); err != nil {
 				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
@@ -199,7 +199,7 @@ func processChannelEvent(ctx context.Context, rt *runtime.Runtime, event *channe
 			}
 
 			// delete config values that came from adding this account
-			remConfig := utils.StringSet([]string{configPushID, configPushToken, configTargetID, configTriggerID})
+			remConfig := utils.StringSet([]string{configPushID, configPushToken, configWebhookID, configTriggerID})
 			if err := ticketer.UpdateConfig(ctx, rt.DB, nil, remConfig); err != nil {
 				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
@@ -246,13 +246,13 @@ func processCommentOnNewTicket(ctx context.Context, rt *runtime.Runtime, reqID R
 	return models.UpdateTicketExternalID(ctx, rt.DB, ticket, fmt.Sprintf("%d", re.TicketID))
 }
 
-type targetRequest struct {
+type webhookRequest struct {
 	Event  string `json:"event"   validate:"required"`
-	ID     int64  `json:"id"      validate:"required"`
+	ID     int    `json:"id"      validate:"required"`
 	Status string `json:"status"`
 }
 
-func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up our ticketer
@@ -268,7 +268,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 	}
 
 	// parse request payload
-	request := &targetRequest{}
+	request := &webhookRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -287,9 +287,9 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
-		case statusSolved, statusClosed, "resuelto", "cerrado":
+		case statusSolved, statusClosed, "resuelto", "cerrado", "resolvido":
 			err = tickets.Close(ctx, rt, oa, ticket, false, l)
-		case statusOpen, "abierto":
+		case statusOpen, "abierto", "aberto":
 			err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 		}
 

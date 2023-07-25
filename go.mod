@@ -66,6 +66,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+require github.com/gabriel-vasile/mimetype v1.4.1
+
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.22.4-weni
+
 
 replace github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8

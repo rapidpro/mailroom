@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -46,13 +47,20 @@ type errorResponse struct {
 	Status   int32  `json:"status,omitempty"`
 }
 
-func (c *baseClient) request(method, url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) request(method, url string, payload url.Values, response interface{}, extraHeaders http.Header) (*httpx.Trace, error) {
 	data := strings.NewReader(payload.Encode())
 	req, err := httpx.NewRequest(method, url, data, map[string]string{})
 	if err != nil {
 		return nil, err
 	}
 	req.SetBasicAuth(c.accountSid, c.authToken)
+
+	for k, vv := range extraHeaders {
+		for _, v := range vv {
+			req.Header.Add(k, v)
+		}
+	}
+
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(payload.Encode())))
 
@@ -73,12 +81,12 @@ func (c *baseClient) request(method, url string, payload url.Values, response in
 	return trace, nil
 }
 
-func (c *baseClient) post(url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
-	return c.request("POST", url, payload, response)
+func (c *baseClient) post(url string, payload url.Values, response interface{}, extraHeaders http.Header) (*httpx.Trace, error) {
+	return c.request("POST", url, payload, response, extraHeaders)
 }
 
-func (c *baseClient) get(url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
-	return c.request("GET", url, payload, response)
+func (c *baseClient) get(url string, payload url.Values, response interface{}, extraHeaders http.Header) (*httpx.Trace, error) {
+	return c.request("GET", url, payload, response, extraHeaders)
 }
 
 type Client struct {
@@ -100,7 +108,7 @@ func (c *Client) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace
 	if err != nil {
 		return nil, nil, err
 	}
-	trace, err := c.post(requestUrl, data, response)
+	trace, err := c.post(requestUrl, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -111,7 +119,7 @@ func (c *Client) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace
 func (c *Client) FetchUser(userSid string) (*ChatUser, *httpx.Trace, error) {
 	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", c.serviceSid, userSid)
 	response := &ChatUser{}
-	trace, err := c.post(requestUrl, url.Values{}, response)
+	trace, err := c.post(requestUrl, url.Values{}, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -127,7 +135,7 @@ func (c *Client) CreateFlexChannel(channel *CreateFlexChannelParams) (*FlexChann
 		return nil, nil, err
 	}
 	data = removeEmpties(data)
-	trace, err := c.post(url, data, response)
+	trace, err := c.post(url, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -139,7 +147,7 @@ func (c *Client) FetchFlexChannel(channelSid string) (*FlexChannel, *httpx.Trace
 	fetchUrl := fmt.Sprintf("https://flex-api.twilio.com/v1/Channels/%s", channelSid)
 	response := &FlexChannel{}
 	data := url.Values{}
-	trace, err := c.get(fetchUrl, data, response)
+	trace, err := c.get(fetchUrl, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -157,7 +165,7 @@ func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebho
 		"Configuration.RetryCount": []string{fmt.Sprint(channelWebhook.ConfigurationRetryCount)},
 		"Type":                     []string{channelWebhook.Type},
 	}
-	trace, err := c.post(requestUrl, data, response)
+	trace, err := c.post(requestUrl, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -165,7 +173,7 @@ func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebho
 }
 
 // CreateMessage create a message in chat channel.
-func (c *Client) CreateMessage(message *CreateChatMessageParams) (*ChatMessage, *httpx.Trace, error) {
+func (c *Client) CreateMessage(message *CreateChatMessageParams, extraHeaders http.Header) (*ChatMessage, *httpx.Trace, error) {
 	url := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", c.serviceSid, message.ChannelSid)
 	response := &ChatMessage{}
 	data, err := query.Values(message)
@@ -173,7 +181,7 @@ func (c *Client) CreateMessage(message *CreateChatMessageParams) (*ChatMessage, 
 		return nil, nil, err
 	}
 	data = removeEmpties(data)
-	trace, err := c.post(url, data, response)
+	trace, err := c.post(url, data, response, extraHeaders)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -193,7 +201,7 @@ func (c *Client) CompleteTask(taskSid string) (*TaskrouterTask, *httpx.Trace, er
 		return nil, nil, err
 	}
 	data = removeEmpties(data)
-	trace, err := c.post(url, data, response)
+	trace, err := c.post(url, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -206,19 +214,21 @@ func (c *Client) CreateMedia(media *CreateMediaParams) (*Media, *httpx.Trace, er
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	mediaPart, err := writer.CreateFormFile("Media", media.FileName)
+	h := make(textproto.MIMEHeader)
+	h.Set(
+		"Content-Disposition",
+		fmt.Sprintf(
+			`form-data; name="%s"; filename="%s"`,
+			"Media", media.FileName,
+		),
+	)
+	h.Set("Content-Type", media.ContentType)
+	mediaPart, err := writer.CreatePart(h)
 	if err != nil {
 		return nil, nil, err
 	}
 	mediaReader := bytes.NewReader(media.Media)
 	io.Copy(mediaPart, mediaReader)
-
-	filenamePart, err := writer.CreateFormField("FileName")
-	if err != nil {
-		return nil, nil, err
-	}
-	filenameReader := bytes.NewReader([]byte(media.FileName))
-	io.Copy(filenamePart, filenameReader)
 
 	writer.Close()
 
@@ -253,7 +263,7 @@ func (c *Client) FetchMedia(mediaSid string) (*Media, *httpx.Trace, error) {
 	fetchUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media/%s", c.serviceSid, mediaSid)
 	response := &Media{}
 	data := url.Values{}
-	trace, err := c.get(fetchUrl, data, response)
+	trace, err := c.get(fetchUrl, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -406,9 +416,10 @@ type TaskrouterTask struct {
 
 // https://www.twilio.com/docs/chat/rest/media
 type CreateMediaParams struct {
-	FileName string `json:"FileName,omitempty"`
-	Media    []byte `json:"Media,omitempty"`
-	Author   string `json:"Author,omitempty"`
+	FileName    string `json:"FileName,omitempty"`
+	Media       []byte `json:"Media,omitempty"`
+	Author      string `json:"Author,omitempty"`
+	ContentType string `json:"ContentType"`
 }
 
 // https://www.twilio.com/docs/chat/rest/media

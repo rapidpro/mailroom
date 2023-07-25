@@ -1,6 +1,85 @@
-1.4.0-mailroom-7.2.6
+1.4.18-mailroom-7.1.22
 ----------
- * Merge nyaruka tag v7.2.6 into weni 1.3.3-mailroom-7.1.22 and resolve conflicts.
+ * Fix wenichats send media #118
+ * Ordering Twilioflex msg history and send each as a separated message #117
+
+1.4.17-mailroom-7.1.22
+----------
+ * Send message attribute to Zendesk on attachment submissions #115
+ * Tweak wenichats integration open room to pass FlowUUID and contact groups #113 & #114
+ * Fix FetchFileWithMaxSize #113
+
+1.4.16-mailroom-7.1.22
+----------
+ * Added wenichats webhook media body bytes limits #111
+
+1.4.15-mailroom-7.1.22
+----------
+ * Send chatbot history on Twilio in just one message #109
+
+1.4.14-mailroom-7.1.22
+----------
+ * Added config for flow start batch timeout #107
+
+1.4.13-mailroom-7.1.22
+----------
+ * Add Domain to File URL for Zendesk #105
+
+1.4.12-mailroom-7.1.22
+----------
+ * Fix file endpoint for Zendesk #103
+
+1.4.11-mailroom-7.1.22
+----------
+ * Add support for sending contact language in messages for WAC and WA #101
+
+1.4.10-mailroom-7.1.22
+----------
+ * Fix submitting tags and custom fields for Zendesk tickets #99
+
+1.4.9-mailroom-7.1.22
+----------
+ * add contact urn field to wenichats room creation params #97
+
+1.4.8-mailroom-7.1.22
+----------
+ * Fix twilio flex messages history #95
+
+1.4.7-mailroom-7.1.22
+----------
+ * Fix twilio flex media creation content-type param #93
+
+1.4.6-mailroom-7.1.22
+----------
+ * Fix tag registration, custom_fields and ticket closing in Zendesk #91
+
+1.4.5-mailroom-7.1.22
+----------
+ * Add Ticket Fields for Zendesk #86
+ * twilio flex detect and setup media on create media type  #87
+ * twilio flex open ticket can set preferred flexflow from body json field flex_flow_sid #88
+ * Swap targets for webhooks in Zendesk #89
+
+1.4.4-mailroom-7.1.22
+----------
+ * wenichats open ticket with contact fields as default in addition to custom fields
+
+1.4.3-mailroom-7.1.22
+----------
+ * fix twilio flex contact echo msgs from webhook
+
+1.4.2-mailroom-7.1.22
+----------
+ * twilio flex support extra fields
+ * twilio flex has Header X-Twilio-Webhook-Enabled=True on send msg
+
+1.4.1-mailroom-7.1.22
+----------
+ * wenichats ticketer support custom fields
+
+1.4.0-mailroom-7.1.22
+----------
+ * Add wenichats ticketer integration
 
 1.3.3-mailroom-7.1.22
 ----------

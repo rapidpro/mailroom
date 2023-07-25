@@ -49,14 +49,15 @@ type Config struct {
 	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
 	SessionStorage       string `validate:"omitempty,session_storage"         help:"where to store session output (s3|db)"`
 
-	S3Endpoint       string `help:"the S3 endpoint we will write attachments to"`
-	S3Region         string `help:"the S3 region we will write attachments to"`
-	S3MediaBucket    string `help:"the S3 bucket we will write attachments to"`
-	S3MediaPrefix    string `help:"the prefix that will be added to attachment filenames"`
-	S3SessionBucket  string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix  string `help:"the prefix that will be added to attachment filenames"`
-	S3DisableSSL     bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
-	S3ForcePathStyle bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	S3Endpoint           string `help:"the S3 endpoint we will write attachments to"`
+	S3Region             string `help:"the S3 region we will write attachments to"`
+	S3MediaBucket        string `help:"the S3 bucket we will write attachments to"`
+	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
+	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
+	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
+	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
+	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
@@ -67,11 +68,14 @@ type Config struct {
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
-	InstanceName string `help:"the unique name of this instance used for analytics"`
-	LogLevel     string `help:"the logging level courier should use"`
-	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
-	Version      string `help:"the version of this mailroom install"`
-	TimeoutTime  int    `help:"the amount of time to between every timeout queued"`
+	InstanceName        string `help:"the unique name of this instance used for analytics"`
+	LogLevel            string `help:"the logging level courier should use"`
+	UUIDSeed            int    `help:"seed to use for UUID generation in a testing environment"`
+	Version             string `help:"the version of this mailroom install"`
+	TimeoutTime         int    `help:"the amount of time to between every timeout queued"`
+	WenichatsServiceURL string `help:"wenichats external api url for ticketer service integration"`
+
+	FlowStartBatchTimeout int `help:"timeout config for flow start batch"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -118,11 +122,14 @@ func NewDefaultConfig() *Config {
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
 
-		InstanceName: hostname,
-		LogLevel:     "error",
-		UUIDSeed:     0,
-		Version:      "Dev",
-		TimeoutTime:  15,
+		InstanceName:        hostname,
+		LogLevel:            "error",
+		UUIDSeed:            0,
+		Version:             "Dev",
+		TimeoutTime:         15,
+		WenichatsServiceURL: "https://chats-engine.dev.cloud.weni.ai/v1/external",
+
+		FlowStartBatchTimeout: 15,
 	}
 }
 

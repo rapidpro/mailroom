@@ -1,0 +1,9 @@
+PATCH /v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/close/ HTTP/1.1
+Host: chats-engine.dev.cloud.weni.ai
+User-Agent: Go-http-client/1.1
+Content-Length: 4
+Authorization: Bearer ****************
+Content-Type: application/json
+Accept-Encoding: gzip
+
+null

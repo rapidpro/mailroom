@@ -273,13 +273,13 @@ func TestCreateMessage(t *testing.T) {
 		ChannelSid: channelSid,
 	}
 
-	_, _, err := client.CreateMessage(msg)
+	_, _, err := client.CreateMessage(msg, http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}})
 	assert.EqualError(t, err, "unable to connect to server")
 
-	_, _, err = client.CreateMessage(msg)
+	_, _, err = client.CreateMessage(msg, http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}})
 	assert.EqualError(t, err, "Something went wrong")
 
-	response, trace, err := client.CreateMessage(msg)
+	response, trace, err := client.CreateMessage(msg, http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}})
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", response.Body)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 708\r\n\r\n", string(trace.ResponseTrace))
@@ -377,8 +377,9 @@ func TestCreateMediaResource(t *testing.T) {
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
 
 	mediaContent := &twilioflex.CreateMediaParams{
-		FileName: "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
-		Media:    []byte(""),
+		FileName:    "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
+		Media:       []byte(""),
+		ContentType: "image/jpeg",
 	}
 
 	_, _, err := client.CreateMedia(mediaContent)
@@ -390,6 +391,7 @@ func TestCreateMediaResource(t *testing.T) {
 	response, trace, err := client.CreateMedia(mediaContent)
 	assert.NoError(t, err)
 	assert.Equal(t, "00ac28a5d76a30d5c8ec4f3a73964887.jpg", response.Filename)
+	assert.Equal(t, "image/jpeg", response.ContentType)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 788\r\n\r\n", string(trace.ResponseTrace))
 }
 

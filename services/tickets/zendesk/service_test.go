@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const fieldTicket = `{"message":"Cookies","priority":"high","subject":"Where are my cookies?","description":"I want to know where is my cookie.","tags": ["TAG_01","TAG_02"],"custom_fields":[{"id":"21938362","value":"hd_3000"}]}`
+
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
@@ -54,6 +56,15 @@ func TestOpenAndForward(t *testing.T) {
 					}
 				]
 			}`),
+		},
+		"https://nyaruka.zendesk.com/api/v2/tickets?external_id=59d74b86-3e2f-4a93-aece-b05d2fdcde0c": {
+			httpx.NewMockResponse(200, nil, `{
+				"tickets": [
+				{
+					"id": 1234,
+					"subject": "Where are my cookie?"
+				}
+			]}`),
 		},
 	}))
 
@@ -90,16 +101,16 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	// try with connection failure
-	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	_, err = svc.Open(session, defaultTopic, fieldTicket, nil, logger.Log)
 	assert.EqualError(t, err, "error pushing message to zendesk: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(session, defaultTopic, fieldTicket, nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
-	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, fieldTicket, ticket.Body())
 	assert.Equal(t, "", ticket.ExternalID())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
