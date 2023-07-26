@@ -3,10 +3,10 @@ package models_test
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestChannelConnections(t *testing.T) {
 	err = conn.UpdateExternalID(ctx, db, "test1")
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
 
 	conn2, err := models.SelectChannelConnection(ctx, db, conn.ID())
 	assert.NoError(t, err)

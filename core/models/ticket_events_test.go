@@ -2,7 +2,9 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -16,7 +18,7 @@ func TestTicketEvents(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	e1 := models.NewTicketOpenedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID)
@@ -54,7 +56,7 @@ func TestTicketEvents(t *testing.T) {
 	err := models.InsertTicketEvents(ctx, db, []*models.TicketEvent{e1, e2, e3, e4, e5})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent`).Returns(5)
-	testsuite.AssertQuery(t, db, `SELECT assignee_id, note FROM tickets_ticketevent WHERE id = $1`, e2.ID()).
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent`).Returns(5)
+	assertdb.Query(t, db, `SELECT assignee_id, note FROM tickets_ticketevent WHERE id = $1`, e2.ID()).
 		Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID), "note": "please handle"})
 }

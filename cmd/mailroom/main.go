@@ -50,10 +50,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var version = "Dev"
+var (
+	// https://goreleaser.com/cookbooks/using-main.version
+	version = "dev"
+	date    = "unknown"
+)
 
 func main() {
 	config := runtime.NewDefaultConfig()
+	config.Version = version
 	loader := ezconf.NewLoader(
 		config,
 		"mailroom", "Mailroom - flow event handler for RapidPro",
@@ -66,18 +71,15 @@ func main() {
 		logrus.Fatalf("invalid config: %s", err)
 	}
 
-	// if we have a custom version, use it
-	if version != "Dev" {
-		config.Version = version
-	}
-
-	// configure our logger
-	logrus.SetOutput(os.Stdout)
 	level, err := logrus.ParseLevel(config.LogLevel)
 	if err != nil {
 		logrus.Fatalf("invalid log level '%s'", level)
 	}
+
 	logrus.SetLevel(level)
+	logrus.SetOutput(os.Stdout)
+	logrus.SetFormatter(&logrus.TextFormatter{})
+	logrus.WithField("version", version).WithField("released", date).Info("starting mailroom")
 
 	// if we have a DSN entry, try to initialize it
 	if config.SentryDSN != "" {
@@ -110,7 +112,7 @@ func main() {
 
 // handleSignals takes care of trapping quit, interrupt or terminate signals and doing the right thing
 func handleSignals(mr *mailroom.Mailroom) {
-	sigs := make(chan os.Signal)
+	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {

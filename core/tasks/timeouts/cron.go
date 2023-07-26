@@ -3,40 +3,21 @@ package timeouts
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	timeoutLock = "sessions_timeouts"
 )
 
 var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartTimeoutCron)
-}
-
-// StartTimeoutCron starts our cron job of continuing timed out sessions every minute
-func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, timeoutLock, time.Second*time.Duration(rt.Config.TimeoutTime), false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return timeoutSessions(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.RegisterCron("sessions_timeouts", time.Second*60, false, timeoutSessions)
 }
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
@@ -55,8 +36,9 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
+	numQueued, numDupes := 0, 0
+
 	// add a timeout task for each run
-	count := 0
 	timeout := &Timeout{}
 	for rows.Next() {
 		err := rows.StructScan(timeout)
@@ -73,6 +55,7 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 
 		// already queued? move on
 		if queued {
+			numDupes++
 			continue
 		}
 
@@ -89,10 +72,10 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 			return errors.Wrapf(err, "error marking timeout task as queued")
 		}
 
-		count++
+		numQueued++
 	}
 
-	log.WithField("elapsed", time.Since(start)).WithField("count", count).Info("timeouts queued")
+	log.WithField("dupes", numDupes).WithField("queued", numQueued).WithField("elapsed", time.Since(start)).Info("session timeouts queued")
 	return nil
 }
 

@@ -27,5 +27,7 @@ func handleContactStatusChanged(ctx context.Context, rt *runtime.Runtime, tx *sq
 	}).Debug("updating contact status")
 
 	scene.AppendToEventPreCommitHook(hooks.CommitStatusChangesHook, event)
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+
 	return nil
 }

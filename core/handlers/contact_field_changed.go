@@ -27,9 +27,9 @@ func handleContactFieldChanged(ctx context.Context, rt *runtime.Runtime, tx *sql
 		"value":        event.Value,
 	}).Debug("contact field changed")
 
-	// add our callback
 	scene.AppendToEventPreCommitHook(hooks.CommitFieldChangesHook, event)
 	scene.AppendToEventPreCommitHook(hooks.UpdateCampaignEventsHook, event)
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
 
 	return nil
 }

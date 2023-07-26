@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -32,6 +33,6 @@ func TestWebhookEvents(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotZero(t, e.ID())
 
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM api_webhookevent WHERE org_id = $1 AND resthook_id = $2 AND data = $3`, tc.OrgID, tc.ResthookID, tc.Data).Returns(1)
+		assertdb.Query(t, db, `SELECT count(*) FROM api_webhookevent WHERE org_id = $1 AND resthook_id = $2 AND data = $3`, tc.OrgID, tc.ResthookID, tc.Data).Returns(1)
 	}
 }

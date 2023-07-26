@@ -30,7 +30,7 @@ func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 			event := e.(*events.SessionTriggeredEvent)
 
 			// look up our flow
-			f, err := oa.Flow(event.Flow.UUID)
+			f, err := oa.FlowByUUID(event.Flow.UUID)
 			if err != nil {
 				return errors.Wrapf(err, "unable to load flow with UUID: %s", event.Flow.UUID)
 			}
@@ -57,11 +57,12 @@ func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 			}
 
 			// create our start
-			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
+			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID()).
 				WithGroupIDs(groupIDs).
 				WithContactIDs(contactIDs).
 				WithURNs(event.URNs).
 				WithQuery(event.ContactQuery).
+				WithExcludeInAFlow(event.Exclusions.InAFlow).
 				WithCreateContact(event.CreateContact).
 				WithParentSummary(event.RunSummary).
 				WithSessionHistory(historyJSON)

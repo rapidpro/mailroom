@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -13,10 +15,7 @@ import (
 	"github.com/nyaruka/goflow/services/classification/wit"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -131,7 +130,7 @@ func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier
 func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Classifier, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectClassifiersSQL, orgID)
+	rows, err := db.Queryx(sqlSelectClassifiers, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying classifiers for org: %d", orgID)
 	}
@@ -140,7 +139,7 @@ func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]asset
 	classifiers := make([]assets.Classifier, 0, 2)
 	for rows.Next() {
 		classifier := &Classifier{}
-		err := dbutil.ReadJSONRow(rows, &classifier.c)
+		err := dbutil.ScanJSON(rows, &classifier.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling classifier")
 		}
@@ -159,7 +158,7 @@ func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]asset
 	return classifiers, nil
 }
 
-const selectClassifiersSQL = `
+const sqlSelectClassifiers = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,

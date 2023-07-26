@@ -27,7 +27,7 @@ func (h *insertTicketsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 	}
 
 	// insert the tickets
-	err := models.InsertTickets(ctx, tx, tickets)
+	err := models.InsertTickets(ctx, tx, oa, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting tickets")
 	}

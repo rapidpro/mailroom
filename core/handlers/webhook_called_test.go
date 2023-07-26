@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -167,7 +168,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	total, _ = unhealthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
 	assert.Equal(t, int64(9), total)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
 
 	// however 1 more bad call means this node is considered unhealthy
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
@@ -178,7 +179,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	assert.Equal(t, int64(10), total)
 
 	// and now we have an incident
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
 
 	var incidentID models.IncidentID
 	db.Get(&incidentID, `SELECT id FROM notifications_incident`)
@@ -189,6 +190,6 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	// another bad call won't create another incident..
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
 	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 }

@@ -37,9 +37,7 @@ func TestTopups(t *testing.T) {
 		if tc.TopupID == models.NilTopupID {
 			assert.Nil(t, topup)
 		} else {
-			assert.NotNil(t, topup)
-			assert.Equal(t, tc.TopupID, topup.ID)
-			assert.Equal(t, tc.Remaining, topup.Remaining)
+			assert.Nil(t, topup)
 		}
 	}
 
@@ -59,7 +57,7 @@ func TestTopups(t *testing.T) {
 
 		topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
 		assert.NoError(t, err)
-		assert.Equal(t, tc.TopupID, topup)
+		assert.Equal(t, models.TopupID(0), topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)
 	}
 

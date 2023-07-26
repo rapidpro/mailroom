@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -67,7 +66,7 @@ func (t *TemplateTranslation) VariableCount() int               { return t.t.Var
 func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Template, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectTemplatesSQL, orgID)
+	rows, err := db.Queryx(sqlSelectTemplates, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying templates for org: %d", orgID)
 	}
@@ -76,7 +75,7 @@ func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	templates := make([]assets.Template, 0)
 	for rows.Next() {
 		template := &Template{}
-		err = dbutil.ReadJSONRow(rows, &template.t)
+		err = dbutil.ScanAndValidateJSON(rows, &template.t)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading group row")
 		}
@@ -89,7 +88,7 @@ func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	return templates, nil
 }
 
-const selectTemplatesSQL = `
+const sqlSelectTemplates = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.name as name, 
 	t.uuid as uuid,

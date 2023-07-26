@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
@@ -39,7 +40,7 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 	locker := redisx.NewLocker(fmt.Sprintf(populateLockKey, t.GroupID), time.Hour)
 	lock, err := locker.Grab(rt.RP, time.Minute*5)
 	if err != nil {
-		return errors.Wrapf(err, "error grabbing lock to repopulate dynamic group: %d", t.GroupID)
+		return errors.Wrapf(err, "error grabbing lock to repopulate smart group: %d", t.GroupID)
 	}
 	defer locker.Release(rt.RP, lock)
 
@@ -50,18 +51,18 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 		"query":    t.Query,
 	})
 
-	log.Info("starting population of dynamic group")
+	log.Info("starting population of smart group")
 
 	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}
 
-	count, err := models.PopulateDynamicGroup(ctx, rt.DB, rt.ES, oa, t.GroupID, t.Query)
+	count, err := search.PopulateSmartGroup(ctx, rt.DB, rt.ES, oa, t.GroupID, t.Query)
 	if err != nil {
-		return errors.Wrapf(err, "error populating dynamic group: %d", t.GroupID)
+		return errors.Wrapf(err, "error populating smart group: %d", t.GroupID)
 	}
-	logrus.WithField("elapsed", time.Since(start)).WithField("count", count).Info("completed populating dynamic group")
+	logrus.WithField("elapsed", time.Since(start)).WithField("count", count).Info("completed populating smart group")
 
 	return nil
 }

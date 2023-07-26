@@ -3,10 +3,10 @@ package models
 import (
 	"context"
 
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
 
@@ -258,4 +258,23 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, mod
 	}
 
 	return eventsByContact, nil
+}
+
+// TypeSprintEnded is a pseudo event that lets add hooks for changes to a contacts current flow or flow history
+const TypeSprintEnded string = "sprint_ended"
+
+type SprintEndedEvent struct {
+	events.BaseEvent
+
+	Contact *Contact // model contact so we can access current flow
+	Resumed bool     // whether this was a resume
+}
+
+// NewSprintEndedEvent creates a new sprint ended event
+func NewSprintEndedEvent(c *Contact, resumed bool) *SprintEndedEvent {
+	return &SprintEndedEvent{
+		BaseEvent: events.NewBaseEvent(TypeSprintEnded),
+		Contact:   c,
+		Resumed:   resumed,
+	}
 }

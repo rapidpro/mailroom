@@ -6,8 +6,7 @@ import (
 	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/apex/log"
+	"github.com/sirupsen/logrus"
 )
 
 // SendMessages tries to send the given messages via Courier or Android syncing
@@ -54,7 +53,7 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 
 			// not being able to queue a message isn't the end of the world, log but don't return an error
 			if err != nil {
-				log.WithField("messages", contactMsgs).WithField("contact", contactID).WithError(err).Error("error queuing messages")
+				logrus.WithField("messages", contactMsgs).WithField("contact", contactID).WithError(err).Error("error queuing messages")
 
 				// in the case of errors we do want to change the messages back to pending however so they
 				// get queued later. (for the common case messages are only inserted and queued, without a status update)
@@ -76,7 +75,7 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 	if len(pending) > 0 {
 		err := models.MarkMessagesPending(ctx, tx, pending)
 		if err != nil {
-			log.WithError(err).Error("error marking message as pending")
+			logrus.WithError(err).Error("error marking message as pending")
 		}
 	}
 }

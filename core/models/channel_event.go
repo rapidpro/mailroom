@@ -78,18 +78,15 @@ func (e *ChannelEvent) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &e.e)
 }
 
-const insertChannelEventSQL = `
-INSERT INTO
-	channels_channelevent(event_type, extra, occurred_on, created_on, channel_id, contact_id, contact_urn_id, org_id)
-	VALUES(:event_type, :extra, :occurred_on, :created_on, :channel_id, :contact_id, :contact_urn_id, :org_id)
-RETURNING
-	id
-`
+const sqlInsertChannelEvent = `
+INSERT INTO channels_channelevent(event_type, extra, occurred_on, created_on, channel_id, contact_id, contact_urn_id, org_id)
+	 VALUES(:event_type, :extra, :occurred_on, :created_on, :channel_id, :contact_id, :contact_urn_id, :org_id)
+  RETURNING id`
 
 // Insert inserts this channel event to our DB. The ID of the channel event will be
 // set if no error is returned
 func (e *ChannelEvent) Insert(ctx context.Context, db Queryer) error {
-	return BulkQuery(ctx, "insert channel event", db, insertChannelEventSQL, []interface{}{&e.e})
+	return BulkQuery(ctx, "insert channel event", db, sqlInsertChannelEvent, []interface{}{&e.e})
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it

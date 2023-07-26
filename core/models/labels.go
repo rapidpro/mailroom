@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -45,7 +45,7 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 	labels := make([]assets.Label, 0, 10)
 	for rows.Next() {
 		label := &Label{}
-		err = dbutil.ReadJSONRow(rows, &label.l)
+		err = dbutil.ScanJSON(rows, &label.l)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}
@@ -75,16 +75,8 @@ ORDER BY
 
 // AddMsgLabels inserts the passed in msg labels to our db
 func AddMsgLabels(ctx context.Context, tx *sqlx.Tx, adds []*MsgLabelAdd) error {
-	is := make([]interface{}, len(adds))
-	for i := range adds {
-		is[i] = adds[i]
-	}
-
-	err := BulkQuery(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, is)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting new msg labels")
-	}
-	return nil
+	err := BulkQuery(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, adds)
+	return errors.Wrapf(err, "error inserting new msg labels")
 }
 
 const insertMsgLabelsSQL = `

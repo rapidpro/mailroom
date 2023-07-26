@@ -68,7 +68,7 @@ func (h *commitFieldChangesHook) Apply(ctx context.Context, rt *runtime.Runtime,
 	// first apply our deletes
 	// in pg9.6 we need to do this as one query per field type, in pg10 we can rewrite this to be a single query
 	for _, fds := range fieldDeletes {
-		err := models.BulkQuery(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fds)
+		err := models.BulkQuery(ctx, "deleting contact field values", tx, sqlDeleteContactFields, fds)
 		if err != nil {
 			return errors.Wrapf(err, "error deleting contact fields")
 		}
@@ -76,7 +76,7 @@ func (h *commitFieldChangesHook) Apply(ctx context.Context, rt *runtime.Runtime,
 
 	// then our updates
 	if len(fieldUpdates) > 0 {
-		err := models.BulkQuery(ctx, "updating contact field values", tx, updateContactFieldsSQL, fieldUpdates)
+		err := models.BulkQuery(ctx, "updating contact field values", tx, sqlUpdateContactFields, fieldUpdates)
 		if err != nil {
 			return errors.Wrapf(err, "error updating contact fields")
 		}
@@ -99,30 +99,14 @@ type FieldValue struct {
 	Text string `json:"text"`
 }
 
-const updateContactFieldsSQL = `
-UPDATE 
-	contacts_contact c
-SET
-	fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb,
-	modified_on = NOW()
-FROM (
-	VALUES(:contact_id, :updates)
-) AS
-	r(contact_id, updates)
-WHERE
-	c.id = r.contact_id::int
-`
+const sqlUpdateContactFields = `
+UPDATE contacts_contact c
+   SET fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb
+  FROM (VALUES(:contact_id, :updates)) AS r(contact_id, updates)
+ WHERE c.id = r.contact_id::int`
 
-const deleteContactFieldsSQL = `
-UPDATE 
-	contacts_contact c
-SET
-	fields = fields - r.field_uuid,
-	modified_on = NOW()
-FROM (
-	VALUES(:contact_id, :field_uuid)
-) AS
-	r(contact_id, field_uuid)
-WHERE
-	c.id = r.contact_id::int
-`
+const sqlDeleteContactFields = `
+UPDATE contacts_contact c
+   SET fields = fields - r.field_uuid
+  FROM (VALUES(:contact_id, :field_uuid)) AS r(contact_id, field_uuid)
+ WHERE c.id = r.contact_id::int`

@@ -53,49 +53,34 @@ type ContactImport struct {
 	BatchStatuses string `db:"batch_statuses"`
 }
 
-var loadContactImportSQL = `
-SELECT 
-	i.id AS "id",
-  	i.org_id AS "org_id",
-  	i.status AS "status",
-  	i.created_by_id AS "created_by_id",
-	i.finished_on AS "finished_on",
-	array_to_string(array_agg(DISTINCT b.status), '') AS "batch_statuses"
-FROM
-	contacts_contactimport i
-LEFT OUTER JOIN
-	contacts_contactimportbatch b ON b.contact_import_id = i.id
-WHERE
-	i.id = $1
-GROUP BY
-	i.id`
+var sqlLoadContactImport = `
+         SELECT i.id, i.org_id, i.status, i.created_by_id, i.finished_on, array_to_string(array_agg(DISTINCT b.status), '') AS "batch_statuses"
+           FROM contacts_contactimport i
+LEFT OUTER JOIN contacts_contactimportbatch b ON b.contact_import_id = i.id
+          WHERE i.id = $1
+       GROUP BY i.id`
 
 // LoadContactImport loads a contact import by ID
 func LoadContactImport(ctx context.Context, db Queryer, id ContactImportID) (*ContactImport, error) {
 	i := &ContactImport{}
-	err := db.GetContext(ctx, i, loadContactImportSQL, id)
+	err := db.GetContext(ctx, i, sqlLoadContactImport, id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contact import id=%d", id)
 	}
 	return i, nil
 }
 
-var markContactImportFinishedSQL = `
-UPDATE
-	contacts_contactimport
-SET
-	status = $2,
-	finished_on = $3
-WHERE 
-	id = $1
-`
+var sqlMarkContactImportFinished = `
+UPDATE contacts_contactimport
+   SET status = $2, finished_on = $3
+ WHERE id = $1`
 
 func (i *ContactImport) MarkFinished(ctx context.Context, db Queryer, status ContactImportStatus) error {
 	now := dates.Now()
 	i.Status = status
 	i.FinishedOn = &now
 
-	_, err := db.ExecContext(ctx, markContactImportFinishedSQL, i.ID, i.Status, i.FinishedOn)
+	_, err := db.ExecContext(ctx, sqlMarkContactImportFinished, i.ID, i.Status, i.FinishedOn)
 	return errors.Wrap(err, "error marking import as finished")
 }
 
@@ -311,7 +296,7 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 			numUpdated++
 		}
 		for _, e := range imp.errors {
-			importErrors = append(importErrors, importError{Record: imp.record, Message: e})
+			importErrors = append(importErrors, importError{Record: imp.record, Row: imp.spec.ImportRow, Message: e})
 		}
 	}
 
@@ -383,10 +368,13 @@ type ContactSpec struct {
 	URNs     []urns.URN         `json:"urns"`
 	Fields   map[string]string  `json:"fields"`
 	Groups   []assets.GroupUUID `json:"groups"`
+
+	ImportRow int `json:"_import_row"`
 }
 
 // an error message associated with a particular record
 type importError struct {
 	Record  int    `json:"record"`
+	Row     int    `json:"row"`
 	Message string `json:"message"`
 }

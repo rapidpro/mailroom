@@ -21,31 +21,18 @@ func init() {
 }
 
 const groupCountsSQL = `
-SELECT 
-  g.id AS id, 
-  g.name AS name, 
-  g.uuid AS uuid, 
-  g.group_type AS group_type, 
-  COALESCE(SUM(c.count), 0) AS count 
-FROM 
-  contacts_contactgroup g 
-LEFT OUTER JOIN 
-  contacts_contactgroupcount c 
-ON 
-  c.group_id = g.id 
-WHERE 
-  g.org_id = $1 AND 
-  g.is_active = TRUE 
-GROUP BY 
- g.id;
-`
+         SELECT g.id, g.name, g.uuid, g.is_system, COALESCE(SUM(c.count), 0) AS count 
+           FROM contacts_contactgroup g 
+LEFT OUTER JOIN contacts_contactgroupcount c ON c.group_id = g.id 
+          WHERE g.org_id = $1 AND g.is_active = TRUE 
+       GROUP BY g.id;`
 
 type groupCountRow struct {
-	ID    models.GroupID   `db:"id"`
-	Name  string           `db:"name"`
-	UUID  assets.GroupUUID `db:"uuid"`
-	Type  string           `db:"group_type"`
-	Count int64            `db:"count"`
+	ID       models.GroupID   `db:"id"`
+	Name     string           `db:"name"`
+	UUID     assets.GroupUUID `db:"uuid"`
+	IsSystem bool             `db:"is_system"`
+	Count    int64            `db:"count"`
 }
 
 func calculateGroupCounts(ctx context.Context, rt *runtime.Runtime, org *models.OrgReference) (*dto.MetricFamily, error) {
@@ -70,26 +57,26 @@ func calculateGroupCounts(ctx context.Context, rt *runtime.Runtime, org *models.
 		}
 
 		groupType := "user"
-		if row.Type != "U" {
+		if row.IsSystem {
 			groupType = "system"
 		}
 
 		family.Metric = append(family.Metric,
 			&dto.Metric{
 				Label: []*dto.LabelPair{
-					&dto.LabelPair{
+					{
 						Name:  proto.String("group_name"),
 						Value: proto.String(row.Name),
 					},
-					&dto.LabelPair{
+					{
 						Name:  proto.String("group_uuid"),
 						Value: proto.String(string(row.UUID)),
 					},
-					&dto.LabelPair{
+					{
 						Name:  proto.String("group_type"),
 						Value: proto.String(groupType),
 					},
-					&dto.LabelPair{
+					{
 						Name:  proto.String("org"),
 						Value: proto.String(org.Name),
 					},
@@ -105,26 +92,11 @@ func calculateGroupCounts(ctx context.Context, rt *runtime.Runtime, org *models.
 }
 
 const channelCountsSQL = `
-SELECT 
-  ch.id AS id, 
-  ch.uuid AS uuid, 
-  ch.name AS name, 
-  ch.role AS role,
-  ch.channel_type AS channel_type,
-  c.count_type AS count_type, 
-  COALESCE(SUM(c.count), 0) as count 
-FROM 
-  channels_channel ch 
-LEFT OUTER JOIN 
-  channels_channelcount c
-ON 
-  c.channel_id = ch.id 
-WHERE 
-  ch.org_id = $1 AND 
-  ch.is_active = TRUE
-GROUP BY 
-  (ch.id, c.count_type);
-`
+         SELECT ch.id, ch.uuid, ch.name, ch.role, ch.channel_type, c.count_type, COALESCE(SUM(c.count), 0) as count 
+           FROM channels_channel ch 
+LEFT OUTER JOIN channels_channelcount c ON c.channel_id = ch.id 
+          WHERE ch.org_id = $1 AND ch.is_active = TRUE
+       GROUP BY ch.id, c.count_type;`
 
 type channelCountRow struct {
 	ID          models.ChannelID   `db:"id"`
@@ -225,27 +197,27 @@ func calculateChannelCounts(ctx context.Context, rt *runtime.Runtime, org *model
 			family.Metric = append(family.Metric,
 				&dto.Metric{
 					Label: []*dto.LabelPair{
-						&dto.LabelPair{
+						{
 							Name:  proto.String("channel_name"),
 							Value: proto.String(channel.Name),
 						},
-						&dto.LabelPair{
+						{
 							Name:  proto.String("channel_uuid"),
 							Value: proto.String(string(channel.UUID)),
 						},
-						&dto.LabelPair{
+						{
 							Name:  proto.String("channel_type"),
 							Value: proto.String(channel.ChannelType),
 						},
-						&dto.LabelPair{
+						{
 							Name:  proto.String("msg_direction"),
 							Value: proto.String(direction),
 						},
-						&dto.LabelPair{
+						{
 							Name:  proto.String("msg_type"),
 							Value: proto.String(countType),
 						},
-						&dto.LabelPair{
+						{
 							Name:  proto.String("org"),
 							Value: proto.String(org.Name),
 						},

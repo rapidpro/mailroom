@@ -52,7 +52,7 @@ func handlePreMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// everybody else gets their timeout cleared, will be set by courier
-	scene.Session().ClearTimeoutOn()
+	scene.Session().ClearWaitTimeout(ctx, nil)
 
 	return nil
 }
@@ -107,7 +107,15 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		}
 	}
 
-	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), event.Msg, event.CreatedOn())
+	// and the flow
+	var flow *models.Flow
+	run, _ := scene.Session().FindStep(e.StepUUID())
+	flowAsset, _ := oa.FlowByUUID(run.FlowReference().UUID)
+	if flowAsset != nil {
+		flow = flowAsset.(*models.Flow)
+	}
+
+	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), flow, event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}

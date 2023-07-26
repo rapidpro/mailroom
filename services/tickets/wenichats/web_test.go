@@ -2,6 +2,7 @@ package wenichats_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -22,6 +23,7 @@ func TestEventCallback(t *testing.T) {
 		testdata.DefaultTopic,
 		"Have you seen my cookies?",
 		"e0fa6b4b-92c2-4906-98dc-e1a9f6b141d2",
+		time.Now(),
 		nil,
 	)
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -112,7 +113,7 @@ func TestBroadcastEvents(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
@@ -134,7 +135,7 @@ func TestBroadcastTask(t *testing.T) {
 	// insert a broadcast so we can check it is being set to sent
 	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
@@ -176,6 +177,7 @@ func TestBroadcastTask(t *testing.T) {
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
 		TicketID      models.TicketID
+		CreatedByID   models.UserID
 		Queue         string
 		BatchCount    int
 		MsgCount      int
@@ -189,7 +191,8 @@ func TestBroadcastTask(t *testing.T) {
 			doctorsOnly,
 			cathyOnly,
 			nil,
-			ticket.ID,
+			models.NilTicketID,
+			testdata.Admin.ID,
 			queue.BatchQueue,
 			2,
 			121,
@@ -204,6 +207,7 @@ func TestBroadcastTask(t *testing.T) {
 			cathyOnly,
 			nil,
 			models.NilTicketID,
+			models.NilUserID,
 			queue.HandlerQueue,
 			1,
 			1,
@@ -217,7 +221,8 @@ func TestBroadcastTask(t *testing.T) {
 			nil,
 			cathyOnly,
 			nil,
-			models.NilTicketID,
+			ticket.ID,
+			testdata.Agent.ID,
 			queue.HandlerQueue,
 			1,
 			1,
@@ -230,7 +235,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.CreatedByID)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -258,22 +263,29 @@ func TestBroadcastTask(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		// make sure our broadcast is marked as sent
 		if tc.BroadcastID != models.NilBroadcastID {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
+			assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
 				Returns(1, "%d: broadcast not marked as sent", i)
 		}
 
-		// if we had a ticket, make sure its last_activity_on was updated
+		// if we had a ticket, make sure its replied_on and last_activity_on were updated
 		if tc.TicketID != models.NilTicketID {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
+			assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
 				Returns(1, "%d: ticket last_activity_on not updated", i)
+			assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND replied_on IS NOT NULL`, tc.TicketID).
+				Returns(1, "%d: ticket replied_on not updated", i)
 		}
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
+
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text, ':u:', $2::text)`, testdata.Org1.ID, testdata.Agent.ID).Returns(1)
+
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailytiming WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
 }

@@ -35,21 +35,5 @@
         },
         "status": 200,
         "response_file": "testdata/multiple_flows.es.po"
-    },
-    {
-        "label": "export Spanish PO from flow exluding test arguments",
-        "method": "POST",
-        "path": "/mr/po/export",
-        "body": {
-            "org_id": 1,
-            "flow_ids": [
-                10000,
-                10001
-            ],
-            "language": "spa",
-            "exclude_arguments": true
-        },
-        "status": 200,
-        "response_file": "testdata/multiple_flows_noargs.es.po"
     }
 ]

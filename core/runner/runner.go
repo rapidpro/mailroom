@@ -6,16 +6,16 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,23 +31,13 @@ var startTypeToOrigin = map[models.StartType]string{
 	models.StartTypeAPIZapier: "zapier",
 }
 
-// NewStartOptions creates and returns the default start options to be used for flow starts
-func NewStartOptions() *StartOptions {
-	start := &StartOptions{
-		RestartParticipants: true,
-		IncludeActive:       true,
-		Interrupt:           true,
-	}
-	return start
-}
-
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
-	// RestartParticipants should be true if the flow start should restart participants already in this flow
-	RestartParticipants models.RestartParticipants
+	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
+	ExcludeInAFlow bool
 
-	// IncludeActive should be true if we want to interrupt people active in other flows (including this one)
-	IncludeActive models.IncludeActive
+	// ExcludeStartedPreviously excludes contacts who have been in this flow previously (at least as long as we have runs for)
+	ExcludeStartedPreviously bool
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -59,11 +49,20 @@ type StartOptions struct {
 	TriggerBuilder TriggerBuilder
 }
 
+// NewStartOptions creates and returns the default start options to be used for flow starts
+func NewStartOptions() *StartOptions {
+	return &StartOptions{
+		ExcludeInAFlow:           false,
+		ExcludeStartedPreviously: false,
+		Interrupt:                true,
+	}
+}
+
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
 type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // ResumeFlow resumes the passed in session using the passed in session
-func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
+func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, session *models.Session, contact *models.Contact, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
 	start := time.Now()
 	sa := oa.SessionAssets()
 
@@ -72,8 +71,8 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	if err != nil {
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
-			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
-			return nil, models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
+			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_uuid", session.UUID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow for resume")
+			return nil, models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusFailed)
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
 	}
@@ -85,9 +84,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// resume our session
-	resumeStart := time.Now()
 	sprint, err := fs.Resume(resume)
-	logrus.WithField("contact_id", resume.Contact().ID()).WithField("elapsed", time.Since(resumeStart)).Info("engine resume complete")
 
 	// had a problem resuming our flow? bail
 	if err != nil {
@@ -104,7 +101,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, rt, tx, oa, fs, sprint, hook)
+	err = session.Update(txCTX, rt, tx, oa, fs, sprint, contact, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -135,8 +132,8 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error committing session changes on resume")
 	}
-	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
 
+	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("session_uuid", session.UUID()).WithField("resume_type", resume.Type()).WithField("elapsed", time.Since(start)).Info("resumed session")
 	return session, nil
 }
 
@@ -204,14 +201,14 @@ func StartFlowBatch(
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(history, batch.ParentSummary())
+			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, batch.ParentSummary())
 			if batchStart {
 				tb = tb.AsBatch()
 			}
 			return tb.Build()
 		}
 
-		tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual()
+		tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual()
 		if batch.Extra() != nil {
 			tb = tb.WithParams(params)
 		}
@@ -234,8 +231,8 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.RestartParticipants = batch.RestartParticipants()
-	options.IncludeActive = batch.IncludeActive()
+	options.ExcludeStartedPreviously = batch.ExcludeStartedPreviously()
+	options.ExcludeInAFlow = batch.ExcludeInAFlow()
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -246,8 +243,8 @@ func StartFlowBatch(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
+	analytics.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
 
 	return sessions, nil
 }
@@ -292,7 +289,7 @@ func FireCampaignEvents(
 	}
 
 	// try to load our flow
-	flow, err := oa.Flow(flowUUID)
+	flow, err := oa.FlowByUUID(flowUUID)
 	if err == models.ErrNotFound {
 		err := models.DeleteEventFires(ctx, rt.DB, fires)
 		if err != nil {
@@ -309,16 +306,16 @@ func FireCampaignEvents(
 	options := NewStartOptions()
 	switch dbEvent.StartMode() {
 	case models.StartModeInterrupt:
-		options.IncludeActive = true
-		options.RestartParticipants = true
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	case models.StartModePassive:
-		options.IncludeActive = true
-		options.RestartParticipants = true
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = false
 	case models.StartModeSkip:
-		options.IncludeActive = false
-		options.RestartParticipants = true
+		options.ExcludeInAFlow = true
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
@@ -396,8 +393,8 @@ func FireCampaignEvents(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
+	analytics.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
 	// build the list of contacts actually started
 	startedContacts := make([]models.ContactID, len(sessions))
@@ -420,7 +417,7 @@ func StartFlow(
 	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
-	if !options.RestartParticipants {
+	if options.ExcludeStartedPreviously {
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
 		if err != nil {
@@ -432,9 +429,9 @@ func StartFlow(
 	}
 
 	// filter out our list of contacts to only include those that should be started
-	if !options.IncludeActive {
+	if options.ExcludeInAFlow {
 		// find all participants active in any flow
-		active, err := models.FindActiveSessionOverlap(ctx, rt.DB, flow.FlowType(), contactIDs)
+		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}
@@ -464,7 +461,7 @@ func StartFlow(
 	start := time.Now()
 
 	// map of locks we've released
-	released := make(map[string]bool)
+	released := make(map[*redisx.Locker]bool)
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
 		locked := make([]models.ContactID, 0, len(remaining))
@@ -473,8 +470,9 @@ func StartFlow(
 
 		// try up to a second to get a lock for a contact
 		for _, contactID := range remaining {
-			lockID := models.ContactLock(oa.OrgID(), contactID)
-			lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second)
+			locker := models.GetContactLocker(oa.OrgID(), contactID)
+
+			lock, err := locker.Grab(rt.RP, time.Second)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error attempting to grab lock")
 			}
@@ -487,8 +485,8 @@ func StartFlow(
 
 			// defer unlocking if we exit due to error
 			defer func() {
-				if !released[lockID] {
-					locker.ReleaseLock(rt.RP, lockID, lock)
+				if !released[locker] {
+					locker.Release(rt.RP, lock)
 				}
 			}()
 		}
@@ -510,7 +508,7 @@ func StartFlow(
 			triggers = append(triggers, trigger)
 		}
 
-		ss, err := StartFlowForContacts(ctx, rt, oa, flow, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, rt, oa, flow, contacts, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}
@@ -520,9 +518,9 @@ func StartFlow(
 
 		// release all our locks
 		for i := range locked {
-			lockID := models.ContactLock(oa.OrgID(), locked[i])
-			locker.ReleaseLock(rt.RP, lockID, locks[i])
-			released[lockID] = true
+			locker := models.GetContactLocker(oa.OrgID(), locked[i])
+			locker.Release(rt.RP, locks[i])
+			released[locker] = true
 		}
 
 		// skipped are now our remaining
@@ -535,7 +533,7 @@ func StartFlow(
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
 	ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
-	flow *models.Flow, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
+	flow *models.Flow, contacts []*models.Contact, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
 	sa := oa.SessionAssets()
 
 	// no triggers? nothing to do
@@ -561,7 +559,7 @@ func StartFlowForContacts(
 			continue
 		}
 		log.WithField("elapsed", time.Since(start)).Info("flow engine start")
-		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
+		analytics.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
 		sprints = append(sprints, sprint)
@@ -581,14 +579,14 @@ func StartFlowForContacts(
 	}
 
 	// build our list of contact ids
-	contactIDs := make([]flows.ContactID, len(triggers))
+	contactIDs := make([]models.ContactID, len(triggers))
 	for i := range triggers {
-		contactIDs[i] = triggers[i].Contact().ID()
+		contactIDs[i] = models.ContactID(triggers[i].Contact().ID())
 	}
 
 	// interrupt all our contacts if desired
 	if interrupt {
-		err = models.InterruptContactRuns(txCTX, tx, flow.FlowType(), contactIDs, start)
+		err = models.InterruptSessionsForContactsTx(txCTX, tx, contactIDs)
 		if err != nil {
 			tx.Rollback()
 			return nil, errors.Wrap(err, "error interrupting contacts")
@@ -596,7 +594,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, rt, tx, oa, sessions, sprints, hook)
+	dbSessions, err := models.InsertSessions(txCTX, rt, tx, oa, sessions, sprints, contacts, hook)
 	if err == nil {
 		// commit it at once
 		commitStart := time.Now()
@@ -617,6 +615,7 @@ func StartFlowForContacts(
 		for i := range sessions {
 			session := sessions[i]
 			sprint := sprints[i]
+			contact := contacts[i]
 
 			txCTX, cancel := context.WithTimeout(ctx, commitTimeout)
 			defer cancel()
@@ -628,7 +627,7 @@ func StartFlowForContacts(
 
 			// interrupt this contact if appropriate
 			if interrupt {
-				err = models.InterruptContactRuns(txCTX, tx, flow.FlowType(), []flows.ContactID{session.Contact().ID()}, start)
+				err = models.InterruptSessionsForContactsTx(txCTX, tx, []models.ContactID{models.ContactID(session.Contact().ID())})
 				if err != nil {
 					tx.Rollback()
 					log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
@@ -636,7 +635,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
+			dbSession, err := models.InsertSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, []*models.Contact{contact}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
@@ -720,7 +719,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	tx, _ := rt.DB.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID).
 		WithContactIDs(contactIDs)
 
 	// insert it

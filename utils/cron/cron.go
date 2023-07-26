@@ -1,23 +1,26 @@
 package cron
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/sirupsen/logrus"
 )
 
 // Function is the function that will be called on our schedule
-type Function func() error
+type Function func(context.Context, *runtime.Runtime) error
 
 // Start calls the passed in function every interval, making sure it acquires a
 // lock so that only one process is running at once. Note that across processes
 // crons may be called more often than duration as there is no inter-process
 // coordination of cron fires. (this might be a worthy addition)
-func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Duration, allInstances bool, cronFunc Function) {
+func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.Duration, allInstances bool, cronFunc Function, timeout time.Duration, quit chan bool) {
+	wg.Add(1) // add ourselves to the wait group
+
 	lockName := fmt.Sprintf("lock:%s_lock", name) // for historical reasons...
 
 	// for jobs that run on all instances, the lock key is specific to this instance
@@ -33,7 +36,10 @@ func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Durat
 	log := logrus.WithField("cron", name).WithField("lockName", lockName)
 
 	go func() {
-		defer log.Info("cron exiting")
+		defer func() {
+			log.Info("cron exiting")
+			wg.Done()
+		}()
 
 		for {
 			select {
@@ -57,15 +63,22 @@ func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Durat
 				}
 
 				// ok, got the lock, run our cron function
-				err = fireCron(cronFunc, lockName, lock)
+				start := time.Now()
+				err = fireCron(rt, cronFunc, lockName, lock)
 				if err != nil {
 					log.WithError(err).Error("error while running cron")
 				}
+				elapsed := time.Since(start)
 
 				// release our lock
 				err = locker.Release(rt.RP, lock)
 				if err != nil {
 					log.WithError(err).Error("error releasing lock")
+				}
+
+				// if cron too longer than a minute, log
+				if elapsed > time.Minute {
+					logrus.WithField("cron", name).WithField("elapsed", elapsed).Error("cron took too long")
 				}
 			}
 
@@ -81,8 +94,11 @@ func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Durat
 
 // fireCron is just a wrapper around the cron function we will call for the purposes of
 // catching and logging panics
-func fireCron(cronFunc Function, lockName string, lockValue string) error {
-	log := log.WithField("lockValue", lockValue).WithField("func", cronFunc)
+func fireCron(rt *runtime.Runtime, cronFunc Function, lockName string, lockValue string) error {
+	log := logrus.WithField("lockValue", lockValue).WithField("func", cronFunc)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
 
 	defer func() {
 		// catch any panics and recover
@@ -92,7 +108,7 @@ func fireCron(cronFunc Function, lockName string, lockValue string) error {
 		}
 	}()
 
-	return cronFunc()
+	return cronFunc(ctx, rt)
 }
 
 // NextFire returns the next time we should fire based on the passed in time and interval
