@@ -1,3 +1,8 @@
+v8.3.0 (2023-08-09)
+-------------------------
+ * Update to latest goflow
+ * Update to go 1.20
+
 v8.2.0 (2023-07-31)
 -------------------------
  * Add dockerfile for dev
