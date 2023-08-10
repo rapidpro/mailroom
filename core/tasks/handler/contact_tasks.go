@@ -350,7 +350,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// load our contact
-	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, event.ContactID)
+	db := rt.ReadonlyDB
+	if event.NewContact {
+		db = rt.DB // it might not be in the read replica yet
+	}
+	modelContact, err := models.LoadContact(ctx, db, oa, event.ContactID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
