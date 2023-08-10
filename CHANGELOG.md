@@ -1,3 +1,7 @@
+v8.3.1 (2023-08-10)
+-------------------------
+ * Always use main db to load contacts for msg events from new contacts
+
 v8.3.0 (2023-08-09)
 -------------------------
  * Update to latest goflow
