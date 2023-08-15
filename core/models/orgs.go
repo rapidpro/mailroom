@@ -107,9 +107,6 @@ func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
 
-// MaxValueLength returns our max value length for contact fields and run results
-func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
-
 // DefaultLocale combines the default languages and countries into a locale
 func (o *Org) DefaultLocale() envs.Locale { return o.env.DefaultLocale() }
 
@@ -221,7 +218,7 @@ func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID Or
 	start := time.Now()
 
 	org := &Org{}
-	rows, err := db.Queryx(selectOrgByID, orgID, cfg.MaxValueLength)
+	rows, err := db.Queryx(selectOrgByID, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
@@ -249,7 +246,6 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	'tt:mm' AS time_format,
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
-	$2::int AS max_value_length,
 	flow_languages AS allowed_languages,
 	COALESCE(
 		(

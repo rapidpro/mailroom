@@ -161,7 +161,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
-	svcs := goflow.Engine(rt.Config).Services()
+	eng := goflow.Engine(rt.Config)
 
 	// reuse id from one of our real flows
 	flowUUID := testdata.Favorites.UUID
@@ -229,7 +229,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 
 			// apply our modifiers
 			for _, mod := range mods {
-				modifiers.Apply(oa.Env(), svcs, oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
+				modifiers.Apply(eng, oa.Env(), oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
 			}
 
 			results[contact.ID()] = result

@@ -244,9 +244,9 @@ func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAsse
 // of the org, e.g. customer support.
 func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
-	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
+	env := flows.NewAssetsEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
-	svcs := goflow.Engine(rt.Config).Services()
+	eng := goflow.Engine(rt.Config)
 
 	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
 
@@ -254,7 +254,7 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, use
 	for contact, mods := range modifiersByContact {
 		events := make([]flows.Event, 0)
 		for _, mod := range mods {
-			modifiers.Apply(env, svcs, oa.SessionAssets(), contact, mod, func(e flows.Event) { events = append(events, e) })
+			modifiers.Apply(eng, env, oa.SessionAssets(), contact, mod, func(e flows.Event) { events = append(events, e) })
 		}
 		eventsByContact[contact] = events
 	}
