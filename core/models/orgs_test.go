@@ -40,7 +40,6 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.DateFormatDayMonthYear, org.DateFormat())
 	assert.Equal(t, envs.TimeFormatHourMinute, org.TimeFormat())
 	assert.Equal(t, envs.RedactionPolicyNone, org.RedactionPolicy())
-	assert.Equal(t, 640, org.MaxValueLength())
 	assert.Equal(t, string(envs.Country("US")), string(org.DefaultCountry()))
 	assert.Equal(t, tz, org.Timezone())
 	assert.Equal(t, []envs.Language{"fra", "eng"}, org.AllowedLanguages())

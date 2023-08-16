@@ -63,6 +63,8 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
+			WithMaxFieldChars(c.MaxValueLength).
+			WithMaxResultChars(c.MaxValueLength).
 			Build()
 	})
 
@@ -87,6 +89,8 @@ func Simulator(c *runtime.Config) flows.Engine {
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).  // and faked airtime transfers
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
+			WithMaxFieldChars(c.MaxValueLength).
+			WithMaxResultChars(c.MaxValueLength).
 			Build()
 	})
 

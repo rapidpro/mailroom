@@ -125,7 +125,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 
 	// run through each contact modifier, applying it to our contact
 	for _, m := range mods {
-		modifiers.Apply(oa.Env(), goflow.Engine(rt.Config).Services(), oa.SessionAssets(), flowContact, m, appender)
+		modifiers.Apply(goflow.Engine(rt.Config), oa.Env(), oa.SessionAssets(), flowContact, m, appender)
 	}
 
 	// set this updated contact on our session
