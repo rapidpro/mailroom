@@ -1,4 +1,4 @@
-name: Build Mailroom in SP, India and Ireland (Push Tag)
+name: Build Mailroom in India and Ireland (Push Tag)
 
 on:
   push:
