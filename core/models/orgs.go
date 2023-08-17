@@ -214,7 +214,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
 	flow_languages AS allowed_languages,
-	'{}'::varchar[] AS input_cleaners,
+	input_cleaners,
 	COALESCE(
 		(
 			SELECT country FROM channels_channel c
