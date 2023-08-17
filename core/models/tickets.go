@@ -371,10 +371,10 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 		return err
 	}
 
-	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountOpening, oa.Org().Timezone(), openingCounts); err != nil {
+	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountOpening, oa.Env().Timezone(), openingCounts); err != nil {
 		return err
 	}
-	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountAssignment, oa.Org().Timezone(), assignmentCounts); err != nil {
+	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountAssignment, oa.Env().Timezone(), assignmentCounts); err != nil {
 		return err
 	}
 
@@ -466,7 +466,7 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 		return nil, errors.Wrap(err, "error inserting notifications")
 	}
 
-	err = insertTicketDailyCounts(ctx, db, TicketDailyCountAssignment, oa.Org().Timezone(), assignmentCounts)
+	err = insertTicketDailyCounts(ctx, db, TicketDailyCountAssignment, oa.Env().Timezone(), assignmentCounts)
 	if err != nil {
 		return nil, errors.Wrap(err, "error inserting assignment counts")
 	}
@@ -928,12 +928,12 @@ func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID 
 		}
 	}
 
-	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
+	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Env().Timezone(), replyCounts); err != nil {
 		return err
 	}
 
 	if firstReplyTime >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Env().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
 			return err
 		}
 	}

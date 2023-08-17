@@ -441,7 +441,7 @@ func GetOrgAssetsWithRefresh(ctx context.Context, rt *runtime.Runtime, orgID Org
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
-func (a *OrgAssets) Env() envs.Environment { return a.org }
+func (a *OrgAssets) Env() envs.Environment { return a.org.env }
 
 func (a *OrgAssets) Org() *Org { return a.org }
 

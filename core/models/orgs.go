@@ -80,41 +80,8 @@ func (o *Org) ID() OrgID { return o.o.ID }
 // Suspended returns whether the org has been suspended
 func (o *Org) Suspended() bool { return o.o.Suspended }
 
-// DateFormat returns the date format for this org
-func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
-
-// NumberFormat returns the date format for this org
-func (o *Org) NumberFormat() *envs.NumberFormat { return envs.DefaultNumberFormat }
-
-// TimeFormat returns the time format for this org
-func (o *Org) TimeFormat() envs.TimeFormat { return o.env.TimeFormat() }
-
-// Timezone returns the timezone for this org
-func (o *Org) Timezone() *time.Location { return o.env.Timezone() }
-
-// DefaultLanguage returns the primary language for this org
-func (o *Org) DefaultLanguage() envs.Language { return o.env.DefaultLanguage() }
-
-// AllowedLanguages returns the list of supported languages for this org
-func (o *Org) AllowedLanguages() []envs.Language { return o.env.AllowedLanguages() }
-
-// RedactionPolicy returns the redaction policy (are we anonymous) for this org
-func (o *Org) RedactionPolicy() envs.RedactionPolicy { return o.env.RedactionPolicy() }
-
-// DefaultCountry returns the default country for this organization (mostly used for number parsing)
-func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
-
-// Now returns the current time in the current timezone for this org
-func (o *Org) Now() time.Time { return o.env.Now() }
-
-// DefaultLocale combines the default languages and countries into a locale
-func (o *Org) DefaultLocale() envs.Locale { return o.env.DefaultLocale() }
-
-// LocationResolver returns a resolver for locations
-func (o *Org) LocationResolver() envs.LocationResolver { return o.env.LocationResolver() }
-
-// Equal return whether we are equal to the passed in environment
-func (o *Org) Equal(env envs.Environment) bool { return o.env.Equal(env) }
+// Environment returns this org as an engine environment
+func (o *Org) Environment() envs.Environment { return o.env }
 
 // MarshalJSON is our custom marshaller so that our inner env get output
 func (o *Org) MarshalJSON() ([]byte, error) {
@@ -247,25 +214,14 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
 	flow_languages AS allowed_languages,
+	'{}'::varchar[] AS input_cleaners,
 	COALESCE(
 		(
-			SELECT
-				country
-			FROM
-				channels_channel c
-			WHERE
-				c.org_id = o.id AND
-				c.is_active = TRUE AND
-				c.country IS NOT NULL
-			GROUP BY
-				c.country
-			ORDER BY
-				count(c.country) desc,
-				country
-			LIMIT 1
-	), '') AS default_country
-	FROM 
-		orgs_org o
-	WHERE
-		o.id = $1
+			SELECT country FROM channels_channel c
+			WHERE c.org_id = o.id AND c.is_active = TRUE AND c.country IS NOT NULL
+			GROUP BY c.country ORDER BY count(c.country) desc, country LIMIT 1
+	    ), ''
+	) AS default_country
+	FROM orgs_org o
+	WHERE o.id = $1
 ) o`
