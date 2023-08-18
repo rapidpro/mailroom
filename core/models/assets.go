@@ -292,7 +292,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshLocations > 0 {
-		oa.locations, err = loadLocations(ctx, db, orgID)
+		oa.locations, err = loadLocations(ctx, db, oa)
 		oa.locationsBuiltAt = time.Now()
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group locations for org %d", orgID)
