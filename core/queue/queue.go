@@ -23,17 +23,19 @@ type Task struct {
 type Priority int
 
 const (
-	queuePattern  = "%s:%d"
-	activePattern = "%s:active"
+	// HighPriority is the highest priority for tasks
+	HighPriority = Priority(-10000000)
 
 	// DefaultPriority is the default priority for tasks
 	DefaultPriority = Priority(0)
 
-	// HighPriority is the highest priority for tasks
-	HighPriority = Priority(-10000000)
-
 	// LowPriority is the lowest priority for tasks
 	LowPriority = Priority(+10000000)
+)
+
+const (
+	queuePattern  = "%s:%d"
+	activePattern = "%s:active"
 
 	// BatchQueue is our queue for batch tasks, most things that operate on more than one cotact at a time
 	BatchQueue = "batch"
