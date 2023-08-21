@@ -1,3 +1,7 @@
+v8.3.5 (2023-08-21)
+-------------------------
+ * Use low priority tasks for batches of big blasts
+
 v8.3.4 (2023-08-21)
 -------------------------
  * Update to latest goflow that replaces input_cleaners with input_collation
