@@ -112,17 +112,24 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 		return nil
 	}
 
+	// split the contact ids into batches to become batch tasks
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
+
 	// by default we start in the batch queue unless we have two or fewer contacts
 	q := queue.BatchQueue
 	if len(contactIDs) <= 2 {
 		q = queue.HandlerQueue
 	}
 
+	// if this is a big multi batch blast, give it low priority
+	priority := queue.DefaultPriority
+	if len(idBatches) > 1 {
+		priority = queue.LowPriority
+	}
+
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	// create tasks for batches of contacts
-	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
 	for i, idBatch := range idBatches {
 		isLast := (i == len(idBatches)-1)
 
@@ -136,7 +143,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 			batchTask = &StartFlowBatchTask{FlowStartBatch: batch}
 		}
 
-		err = tasks.Queue(rc, q, start.OrgID, batchTask, queue.DefaultPriority)
+		err = tasks.Queue(rc, q, start.OrgID, batchTask, priority)
 		if err != nil {
 			if i == 0 {
 				return errors.Wrap(err, "error queuing flow start batch")
