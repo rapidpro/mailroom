@@ -1,3 +1,8 @@
+v8.3.4 (2023-08-21)
+-------------------------
+ * Update to latest goflow that replaces input_cleaners with input_collation
+ * Test on Postgres 15
+
 v8.3.3 (2023-08-17)
 -------------------------
  * Read input cleaners from org
