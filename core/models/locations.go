@@ -45,12 +45,12 @@ func (l *Location) Aliases() []string { return l.Aliases_ }
 func (l *Location) Children() []*Location { return l.Children_ }
 
 // loadLocations loads all the locations for this org returning the root node
-func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.LocationHierarchy, error) {
+func loadLocations(ctx context.Context, db sqlx.Queryer, oa *OrgAssets) ([]assets.LocationHierarchy, error) {
 	start := time.Now()
 
-	rows, err := db.Query(loadLocationsSQL, orgID)
+	rows, err := db.Query(loadLocationsSQL, oa.orgID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying locations for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying locations for org: %d", oa.orgID)
 	}
 	defer rows.Close()
 
@@ -103,12 +103,12 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	}
 
 	// then read it in
-	hierarchy, err := envs.ReadLocationHierarchy(locationJSON)
+	hierarchy, err := envs.ReadLocationHierarchy(oa.Env(), locationJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded locations")
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", oa.orgID).Debug("loaded locations")
 
 	return []assets.LocationHierarchy{hierarchy}, nil
 }
