@@ -1,3 +1,7 @@
+v8.3.7 (2023-08-23)
+-------------------------
+ * Use input_collation when matching msg triggers
+
 v8.3.6 (2023-08-23)
 -------------------------
  * Use input_collation set on org
