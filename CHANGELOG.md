@@ -1,3 +1,7 @@
+v8.3.6 (2023-08-23)
+-------------------------
+ * Use input_collation set on org
+
 v8.3.5 (2023-08-21)
 -------------------------
  * Use low priority tasks for batches of big blasts
