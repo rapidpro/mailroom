@@ -8,6 +8,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
@@ -125,12 +126,12 @@ func FindMatchingMsgTrigger(oa *OrgAssets, contact *flows.Contact, text string) 
 	only := false
 	if len(words) > 0 {
 		// our keyword is our first word
-		keyword = strings.ToLower(words[0])
+		keyword = words[0]
 		only = len(words) == 1
 	}
 
 	candidates := findTriggerCandidates(oa, KeywordTriggerType, func(t *Trigger) bool {
-		return t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only))
+		return envs.CollateEquals(oa.Env(), t.Keyword(), keyword) && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only))
 	})
 
 	// if we have a matching keyword trigger return that, otherwise we move on to catchall triggers..
@@ -220,7 +221,6 @@ type triggerMatch struct {
 // include (2) + exclude (1) = 3
 // include (2) = 2
 // exclude (1) = 1
-//
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
