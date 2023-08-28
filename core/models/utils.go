@@ -18,10 +18,11 @@ import (
 type Queryer interface {
 	dbutil.Queryer
 
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
-	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
-	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
+	GetContext(ctx context.Context, value any, query string, args ...any) error
 }
 
 // QueryerWithTx adds support for beginning transactions
