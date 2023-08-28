@@ -19,20 +19,18 @@ import (
 func TestOrgs(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
+	defer testsuite.Reset(testsuite.ResetAll)
+
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 
-	tx, err := rt.DB.BeginTxx(ctx, nil)
-	assert.NoError(t, err)
-	defer tx.Rollback()
+	rt.DB.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.TwitterChannel.ID)
+	rt.DB.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
 
-	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.TwitterChannel.ID)
-	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdata.Org2.ID)
 
-	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
-	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
-	tx.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdata.Org2.ID)
-
-	org, err := models.LoadOrg(ctx, rt.Config, tx, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, models.OrgID(1), org.ID())
@@ -46,14 +44,14 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.Language("fra"), org.Environment().DefaultLanguage())
 	assert.Equal(t, "fr-US", org.Environment().DefaultLocale().ToBCP47())
 
-	org, err = models.LoadOrg(ctx, rt.Config, tx, testdata.Org2.ID)
+	org, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org2.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, envs.DateFormatMonthDayYear, org.Environment().DateFormat())
 	assert.Equal(t, []envs.Language{}, org.Environment().AllowedLanguages())
 	assert.Equal(t, envs.NilLanguage, org.Environment().DefaultLanguage())
 	assert.Equal(t, "", org.Environment().DefaultLocale().ToBCP47())
 
-	_, err = models.LoadOrg(ctx, rt.Config, tx, 99)
+	_, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, 99)
 	assert.Error(t, err)
 }
 
@@ -65,7 +63,7 @@ func TestStoreAttachment(t *testing.T) {
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := models.LoadOrg(ctx, rt.Config, rt.DB, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(context.Background(), rt, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)

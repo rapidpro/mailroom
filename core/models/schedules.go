@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"time"
@@ -272,8 +273,8 @@ ORDER BY
 `
 
 // GetUnfiredSchedules returns all unfired schedules
-func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
-	rows, err := db.QueryxContext(ctx, selectUnfiredSchedules)
+func GetUnfiredSchedules(ctx context.Context, db *sql.DB) ([]*Schedule, error) {
+	rows, err := db.QueryContext(ctx, selectUnfiredSchedules)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting unfired schedules")
 	}

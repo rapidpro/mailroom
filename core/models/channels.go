@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"math"
@@ -129,8 +130,8 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 
 // GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending, and
 // that this function will return deleted channels.
-func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Channel, error) {
-	rows, err := db.QueryxContext(ctx, sqlSelectChannelsByID, pq.Array(ids))
+func GetChannelsByID(ctx context.Context, db *sql.DB, ids []ChannelID) ([]*Channel, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectChannelsByID, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels by id")
 	}
@@ -166,10 +167,10 @@ WHERE
 ) r;`
 
 // loadChannels loads all the channels for the passed in org
-func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channel, error) {
+func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channel, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, sqlSelectChannels, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectChannels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}

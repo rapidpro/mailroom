@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -64,10 +64,10 @@ func (t *TemplateTranslation) Namespace() string  { return t.t.Namespace }
 func (t *TemplateTranslation) VariableCount() int { return t.t.VariableCount }
 
 // loads the templates for the passed in org
-func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Template, error) {
+func loadTemplates(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Template, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(sqlSelectTemplates, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectTemplates, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying templates for org: %d", orgID)
 	}

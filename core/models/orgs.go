@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -181,11 +181,11 @@ func orgFromAssets(sa flows.SessionAssets) *Org {
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+func LoadOrg(ctx context.Context, cfg *runtime.Config, db *sql.DB, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}
-	rows, err := db.Queryx(selectOrgByID, orgID)
+	rows, err := db.QueryContext(ctx, selectOrgByID, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}

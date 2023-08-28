@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -33,10 +34,10 @@ func (r *Resthook) Slug() string { return r.r.Slug }
 func (r *Resthook) Subscribers() []string { return r.r.Subscribers }
 
 // loads the resthooks for the passed in org
-func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Resthook, error) {
+func loadResthooks(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Resthook, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectResthooksSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectResthooksSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying resthooks for org: %d", orgID)
 	}

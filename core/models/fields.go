@@ -2,9 +2,9 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
@@ -45,10 +45,10 @@ func (f *Field) Type() assets.FieldType { return f.f.Type }
 func (f *Field) System() bool { return f.f.System }
 
 // loadFields loads the assets for the passed in db
-func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, []assets.Field, error) {
+func loadFields(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Field, []assets.Field, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(sqlSelectFields, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectFields, orgID)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
 	}

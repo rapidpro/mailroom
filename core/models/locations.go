@@ -2,13 +2,13 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -45,10 +45,10 @@ func (l *Location) Aliases() []string { return l.Aliases_ }
 func (l *Location) Children() []*Location { return l.Children_ }
 
 // loadLocations loads all the locations for this org returning the root node
-func loadLocations(ctx context.Context, db sqlx.Queryer, oa *OrgAssets) ([]assets.LocationHierarchy, error) {
+func loadLocations(ctx context.Context, db *sql.DB, oa *OrgAssets) ([]assets.LocationHierarchy, error) {
 	start := time.Now()
 
-	rows, err := db.Query(loadLocationsSQL, oa.orgID)
+	rows, err := db.QueryContext(ctx, loadLocationsSQL, oa.orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying locations for org: %d", oa.orgID)
 	}

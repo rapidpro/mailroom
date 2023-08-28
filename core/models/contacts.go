@@ -270,7 +270,7 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 	contacts := make([]*Contact, 0, len(ids))
 	for rows.Next() {
 		e := &contactEnvelope{}
-		err := dbutil.ScanJSON(rows, e)
+		err := dbutil.ScanJSON(rows.Rows, e)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning contact json")
 		}
@@ -900,7 +900,7 @@ func URNForURN(ctx context.Context, db Queryer, oa *OrgAssets, u urns.URN) (urns
 		return urns.NilURN, errors.Errorf("no urn with identity: %s", u.Identity())
 	}
 
-	err = dbutil.ScanJSON(rows, urn)
+	err = dbutil.ScanJSON(rows.Rows, urn)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}
@@ -961,7 +961,7 @@ func URNForID(ctx context.Context, db Queryer, oa *OrgAssets, urnID URNID) (urns
 		return urns.NilURN, errors.Errorf("no urn with id: %d", urnID)
 	}
 
-	err = dbutil.ScanJSON(rows, urn)
+	err = dbutil.ScanJSON(rows.Rows, urn)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}

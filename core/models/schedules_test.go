@@ -64,7 +64,7 @@ func TestGetExpired(t *testing.T) {
 	assert.NoError(t, err)
 
 	// get expired schedules
-	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB)
+	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB.DB)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(schedules))
 

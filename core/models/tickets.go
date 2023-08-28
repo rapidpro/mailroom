@@ -833,8 +833,8 @@ WHERE
 `
 
 // LookupTicketerByUUID looks up the ticketer with the passed in UUID
-func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerUUID) (*Ticketer, error) {
-	rows, err := db.QueryxContext(ctx, sqlSelectTicketerByUUID, string(uuid))
+func LookupTicketerByUUID(ctx context.Context, db *sql.DB, uuid assets.TicketerUUID) (*Ticketer, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectTicketerByUUID, string(uuid))
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying for ticketer for uuid: %s", string(uuid))
 	}
@@ -872,10 +872,10 @@ ORDER BY
 `
 
 // loadTicketers loads all the ticketers for the passed in org
-func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Ticketer, error) {
+func loadTicketers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Ticketer, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(sqlSelectOrgTicketers, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectOrgTicketers, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying ticketers for org: %d", orgID)
 	}

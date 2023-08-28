@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -127,10 +127,10 @@ func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier
 }
 
 // loadClassifiers loads all the classifiers for the passed in org
-func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Classifier, error) {
+func loadClassifiers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Classifier, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(sqlSelectClassifiers, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectClassifiers, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying classifiers for org: %d", orgID)
 	}

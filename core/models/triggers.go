@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"strings"
 	"time"
@@ -93,10 +94,10 @@ func (t *Trigger) Match() *triggers.KeywordMatch {
 }
 
 // loadTriggers loads all non-schedule triggers for the passed in org
-func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, error) {
+func loadTriggers(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Trigger, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, selectTriggersSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectTriggersSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
 	}

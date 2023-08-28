@@ -33,7 +33,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 	defer rc.Close()
 
 	// get any expired schedules
-	unfired, err := models.GetUnfiredSchedules(ctx, rt.DB)
+	unfired, err := models.GetUnfiredSchedules(ctx, rt.DB.DB)
 	if err != nil {
 		return errors.Wrapf(err, "error while getting unfired schedules")
 	}

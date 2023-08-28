@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v2"
@@ -90,10 +89,10 @@ LEFT JOIN LATERAL (SELECT id, uuid, name FROM tickets_team WHERE tickets_team.id
 ) r;`
 
 // loadUsers loads all the users for the passed in org
-func loadUsers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.User, error) {
+func loadUsers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.User, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectOrgUsersSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectOrgUsersSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying users for org: %d", orgID)
 	}

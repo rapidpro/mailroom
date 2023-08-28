@@ -2,13 +2,12 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,10 +31,10 @@ func (g *Global) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, 
 func (g *Global) MarshalJSON() ([]byte, error) { return json.Marshal(g.g) }
 
 // loads the globals for the passed in org
-func loadGlobals(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Global, error) {
+func loadGlobals(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Global, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectGlobalsSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectGlobalsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying globals for org: %d", orgID)
 	}
