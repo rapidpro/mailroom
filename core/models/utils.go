@@ -14,8 +14,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Queryer contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
+// Queryer lets us pass anything that supports QueryContext to a function (sql.DB, sql.Tx, sqlx.DB, sqlx.Tx)
 type Queryer interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// DBorTxx contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
+type DBorTxx interface {
 	dbutil.Queryer
 
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -27,13 +32,13 @@ type Queryer interface {
 
 // QueryerWithTx adds support for beginning transactions
 type QueryerWithTx interface {
-	Queryer
+	DBorTxx
 
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
 }
 
 // BulkQuery runs the given query as a bulk operation
-func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string, structs []T) error {
+func BulkQuery[T any](ctx context.Context, label string, tx DBorTxx, sql string, structs []T) error {
 	// no values, nothing to do
 	if len(structs) == 0 {
 		return nil
@@ -52,7 +57,7 @@ func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string,
 }
 
 // BulkQueryBatches runs the given query as a bulk operation, in batches of the given size
-func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string, batchSize int, structs []interface{}) error {
+func BulkQueryBatches(ctx context.Context, label string, tx DBorTxx, sql string, batchSize int, structs []interface{}) error {
 	start := time.Now()
 
 	batches := ChunkSlice(structs, batchSize)

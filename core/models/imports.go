@@ -61,7 +61,7 @@ LEFT OUTER JOIN contacts_contactimportbatch b ON b.contact_import_id = i.id
        GROUP BY i.id`
 
 // LoadContactImport loads a contact import by ID
-func LoadContactImport(ctx context.Context, db Queryer, id ContactImportID) (*ContactImport, error) {
+func LoadContactImport(ctx context.Context, db DBorTxx, id ContactImportID) (*ContactImport, error) {
 	i := &ContactImport{}
 	err := db.GetContext(ctx, i, sqlLoadContactImport, id)
 	if err != nil {
@@ -75,7 +75,7 @@ UPDATE contacts_contactimport
    SET status = $2, finished_on = $3
  WHERE id = $1`
 
-func (i *ContactImport) MarkFinished(ctx context.Context, db Queryer, status ContactImportStatus) error {
+func (i *ContactImport) MarkFinished(ctx context.Context, db DBorTxx, status ContactImportStatus) error {
 	now := dates.Now()
 	i.Status = status
 	i.FinishedOn = &now
@@ -264,7 +264,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 }
 
 // loads any import contacts for which we have UUIDs
-func (b *ContactImportBatch) loadContactsByUUID(ctx context.Context, db Queryer, oa *OrgAssets, imports []*importContact) (map[flows.ContactUUID]*Contact, error) {
+func (b *ContactImportBatch) loadContactsByUUID(ctx context.Context, db DBorTxx, oa *OrgAssets, imports []*importContact) (map[flows.ContactUUID]*Contact, error) {
 	uuids := make([]flows.ContactUUID, 0, 50)
 	for _, imp := range imports {
 		if imp.spec.UUID != "" {
@@ -285,13 +285,13 @@ func (b *ContactImportBatch) loadContactsByUUID(ctx context.Context, db Queryer,
 	return contactsByUUID, nil
 }
 
-func (b *ContactImportBatch) markProcessing(ctx context.Context, db Queryer) error {
+func (b *ContactImportBatch) markProcessing(ctx context.Context, db DBorTxx) error {
 	b.Status = ContactImportStatusProcessing
 	_, err := db.ExecContext(ctx, `UPDATE contacts_contactimportbatch SET status = $2 WHERE id = $1`, b.ID, b.Status)
 	return err
 }
 
-func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, imports []*importContact) error {
+func (b *ContactImportBatch) markComplete(ctx context.Context, db DBorTxx, imports []*importContact) error {
 	numCreated := 0
 	numUpdated := 0
 	numErrored := 0
@@ -338,7 +338,7 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	return err
 }
 
-func (b *ContactImportBatch) markFailed(ctx context.Context, db Queryer) error {
+func (b *ContactImportBatch) markFailed(ctx context.Context, db DBorTxx) error {
 	now := dates.Now()
 	b.Status = ContactImportStatusFailed
 	b.FinishedOn = &now
@@ -360,7 +360,7 @@ WHERE
 	id = $1`
 
 // LoadContactImportBatch loads a contact import batch by ID
-func LoadContactImportBatch(ctx context.Context, db Queryer, id ContactImportBatchID) (*ContactImportBatch, error) {
+func LoadContactImportBatch(ctx context.Context, db DBorTxx, id ContactImportBatchID) (*ContactImportBatch, error) {
 	b := &ContactImportBatch{}
 	err := db.GetContext(ctx, b, loadContactImportBatchSQL, id)
 	if err != nil {

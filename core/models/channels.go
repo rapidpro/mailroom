@@ -228,7 +228,7 @@ ORDER BY
 ) r;`
 
 // OrgIDForChannelUUID returns the org id for the passed in channel UUID if any
-func OrgIDForChannelUUID(ctx context.Context, db Queryer, channelUUID assets.ChannelUUID) (OrgID, error) {
+func OrgIDForChannelUUID(ctx context.Context, db DBorTxx, channelUUID assets.ChannelUUID) (OrgID, error) {
 	var orgID OrgID
 	err := db.GetContext(ctx, &orgID, `SELECT org_id FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
 	if err != nil {

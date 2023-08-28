@@ -198,7 +198,7 @@ ORDER BY opened_on DESC
    LIMIT 1`
 
 // LoadOpenTicketForContact looks up the last opened open ticket for the passed in contact
-func LoadOpenTicketForContact(ctx context.Context, db Queryer, contact *Contact) (*Ticket, error) {
+func LoadOpenTicketForContact(ctx context.Context, db DBorTxx, contact *Contact) (*Ticket, error) {
 	tickets, err := loadTickets(ctx, db, sqlSelectLastOpenTicket, contact.ID())
 	if err != nil {
 		return nil, err
@@ -234,11 +234,11 @@ SELECT
 ORDER BY opened_on DESC`
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
+func LoadTickets(ctx context.Context, db DBorTxx, ids []TicketID) ([]*Ticket, error) {
 	return loadTickets(ctx, db, sqlSelectTicketsByID, pq.Array(ids))
 }
 
-func loadTickets(ctx context.Context, db Queryer, query string, params ...interface{}) ([]*Ticket, error) {
+func loadTickets(ctx context.Context, db DBorTxx, query string, params ...interface{}) ([]*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrap(err, "error loading tickets")
@@ -314,11 +314,11 @@ WHERE
   t.ticketer_id = $1 AND t.external_id = $2`
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
-func LookupTicketByExternalID(ctx context.Context, db Queryer, ticketerID TicketerID, externalID string) (*Ticket, error) {
+func LookupTicketByExternalID(ctx context.Context, db DBorTxx, ticketerID TicketerID, externalID string) (*Ticket, error) {
 	return lookupTicket(ctx, db, sqlSelectTicketByExternalID, ticketerID, externalID)
 }
 
-func lookupTicket(ctx context.Context, db Queryer, query string, params ...interface{}) (*Ticket, error) {
+func lookupTicket(ctx context.Context, db DBorTxx, query string, params ...interface{}) (*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -347,7 +347,7 @@ RETURNING
 `
 
 // InsertTickets inserts the passed in tickets returning any errors encountered
-func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ticket) error {
+func InsertTickets(ctx context.Context, tx DBorTxx, oa *OrgAssets, tickets []*Ticket) error {
 	if len(tickets) == 0 {
 		return nil
 	}
@@ -382,7 +382,7 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 }
 
 // UpdateTicketExternalID updates the external ID of the given ticket
-func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, externalID string) error {
+func UpdateTicketExternalID(ctx context.Context, db DBorTxx, ticket *Ticket, externalID string) error {
 	t := &ticket.t
 	t.ExternalID = null.String(externalID)
 
@@ -391,7 +391,7 @@ func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, ext
 }
 
 // UpdateTicketConfig updates the passed in ticket's config with any passed in values
-func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
+func UpdateTicketConfig(ctx context.Context, db DBorTxx, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
 	for key, value := range config {
 		t.Config[key] = value
@@ -402,7 +402,7 @@ func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config 
 }
 
 // UpdateTicketLastActivity updates the last_activity_on of the given tickets to be now
-func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket) error {
+func UpdateTicketLastActivity(ctx context.Context, db DBorTxx, tickets []*Ticket) error {
 	now := dates.Now()
 	ids := make([]TicketID, len(tickets))
 	for i, t := range tickets {
@@ -412,7 +412,7 @@ func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket
 	return updateTicketLastActivity(ctx, db, ids, now)
 }
 
-func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, now time.Time) error {
+func updateTicketLastActivity(ctx context.Context, db DBorTxx, ids []TicketID, now time.Time) error {
 	_, err := db.ExecContext(ctx, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 	return err
 }
@@ -423,7 +423,7 @@ UPDATE tickets_ticket
  WHERE id = ANY($1)`
 
 // TicketsAssign assigns the passed in tickets
-func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID) (map[*Ticket]*TicketEvent, error) {
+func TicketsAssign(ctx context.Context, db DBorTxx, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -479,7 +479,7 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 }
 
 // TicketsAddNote adds a note to the passed in tickets
-func TicketsAddNote(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
+func TicketsAddNote(ctx context.Context, db DBorTxx, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 
@@ -513,7 +513,7 @@ UPDATE tickets_ticket
  WHERE id = ANY($1)`
 
 // TicketsChangeTopic changes the topic of the passed in tickets
-func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, topicID TopicID) (map[*Ticket]*TicketEvent, error) {
+func TicketsChangeTopic(ctx context.Context, db DBorTxx, oa *OrgAssets, userID UserID, tickets []*Ticket, topicID TopicID) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -679,7 +679,7 @@ func ReopenTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, user
 }
 
 // because groups can be based on "tickets" need to recalculate after closing/reopening tickets
-func recalcGroupsForTicketChanges(ctx context.Context, db Queryer, oa *OrgAssets, contactIDs map[ContactID]bool) error {
+func recalcGroupsForTicketChanges(ctx context.Context, db DBorTxx, oa *OrgAssets, contactIDs map[ContactID]bool) error {
 	ids := make([]ContactID, 0, len(contactIDs))
 	for cid := range contactIDs {
 		ids = append(ids, cid)
@@ -711,7 +711,7 @@ RETURNING CASE WHEN t2.replied_on IS NULL THEN EXTRACT(EPOCH FROM (t1.replied_on
 // TicketRecordReplied records a ticket as being replied to, updating last_activity_on. If this is the first reply
 // to this ticket then replied_on is updated and the function returns the number of seconds between that and when
 // the ticket was opened.
-func TicketRecordReplied(ctx context.Context, db Queryer, ticketID TicketID, when time.Time) (time.Duration, error) {
+func TicketRecordReplied(ctx context.Context, db DBorTxx, ticketID TicketID, when time.Time) (time.Duration, error) {
 	rows, err := db.QueryxContext(ctx, sqlUpdateTicketRepliedOn, ticketID, when)
 	if err != nil && err != sql.ErrNoRows {
 		return -1, err
@@ -784,7 +784,7 @@ func (t *Ticketer) AsService(cfg *runtime.Config, ticketer *flows.Ticketer) (Tic
 }
 
 // UpdateConfig updates the configuration of this ticketer with the given values
-func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]string, remove map[string]bool) error {
+func (t *Ticketer) UpdateConfig(ctx context.Context, db DBorTxx, add map[string]string, remove map[string]bool) error {
 	for key, value := range add {
 		t.t.Config[key] = value
 	}
@@ -906,15 +906,15 @@ func (i TicketerID) Value() (driver.Value, error)  { return null.IntValue(i) }
 func (i *TicketerID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
 func (i TicketerID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
+func insertTicketDailyCounts(ctx context.Context, tx DBorTxx, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
 	return insertDailyCounts(ctx, tx, "tickets_ticketdailycount", countType, tz, scopeCounts)
 }
 
-func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
+func insertTicketDailyTiming(ctx context.Context, tx DBorTxx, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
 	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, duration)
 }
 
-func RecordTicketReply(ctx context.Context, db Queryer, oa *OrgAssets, ticketID TicketID, userID UserID) error {
+func RecordTicketReply(ctx context.Context, db DBorTxx, oa *OrgAssets, ticketID TicketID, userID UserID) error {
 	firstReplyTime, err := TicketRecordReplied(ctx, db, ticketID, dates.Now())
 	if err != nil {
 		return err

@@ -16,7 +16,7 @@ type contactAndChannel struct {
 }
 
 // SendMessages tries to send the given messages via Courier or Android syncing
-func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, fc *fcm.Client, msgs []*models.Msg) error {
+func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.DBorTxx, fc *fcm.Client, msgs []*models.Msg) error {
 	// messages to be sent by courier, organized by contact+channel
 	courierMsgs := make(map[contactAndChannel][]*models.Msg, 100)
 

@@ -100,7 +100,7 @@ SELECT ROW_TO_JSON(r) FROM (
 ) r;`
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
+func RemoveContactsFromGroups(ctx context.Context, tx DBorTxx, removals []*GroupRemove) error {
 	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removals)
 }
 
@@ -127,7 +127,7 @@ IN (
 `
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
+func AddContactsToGroups(ctx context.Context, tx DBorTxx, adds []*GroupAdd) error {
 	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
 }
 
@@ -147,7 +147,7 @@ ON CONFLICT
 `
 
 // ContactIDsForGroupIDs returns the unique contacts that are in the passed in groups
-func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) ([]ContactID, error) {
+func ContactIDsForGroupIDs(ctx context.Context, tx DBorTxx, groupIDs []GroupID) ([]ContactID, error) {
 	// now add all the ids for our groups
 	rows, err := tx.QueryxContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
 	if err != nil {
@@ -171,7 +171,7 @@ func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) 
 const updateGroupStatusSQL = `UPDATE contacts_contactgroup SET status = $2 WHERE id = $1`
 
 // UpdateGroupStatus updates the group status for the passed in group
-func UpdateGroupStatus(ctx context.Context, db Queryer, groupID GroupID, status GroupStatus) error {
+func UpdateGroupStatus(ctx context.Context, db DBorTxx, groupID GroupID, status GroupStatus) error {
 	_, err := db.ExecContext(ctx, updateGroupStatusSQL, groupID, status)
 	if err != nil {
 		return errors.Wrapf(err, "error updating group status for group: %d", groupID)

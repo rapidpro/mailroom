@@ -163,25 +163,25 @@ func (s *FlowStart) WithParams(params json.RawMessage) *FlowStart {
 }
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int) error {
+func MarkStartStarted(ctx context.Context, db DBorTxx, startID StartID, contactCount int) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	return errors.Wrapf(err, "error setting start as started")
 }
 
 // MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+func MarkStartComplete(ctx context.Context, db DBorTxx, startID StartID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	return errors.Wrapf(err, "error marking flow start as complete")
 }
 
 // MarkStartFailed sets the status for the passed in flow start to F
-func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
+func MarkStartFailed(ctx context.Context, db DBorTxx, startID StartID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
 	return errors.Wrapf(err, "error setting flow start as failed")
 }
 
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and params
-func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
+func GetFlowStartAttributes(ctx context.Context, db DBorTxx, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
 	err := db.GetContext(ctx, start, `SELECT id, uuid, flow_id, params, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
@@ -201,7 +201,7 @@ type startGroup struct {
 }
 
 // InsertFlowStarts inserts all the passed in starts
-func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) error {
+func InsertFlowStarts(ctx context.Context, db DBorTxx, starts []*FlowStart) error {
 	// insert our starts
 	err := BulkQuery(ctx, "inserting flow start", db, sqlInsertStart, starts)
 	if err != nil {

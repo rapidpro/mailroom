@@ -39,7 +39,7 @@ INSERT INTO api_webhookevent(data, resthook_id, org_id, created_on, action)
   RETURNING id`
 
 // InsertWebhookEvents inserts the passed in webhook events, assigning them ids
-func InsertWebhookEvents(ctx context.Context, db Queryer, events []*WebhookEvent) error {
+func InsertWebhookEvents(ctx context.Context, db DBorTxx, events []*WebhookEvent) error {
 	if len(events) == 0 {
 		return nil
 	}

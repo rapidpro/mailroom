@@ -354,7 +354,7 @@ WHERE
 
 // ArchiveContactTriggers removes the given contacts from any triggers and archives any triggers
 // which reference only those contacts
-func ArchiveContactTriggers(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+func ArchiveContactTriggers(ctx context.Context, tx DBorTxx, contactIDs []ContactID) error {
 	// start by getting all the active triggers that reference these contacts
 	rows, err := tx.QueryxContext(ctx, selectTriggersByContactIDsSQL, pq.Array(contactIDs))
 	if err != nil {

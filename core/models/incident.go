@@ -46,7 +46,7 @@ type Incident struct {
 }
 
 // End ends this incident
-func (i *Incident) End(ctx context.Context, db Queryer) error {
+func (i *Incident) End(ctx context.Context, db DBorTxx) error {
 	now := time.Now()
 	i.EndedOn = &now
 	_, err := db.ExecContext(ctx, `UPDATE notifications_incident SET ended_on = $2 WHERE id = $1`, i.ID, i.EndedOn)
@@ -54,7 +54,7 @@ func (i *Incident) End(ctx context.Context, db Queryer) error {
 }
 
 // IncidentWebhooksUnhealthy ensures there is an open unhealthy webhooks incident for the given org
-func IncidentWebhooksUnhealthy(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
+func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTxx, rp *redis.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
 	id, err := getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
 		Type:      IncidentTypeWebhooksUnhealthy,
@@ -88,7 +88,7 @@ INSERT INTO notifications_incident(org_id, incident_type, scope, started_on, cha
 ON CONFLICT DO NOTHING 
   RETURNING id`
 
-func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) (IncidentID, error) {
+func getOrCreateIncident(ctx context.Context, db DBorTxx, oa *OrgAssets, incident *Incident) (IncidentID, error) {
 	var incidentID IncidentID
 	err := db.GetContext(ctx, &incidentID, sqlInsertIncident, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn, incident.ChannelID)
 	if err != nil && err != sql.ErrNoRows {
@@ -117,7 +117,7 @@ SELECT id, org_id, incident_type, scope, started_on, ended_on, channel_id
   FROM notifications_incident
  WHERE ended_on IS NULL AND incident_type = ANY($1)`
 
-func GetOpenIncidents(ctx context.Context, db Queryer, types []IncidentType) ([]*Incident, error) {
+func GetOpenIncidents(ctx context.Context, db DBorTxx, types []IncidentType) ([]*Incident, error) {
 	rows, err := db.QueryxContext(ctx, sqlSelectOpenIncidents, pq.Array(types))
 	if err != nil {
 		return nil, errors.Wrap(err, "error querying open incidents")
