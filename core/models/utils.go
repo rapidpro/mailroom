@@ -21,9 +21,9 @@ type Queryer interface {
 
 // DBorTxx contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
 type DBorTxx interface {
-	dbutil.Queryer
+	Queryer
+	dbutil.BulkQueryer
 
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
 	SelectContext(ctx context.Context, dest any, query string, args ...any) error
