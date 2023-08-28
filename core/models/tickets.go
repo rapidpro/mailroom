@@ -385,7 +385,9 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, externalID string) error {
 	t := &ticket.t
 	t.ExternalID = null.String(externalID)
-	return Exec(ctx, "update ticket external ID", db, `UPDATE tickets_ticket SET external_id = $2 WHERE id = $1`, t.ID, t.ExternalID)
+
+	_, err := db.ExecContext(ctx, `UPDATE tickets_ticket SET external_id = $2 WHERE id = $1`, t.ID, t.ExternalID)
+	return errors.Wrap(err, "error updating ticket external id")
 }
 
 // UpdateTicketConfig updates the passed in ticket's config with any passed in values
@@ -395,7 +397,8 @@ func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config 
 		t.Config[key] = value
 	}
 
-	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
+	_, err := db.ExecContext(ctx, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
+	return errors.Wrap(err, "error updating ticket config")
 }
 
 // UpdateTicketLastActivity updates the last_activity_on of the given tickets to be now
@@ -410,7 +413,8 @@ func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket
 }
 
 func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, now time.Time) error {
-	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
+	_, err := db.ExecContext(ctx, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
+	return err
 }
 
 const sqlUpdateTicketsAssignment = `
@@ -451,7 +455,7 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	}
 
 	// mark the tickets as assigned in the db
-	err := Exec(ctx, "assign tickets", db, sqlUpdateTicketsAssignment, pq.Array(ids), assigneeID, now)
+	_, err := db.ExecContext(ctx, sqlUpdateTicketsAssignment, pq.Array(ids), assigneeID, now)
 	if err != nil {
 		return nil, errors.Wrap(err, "error updating tickets")
 	}
@@ -530,14 +534,14 @@ func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID U
 	}
 
 	// mark the tickets as assigned in the db
-	err := Exec(ctx, "change tickets topic", db, sqlUpdateTicketsTopic, pq.Array(ids), topicID, now)
+	_, err := db.ExecContext(ctx, sqlUpdateTicketsTopic, pq.Array(ids), topicID, now)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating tickets")
+		return nil, errors.Wrap(err, "error updating tickets")
 	}
 
 	err = InsertTicketEvents(ctx, db, events)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting ticket events")
+		return nil, errors.Wrap(err, "error inserting ticket events")
 	}
 
 	return eventsByTicket, nil
@@ -592,9 +596,9 @@ func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userI
 	}
 
 	// mark the tickets as closed in the db
-	err := Exec(ctx, "close tickets", rt.DB, sqlCloseTickets, pq.Array(ids), now)
+	_, err := rt.DB.ExecContext(ctx, sqlCloseTickets, pq.Array(ids), now)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating tickets")
+		return nil, errors.Wrap(err, "error updating tickets")
 	}
 
 	if err := InsertTicketEvents(ctx, rt.DB, events); err != nil {
@@ -657,7 +661,7 @@ func ReopenTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, user
 	}
 
 	// mark the tickets as opened in the db
-	err := Exec(ctx, "reopen tickets", rt.DB, sqlReopenTickets, pq.Array(ids), now)
+	_, err := rt.DB.ExecContext(ctx, sqlReopenTickets, pq.Array(ids), now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
@@ -794,7 +798,8 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]
 		dbMap[key] = value
 	}
 
-	return Exec(ctx, "update ticketer config", db, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.Map(dbMap))
+	_, err := db.ExecContext(ctx, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.Map(dbMap))
+	return errors.Wrap(err, "error updating ticketer config")
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages
