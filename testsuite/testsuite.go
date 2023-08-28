@@ -72,10 +72,10 @@ func Runtime() (context.Context, *runtime.Runtime) {
 	cfg := runtime.NewDefaultConfig()
 	cfg.ElasticContactsIndex = elasticContactsIndex
 
-	db := getDB()
+	dbx := getDB()
 	rt := &runtime.Runtime{
-		DB:                db,
-		ReadonlyDB:        db,
+		DB:                dbx,
+		ReadonlyDB:        dbx.DB,
 		RP:                getRP(),
 		ES:                es,
 		AttachmentStorage: storage.NewFS(attachmentStorageDir, 0766),

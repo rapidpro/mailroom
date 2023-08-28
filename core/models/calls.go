@@ -276,7 +276,7 @@ LIMIT
 `
 
 // LoadCallsToRetry returns up to limit calls that need to be retried
-func LoadCallsToRetry(ctx context.Context, db DBorTxx, limit int) ([]*Call, error) {
+func LoadCallsToRetry(ctx context.Context, db *sqlx.DB, limit int) ([]*Call, error) {
 	rows, err := db.QueryxContext(ctx, sqlSelectRetryCalls, limit)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting calls to retry")

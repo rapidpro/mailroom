@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
@@ -459,7 +460,7 @@ ORDER BY
 	id ASC`
 
 // GetMessagesByID fetches the messages with the given ids
-func GetMessagesByID(ctx context.Context, db DBorTxx, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
+func GetMessagesByID(ctx context.Context, db *sqlx.DB, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
 }
 
@@ -504,11 +505,11 @@ ORDER BY
 LIMIT 5000`
 
 // GetMessagesForRetry gets errored outgoing messages scheduled for retry, with an active channel
-func GetMessagesForRetry(ctx context.Context, db DBorTxx) ([]*Msg, error) {
+func GetMessagesForRetry(ctx context.Context, db *sqlx.DB) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
 
-func loadMessages(ctx context.Context, db DBorTxx, sql string, params ...interface{}) ([]*Msg, error) {
+func loadMessages(ctx context.Context, db *sqlx.DB, sql string, params ...interface{}) ([]*Msg, error) {
 	rows, err := db.QueryxContext(ctx, sql, params...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying msgs")

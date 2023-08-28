@@ -399,7 +399,7 @@ type EventFire struct {
 }
 
 // LoadEventFires loads all the event fires with the passed in ids
-func LoadEventFires(ctx context.Context, db DBorTxx, ids []FireID) ([]*EventFire, error) {
+func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []FireID) ([]*EventFire, error) {
 	start := time.Now()
 
 	q, vs, err := sqlx.In(sqlSelectEventFires, ids)
@@ -642,7 +642,7 @@ const sqlEligibleContactsForField = `
 INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
      WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND (c.fields->$2->>'datetime')::timestamptz IS NOT NULL`
 
-func campaignEventEligibleContacts(ctx context.Context, db DBorTxx, groupID GroupID, field *Field) ([]*eligibleContact, error) {
+func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string
 	var params []interface{}
 

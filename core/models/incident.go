@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/flows"
@@ -117,7 +118,7 @@ SELECT id, org_id, incident_type, scope, started_on, ended_on, channel_id
   FROM notifications_incident
  WHERE ended_on IS NULL AND incident_type = ANY($1)`
 
-func GetOpenIncidents(ctx context.Context, db DBorTxx, types []IncidentType) ([]*Incident, error) {
+func GetOpenIncidents(ctx context.Context, db *sqlx.DB, types []IncidentType) ([]*Incident, error) {
 	rows, err := db.QueryxContext(ctx, sqlSelectOpenIncidents, pq.Array(types))
 	if err != nil {
 		return nil, errors.Wrap(err, "error querying open incidents")

@@ -350,7 +350,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// load our contact
-	db := rt.ReadonlyDB
+	var db models.Queryer = rt.ReadonlyDB
 	if event.NewContact {
 		db = rt.DB // it might not be in the read replica yet
 	}

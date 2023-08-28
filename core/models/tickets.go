@@ -198,7 +198,7 @@ ORDER BY opened_on DESC
    LIMIT 1`
 
 // LoadOpenTicketForContact looks up the last opened open ticket for the passed in contact
-func LoadOpenTicketForContact(ctx context.Context, db DBorTxx, contact *Contact) (*Ticket, error) {
+func LoadOpenTicketForContact(ctx context.Context, db *sqlx.DB, contact *Contact) (*Ticket, error) {
 	tickets, err := loadTickets(ctx, db, sqlSelectLastOpenTicket, contact.ID())
 	if err != nil {
 		return nil, err
@@ -234,11 +234,11 @@ SELECT
 ORDER BY opened_on DESC`
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db DBorTxx, ids []TicketID) ([]*Ticket, error) {
+func LoadTickets(ctx context.Context, db *sqlx.DB, ids []TicketID) ([]*Ticket, error) {
 	return loadTickets(ctx, db, sqlSelectTicketsByID, pq.Array(ids))
 }
 
-func loadTickets(ctx context.Context, db DBorTxx, query string, params ...interface{}) ([]*Ticket, error) {
+func loadTickets(ctx context.Context, db *sqlx.DB, query string, params ...interface{}) ([]*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrap(err, "error loading tickets")
