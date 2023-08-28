@@ -26,7 +26,7 @@ func TestTicketers(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// can load directly by UUID
-	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Zendesk.UUID)
+	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB.DB, testdata.Zendesk.UUID)
 	assert.NoError(t, err)
 	assert.Equal(t, testdata.Zendesk.ID, ticketer.ID())
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())

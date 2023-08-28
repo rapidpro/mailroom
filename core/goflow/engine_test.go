@@ -62,7 +62,7 @@ func TestSimulatorAirtime(t *testing.T) {
 func TestSimulatorTicket(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
+	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB.DB, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
 	svc, err := goflow.Simulator(rt.Config).Services().Ticket(flows.NewTicketer(ticketer))

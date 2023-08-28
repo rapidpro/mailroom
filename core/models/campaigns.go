@@ -257,10 +257,10 @@ func (e *CampaignEvent) Campaign() *Campaign { return e.campaign }
 func (e *CampaignEvent) StartMode() StartMode { return e.e.StartMode }
 
 // loadCampaigns loads all the campaigns for the passed in org
-func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campaign, error) {
+func loadCampaigns(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Campaign, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectCampaignsSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectCampaignsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying campaigns for org: %d", orgID)
 	}

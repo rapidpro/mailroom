@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
@@ -62,10 +61,10 @@ ORDER BY
 `
 
 // loadTopics loads all the topics for the passed in org
-func loadTopics(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Topic, error) {
+func loadTopics(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Topic, error) {
 	start := dates.Now()
 
-	rows, err := db.Queryx(selectOrgTopicsSQL, orgID)
+	rows, err := db.QueryContext(ctx, selectOrgTopicsSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying topics for org: %d", orgID)
 	}

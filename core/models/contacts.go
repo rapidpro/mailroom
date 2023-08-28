@@ -261,7 +261,7 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, sqlSelectContact, pq.Array(ids), oa.OrgID())
+	rows, err := db.QueryContext(ctx, sqlSelectContact, pq.Array(ids), oa.OrgID())
 	if err != nil {
 		return nil, errors.Wrap(err, "error selecting contacts")
 	}
@@ -887,7 +887,7 @@ func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID U
 // set that goflow and mailroom depend on.
 func URNForURN(ctx context.Context, db Queryer, oa *OrgAssets, u urns.URN) (urns.URN, error) {
 	urn := &ContactURN{}
-	rows, err := db.QueryxContext(ctx,
+	rows, err := db.QueryContext(ctx,
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
 		u.Identity(), oa.OrgID(),
 	)
@@ -948,7 +948,7 @@ func GetOrCreateURN(ctx context.Context, db Queryer, oa *OrgAssets, contactID Co
 // but occasionally we need to load URNs one by one and this accomplishes that
 func URNForID(ctx context.Context, db Queryer, oa *OrgAssets, urnID URNID) (urns.URN, error) {
 	urn := &ContactURN{}
-	rows, err := db.QueryxContext(ctx,
+	rows, err := db.QueryContext(ctx,
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
 		urnID,
 	)

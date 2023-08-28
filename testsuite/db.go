@@ -41,6 +41,13 @@ func (d *MockDB) Rebind(query string) string {
 	return d.real.Rebind(query)
 }
 
+func (d *MockDB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	if err := d.check("QueryContext"); err != nil {
+		return nil, err
+	}
+	return d.real.QueryContext(ctx, query, args...)
+}
+
 func (d *MockDB) QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
 	if err := d.check("QueryxContext"); err != nil {
 		return nil, err

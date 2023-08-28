@@ -63,7 +63,7 @@ func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketU
 
 // FromTicketerUUID takes a ticketer UUID and looks up the ticketer and creates the service
 func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
-	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, uuid)
+	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB.DB, uuid)
 	if err != nil || ticketer == nil || ticketer.Type() != ticketerType {
 		return nil, nil, errors.Errorf("error looking up ticketer %s", uuid)
 	}

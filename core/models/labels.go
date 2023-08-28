@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
@@ -33,10 +34,10 @@ func (l *Label) UUID() assets.LabelUUID { return l.l.UUID }
 func (l *Label) Name() string { return l.l.Name }
 
 // loads the labels for the passed in org
-func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Label, error) {
+func loadLabels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Label, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(sqlSelectLabels, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectLabels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
 	}

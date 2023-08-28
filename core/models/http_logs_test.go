@@ -56,7 +56,7 @@ func TestHTTPLogger(t *testing.T) {
 		},
 	}))
 
-	mailgun, err := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
+	mailgun, err := models.LookupTicketerByUUID(ctx, rt.DB.DB, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
 	logger := &models.HTTPLogger{}

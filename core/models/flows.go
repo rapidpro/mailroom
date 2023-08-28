@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -132,24 +133,24 @@ func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 	return flowID, err
 }
 
-func LoadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+func LoadFlowByUUID(ctx context.Context, db *sql.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByUUID, orgID, flowUUID)
 }
 
-func LoadFlowByName(ctx context.Context, db Queryer, orgID OrgID, name string) (*Flow, error) {
+func LoadFlowByName(ctx context.Context, db *sql.DB, orgID OrgID, name string) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByName, orgID, name)
 }
 
-func LoadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
+func LoadFlowByID(ctx context.Context, db *sql.DB, orgID OrgID, flowID FlowID) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByID, orgID, flowID)
 }
 
 // loads the flow with the passed in UUID
-func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+func loadFlow(ctx context.Context, db *sql.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
 	start := time.Now()
 	flow := &Flow{}
 
-	rows, err := db.QueryxContext(ctx, sql, orgID, arg)
+	rows, err := db.QueryContext(ctx, sql, orgID, arg)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying flow by: %v", arg)
 	}

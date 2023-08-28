@@ -31,7 +31,7 @@ func TestWithHTTPLogs(t *testing.T) {
 	}))
 
 	handler := func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
-		ticketer, _ := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
+		ticketer, _ := models.LookupTicketerByUUID(ctx, rt.DB.DB, testdata.Mailgun.UUID)
 
 		logger := l.Ticketer(ticketer)
 
