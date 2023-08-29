@@ -149,22 +149,17 @@ ON CONFLICT
 // ContactIDsForGroupIDs returns the unique contacts that are in the passed in groups
 func ContactIDsForGroupIDs(ctx context.Context, tx DBorTx, groupIDs []GroupID) ([]ContactID, error) {
 	// now add all the ids for our groups
-	rows, err := tx.QueryxContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contacts for groups")
 	}
-	defer rows.Close()
 
 	contactIDs := make([]ContactID, 0, 10)
-	var contactID ContactID
-	for rows.Next() {
-		err := rows.Scan(&contactID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error scanning contact id")
-		}
-		contactIDs = append(contactIDs, contactID)
-	}
 
+	contactIDs, err = dbutil.ScanAllSlice(rows, contactIDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error scanning contact ids")
+	}
 	return contactIDs, nil
 }
 

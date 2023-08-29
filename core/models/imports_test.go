@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -222,16 +223,13 @@ func TestContactSpecUnmarshal(t *testing.T) {
 
 // utility to load all contacts for the given org and return as slice sorted by ID
 func loadAllContacts(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) []*flows.Contact {
-	rows, err := rt.DB.Queryx(`SELECT id FROM contacts_contact WHERE org_id = $1`, oa.OrgID())
+	rows, err := rt.DB.Query(`SELECT id FROM contacts_contact WHERE org_id = $1`, oa.OrgID())
 	require.NoError(t, err)
-	defer rows.Close()
 
 	var allIDs []models.ContactID
-	var id models.ContactID
-	for rows.Next() {
-		rows.Scan(&id)
-		allIDs = append(allIDs, id)
-	}
+
+	allIDs, err = dbutil.ScanAllSlice(rows, allIDs)
+	require.NoError(t, err)
 
 	contacts, err := models.LoadContacts(context.Background(), rt.DB, oa, allIDs)
 	require.NoError(t, err)

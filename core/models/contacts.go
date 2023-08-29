@@ -403,20 +403,16 @@ func getContactIDsFromUUIDs(ctx context.Context, db Queryer, orgID OrgID, uuids 
 
 // utility to query contact IDs
 func queryContactIDs(ctx context.Context, db Queryer, query string, args ...any) ([]ContactID, error) {
-	ids := make([]ContactID, 0, 10)
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying contact ids")
 	}
-	defer rows.Close()
 
-	var id ContactID
-	for rows.Next() {
-		err := rows.Scan(&id)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error scanning contact id")
-		}
-		ids = append(ids, id)
+	ids := make([]ContactID, 0, 10)
+
+	ids, err = dbutil.ScanAllSlice(rows, ids)
+	if err != nil {
+		return nil, errors.Wrap(err, "error scanning contact ids")
 	}
 	return ids, nil
 }
