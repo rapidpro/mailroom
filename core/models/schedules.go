@@ -91,7 +91,7 @@ func (s *Schedule) Timezone() (*time.Location, error) {
 }
 
 // UpdateFires updates the next and last fire for a shedule on the db
-func (s *Schedule) UpdateFires(ctx context.Context, tx DBorTxx, last time.Time, next *time.Time) error {
+func (s *Schedule) UpdateFires(ctx context.Context, tx DBorTx, last time.Time, next *time.Time) error {
 	_, err := tx.ExecContext(ctx, `UPDATE schedules_schedule SET last_fire = $2, next_fire = $3 WHERE id = $1`,
 		s.s.ID, last, next,
 	)

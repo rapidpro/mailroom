@@ -47,7 +47,7 @@ type Incident struct {
 }
 
 // End ends this incident
-func (i *Incident) End(ctx context.Context, db DBorTxx) error {
+func (i *Incident) End(ctx context.Context, db DBorTx) error {
 	now := time.Now()
 	i.EndedOn = &now
 	_, err := db.ExecContext(ctx, `UPDATE notifications_incident SET ended_on = $2 WHERE id = $1`, i.ID, i.EndedOn)
@@ -55,7 +55,7 @@ func (i *Incident) End(ctx context.Context, db DBorTxx) error {
 }
 
 // IncidentWebhooksUnhealthy ensures there is an open unhealthy webhooks incident for the given org
-func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTxx, rp *redis.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
+func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
 	id, err := getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
 		Type:      IncidentTypeWebhooksUnhealthy,
@@ -89,7 +89,7 @@ INSERT INTO notifications_incident(org_id, incident_type, scope, started_on, cha
 ON CONFLICT DO NOTHING 
   RETURNING id`
 
-func getOrCreateIncident(ctx context.Context, db DBorTxx, oa *OrgAssets, incident *Incident) (IncidentID, error) {
+func getOrCreateIncident(ctx context.Context, db DBorTx, oa *OrgAssets, incident *Incident) (IncidentID, error) {
 	var incidentID IncidentID
 	err := db.GetContext(ctx, &incidentID, sqlInsertIncident, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn, incident.ChannelID)
 	if err != nil && err != sql.ErrNoRows {

@@ -22,7 +22,7 @@ type dailyCount struct {
 
 const sqlInsertDailyCount = `INSERT INTO %s(count_type, scope, day, count, is_squashed) VALUES(:count_type, :scope, :day, :count, FALSE)`
 
-func insertDailyCounts(ctx context.Context, tx DBorTxx, table string, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
+func insertDailyCounts(ctx context.Context, tx DBorTx, table string, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
 	day := dates.ExtractDate(dates.Now().In(tz))
 
 	counts := make([]*dailyCount, 0, len(scopeCounts))
@@ -48,7 +48,7 @@ type dailyTiming struct {
 
 const sqlInsertDailyTiming = `INSERT INTO %s(count_type, scope, day, count, seconds, is_squashed) VALUES(:count_type, :scope, :day, :count, :seconds, FALSE)`
 
-func insertDailyTiming(ctx context.Context, tx DBorTxx, table string, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
+func insertDailyTiming(ctx context.Context, tx DBorTx, table string, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
 	day := dates.ExtractDate(dates.Now().In(tz))
 	timing := &dailyTiming{
 		dailyCount: dailyCount{

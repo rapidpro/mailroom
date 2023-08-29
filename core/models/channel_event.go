@@ -84,7 +84,7 @@ INSERT INTO channels_channelevent(event_type, extra, occurred_on, created_on, ch
 
 // Insert inserts this channel event to our DB. The ID of the channel event will be
 // set if no error is returned
-func (e *ChannelEvent) Insert(ctx context.Context, db DBorTxx) error {
+func (e *ChannelEvent) Insert(ctx context.Context, db DBorTx) error {
 	return BulkQuery(ctx, "insert channel event", db, sqlInsertChannelEvent, []interface{}{&e.e})
 }
 

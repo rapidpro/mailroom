@@ -195,7 +195,7 @@ WHERE
 `
 
 // GetCallByID loads a call by id
-func GetCallByID(ctx context.Context, db DBorTxx, orgID OrgID, id CallID) (*Call, error) {
+func GetCallByID(ctx context.Context, db DBorTx, orgID OrgID, id CallID) (*Call, error) {
 	c := &Call{}
 	err := db.GetContext(ctx, &c.c, sqlSelectCallByID, orgID, id)
 	if err != nil {
@@ -235,7 +235,7 @@ LIMIT 1
 `
 
 // GetCallByExternalID loads a call by its external ID
-func GetCallByExternalID(ctx context.Context, db DBorTxx, channelID ChannelID, externalID string) (*Call, error) {
+func GetCallByExternalID(ctx context.Context, db DBorTx, channelID ChannelID, externalID string) (*Call, error) {
 	c := &Call{}
 	err := db.GetContext(ctx, &c.c, sqlSelectCallByExternalID, channelID, externalID)
 	if err != nil {
@@ -297,7 +297,7 @@ func LoadCallsToRetry(ctx context.Context, db *sqlx.DB, limit int) ([]*Call, err
 }
 
 // UpdateExternalID updates the external id on the passed in channel session
-func (c *Call) UpdateExternalID(ctx context.Context, db DBorTxx, id string) error {
+func (c *Call) UpdateExternalID(ctx context.Context, db DBorTx, id string) error {
 	c.c.ExternalID = id
 	c.c.Status = CallStatusWired
 
@@ -310,7 +310,7 @@ func (c *Call) UpdateExternalID(ctx context.Context, db DBorTxx, id string) erro
 }
 
 // MarkStarted updates the status for this call as well as sets the started on date
-func (c *Call) MarkStarted(ctx context.Context, db DBorTxx, now time.Time) error {
+func (c *Call) MarkStarted(ctx context.Context, db DBorTx, now time.Time) error {
 	c.c.Status = CallStatusInProgress
 	c.c.StartedOn = &now
 
@@ -323,7 +323,7 @@ func (c *Call) MarkStarted(ctx context.Context, db DBorTxx, now time.Time) error
 }
 
 // MarkErrored updates the status for this call to errored and schedules a retry if appropriate
-func (c *Call) MarkErrored(ctx context.Context, db DBorTxx, now time.Time, retryWait *time.Duration, errorReason CallError) error {
+func (c *Call) MarkErrored(ctx context.Context, db DBorTx, now time.Time, retryWait *time.Duration, errorReason CallError) error {
 	c.c.Status = CallStatusErrored
 	c.c.ErrorReason = null.String(errorReason)
 	c.c.EndedOn = &now
@@ -350,7 +350,7 @@ func (c *Call) MarkErrored(ctx context.Context, db DBorTxx, now time.Time, retry
 }
 
 // MarkFailed updates the status for this call to failed
-func (c *Call) MarkFailed(ctx context.Context, db DBorTxx, now time.Time) error {
+func (c *Call) MarkFailed(ctx context.Context, db DBorTx, now time.Time) error {
 	c.c.Status = CallStatusFailed
 	c.c.EndedOn = &now
 
@@ -367,7 +367,7 @@ func (c *Call) MarkFailed(ctx context.Context, db DBorTxx, now time.Time) error 
 }
 
 // MarkThrottled updates the status for this call to be queued, to be retried in a minute
-func (c *Call) MarkThrottled(ctx context.Context, db DBorTxx, now time.Time) error {
+func (c *Call) MarkThrottled(ctx context.Context, db DBorTx, now time.Time) error {
 	c.c.Status = CallStatusQueued
 	next := now.Add(CallThrottleWait)
 	c.c.NextAttempt = &next
@@ -381,7 +381,7 @@ func (c *Call) MarkThrottled(ctx context.Context, db DBorTxx, now time.Time) err
 }
 
 // UpdateStatus updates the status for this call
-func (c *Call) UpdateStatus(ctx context.Context, db DBorTxx, status CallStatus, duration int, now time.Time) error {
+func (c *Call) UpdateStatus(ctx context.Context, db DBorTx, status CallStatus, duration int, now time.Time) error {
 	c.c.Status = status
 	var err error
 
@@ -402,7 +402,7 @@ func (c *Call) UpdateStatus(ctx context.Context, db DBorTxx, status CallStatus, 
 }
 
 // BulkUpdateCallStatuses updates the status for all the passed in call ids
-func BulkUpdateCallStatuses(ctx context.Context, db DBorTxx, callIDs []CallID, status CallStatus) error {
+func BulkUpdateCallStatuses(ctx context.Context, db DBorTx, callIDs []CallID, status CallStatus) error {
 	if len(callIDs) == 0 {
 		return nil
 	}
@@ -418,7 +418,7 @@ func BulkUpdateCallStatuses(ctx context.Context, db DBorTxx, callIDs []CallID, s
 	return nil
 }
 
-func (c *Call) AttachLog(ctx context.Context, db DBorTxx, clog *ChannelLog) error {
+func (c *Call) AttachLog(ctx context.Context, db DBorTx, clog *ChannelLog) error {
 	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
 	if err != nil {
 		return errors.Wrap(err, "error attaching log to call")
@@ -429,7 +429,7 @@ func (c *Call) AttachLog(ctx context.Context, db DBorTxx, clog *ChannelLog) erro
 }
 
 // ActiveCallCount returns the number of ongoing calls for the passed in channel
-func ActiveCallCount(ctx context.Context, db DBorTxx, id ChannelID) (int, error) {
+func ActiveCallCount(ctx context.Context, db DBorTx, id ChannelID) (int, error) {
 	count := 0
 	err := db.GetContext(ctx, &count, `SELECT count(*) FROM ivr_call WHERE channel_id = $1 AND (status = 'W' OR status = 'I')`, id)
 	if err != nil {

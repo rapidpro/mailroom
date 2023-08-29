@@ -103,7 +103,7 @@ RETURNING
 	id
 `
 
-func InsertTicketEvents(ctx context.Context, db DBorTxx, evts []*TicketEvent) error {
+func InsertTicketEvents(ctx context.Context, db DBorTx, evts []*TicketEvent) error {
 	// convert to interface arrray
 	is := make([]interface{}, len(evts))
 	for i := range evts {

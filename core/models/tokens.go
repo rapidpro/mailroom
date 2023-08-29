@@ -38,7 +38,7 @@ WHERE
 `
 
 // LookupOrgByUUIDAndToken looks up an OrgReference for the given UUID and token
-func LookupOrgByUUIDAndToken(ctx context.Context, db DBorTxx, orgUUID uuids.UUID, permission string, token string) (*OrgReference, error) {
+func LookupOrgByUUIDAndToken(ctx context.Context, db DBorTx, orgUUID uuids.UUID, permission string, token string) (*OrgReference, error) {
 	org := &OrgReference{}
 	err := db.GetContext(ctx, org, lookupOrgByUUIDAndTokenSQL, orgUUID, permission, token)
 	if err == sql.ErrNoRows {

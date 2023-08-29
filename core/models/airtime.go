@@ -75,7 +75,7 @@ RETURNING id
 `
 
 // InsertAirtimeTransfers inserts the passed in airtime transfers returning any errors encountered
-func InsertAirtimeTransfers(ctx context.Context, db DBorTxx, transfers []*AirtimeTransfer) error {
+func InsertAirtimeTransfers(ctx context.Context, db DBorTx, transfers []*AirtimeTransfer) error {
 	if len(transfers) == 0 {
 		return nil
 	}

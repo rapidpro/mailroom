@@ -551,7 +551,7 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 }
 
 // InsertMessages inserts the passed in messages in a single query
-func InsertMessages(ctx context.Context, tx DBorTxx, msgs []*Msg) error {
+func InsertMessages(ctx context.Context, tx DBorTx, msgs []*Msg) error {
 	is := make([]interface{}, len(msgs))
 	for i := range msgs {
 		is[i] = &msgs[i].m
@@ -575,7 +575,7 @@ RETURNING
 `
 
 // MarkMessageHandled updates a message after handling
-func MarkMessageHandled(ctx context.Context, tx DBorTxx, msgID MsgID, status MsgStatus, visibility MsgVisibility, flowID FlowID, ticketID TicketID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
+func MarkMessageHandled(ctx context.Context, tx DBorTx, msgID MsgID, status MsgStatus, visibility MsgVisibility, flowID FlowID, ticketID TicketID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
 		`UPDATE msgs_msg SET status = $2, visibility = $3, flow_id = $4, ticket_id = $5, attachments = $6, log_uuids = array_cat(log_uuids, $7) WHERE id = $1`,
 		msgID, status, visibility, flowID, ticketID, pq.Array(attachments), pq.Array(logUUIDs),
@@ -585,13 +585,13 @@ func MarkMessageHandled(ctx context.Context, tx DBorTxx, msgID MsgID, status Msg
 
 // MarkMessagesForRequeuing marks the passed in messages as initializing(I) with a next attempt value
 // so that the retry messages task will pick them up.
-func MarkMessagesForRequeuing(ctx context.Context, db DBorTxx, msgs []*Msg) error {
+func MarkMessagesForRequeuing(ctx context.Context, db DBorTx, msgs []*Msg) error {
 	nextAttempt := time.Now().Add(10 * time.Minute)
 	return updateMessageStatus(ctx, db, msgs, MsgStatusInitializing, &nextAttempt)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued(Q)
-func MarkMessagesQueued(ctx context.Context, db DBorTxx, msgs []*Msg) error {
+func MarkMessagesQueued(ctx context.Context, db DBorTx, msgs []*Msg) error {
 	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued, nil)
 }
 
@@ -601,7 +601,7 @@ UPDATE msgs_msg
   FROM (VALUES(:id, :status, :next_attempt)) AS m(id, status, next_attempt)
  WHERE msgs_msg.id = m.id::bigint`
 
-func updateMessageStatus(ctx context.Context, db DBorTxx, msgs []*Msg, status MsgStatus, nextAttempt *time.Time) error {
+func updateMessageStatus(ctx context.Context, db DBorTx, msgs []*Msg, status MsgStatus, nextAttempt *time.Time) error {
 	is := make([]interface{}, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
@@ -631,7 +631,7 @@ UPDATE msgs_msg m
  WHERE id = ANY($1)`
 
 // ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
-func ResendMessages(ctx context.Context, db DBorTxx, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
+func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
 	channels := oa.SessionAssets().Channels()
 
 	// for the bulk db updates
@@ -708,7 +708,7 @@ WITH rows AS (
 )
 UPDATE msgs_msg SET status = 'F', failed_reason = $3, modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
-func FailChannelMessages(ctx context.Context, db DBorTxx, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
+func FailChannelMessages(ctx context.Context, db DBorTx, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
 	for {
 		// and update the messages as FAILED
 		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, failedReason)

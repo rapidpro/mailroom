@@ -923,7 +923,7 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	return nil
 }
 
-func getWaitingSessionsForContacts(ctx context.Context, db DBorTxx, contactIDs []ContactID) ([]SessionID, error) {
+func getWaitingSessionsForContacts(ctx context.Context, db DBorTx, contactIDs []ContactID) ([]SessionID, error) {
 	sessionIDs := make([]SessionID, 0, len(contactIDs))
 
 	err := db.SelectContext(ctx, &sessionIDs, `SELECT id FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`, pq.Array(contactIDs))
