@@ -97,7 +97,7 @@ type startRequest struct {
 }
 
 // handleSimulationEvents takes care of updating our db with any events needed during simulation
-func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.OrgAssets, es []flows.Event) error {
+func handleSimulationEvents(ctx context.Context, db models.DBorTx, oa *models.OrgAssets, es []flows.Event) error {
 	// nicpottier: this could be refactored into something more similar to how we handle normal events (ie hooks) if
 	// we see ourselves taking actions for more than just webhook events
 	wes := make([]*models.WebhookEvent, 0)

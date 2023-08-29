@@ -119,7 +119,7 @@ func FlushCache() {
 // org assets passed in to prevent refetching locations
 func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
 	// assets are immutable in mailroom so safe to load from readonly database connection
-	db := rt.ReadonlyDB.DB
+	db := rt.ReadonlyDB
 
 	// build our new assets
 	oa := &OrgAssets{
@@ -520,7 +520,7 @@ func (a *OrgAssets) FlowByUUID(flowUUID assets.FlowUUID) (assets.Flow, error) {
 			return a.flowByUUID[flowUUID]
 		},
 		func(ctx context.Context) (*Flow, error) {
-			return LoadFlowByUUID(ctx, a.rt.ReadonlyDB.DB, a.orgID, flowUUID)
+			return LoadFlowByUUID(ctx, a.rt.ReadonlyDB, a.orgID, flowUUID)
 		},
 	)
 }
@@ -537,7 +537,7 @@ func (a *OrgAssets) FlowByName(name string) (assets.Flow, error) {
 			return nil
 		},
 		func(ctx context.Context) (*Flow, error) {
-			return LoadFlowByName(ctx, a.rt.ReadonlyDB.DB, a.orgID, name)
+			return LoadFlowByName(ctx, a.rt.ReadonlyDB, a.orgID, name)
 		},
 	)
 }
@@ -549,7 +549,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 			return a.flowByID[flowID]
 		},
 		func(ctx context.Context) (*Flow, error) {
-			return LoadFlowByID(ctx, a.rt.ReadonlyDB.DB, a.orgID, flowID)
+			return LoadFlowByID(ctx, a.rt.ReadonlyDB, a.orgID, flowID)
 		},
 	)
 	if err != nil {

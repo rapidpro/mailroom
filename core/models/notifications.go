@@ -46,7 +46,7 @@ type Notification struct {
 }
 
 // NotifyImportFinished notifies the user who created an import that it has finished
-func NotifyImportFinished(ctx context.Context, db Queryer, imp *ContactImport) error {
+func NotifyImportFinished(ctx context.Context, db DBorTx, imp *ContactImport) error {
 	n := &Notification{
 		OrgID:           imp.OrgID,
 		Type:            NotificationTypeImportFinished,
@@ -59,7 +59,7 @@ func NotifyImportFinished(ctx context.Context, db Queryer, imp *ContactImport) e
 }
 
 // NotifyIncidentStarted notifies administrators that an incident has started
-func NotifyIncidentStarted(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
+func NotifyIncidentStarted(ctx context.Context, db DBorTx, oa *OrgAssets, incident *Incident) error {
 	admins := usersWithRoles(oa, []UserRole{UserRoleAdministrator})
 	notifications := make([]*Notification, len(admins))
 
@@ -79,7 +79,7 @@ func NotifyIncidentStarted(ctx context.Context, db Queryer, oa *OrgAssets, incid
 var ticketAssignableToles = []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}
 
 // NotificationsFromTicketEvents logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
-func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAssets, events map[*Ticket]*TicketEvent) error {
+func NotificationsFromTicketEvents(ctx context.Context, db DBorTx, oa *OrgAssets, events map[*Ticket]*TicketEvent) error {
 	notifyTicketsOpened := make(map[UserID]bool)
 	notifyTicketsActivity := make(map[UserID]bool)
 
@@ -139,7 +139,7 @@ INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user
                                VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :contact_import_id, :incident_id) 
 							   ON CONFLICT DO NOTHING`
 
-func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
+func insertNotifications(ctx context.Context, db DBorTx, notifications []*Notification) error {
 	err := dbutil.BulkQuery(ctx, db, insertNotificationSQL, notifications)
 	return errors.Wrap(err, "error inserting notifications")
 }

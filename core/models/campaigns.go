@@ -331,7 +331,7 @@ WHERE
 `
 
 // MarkEventsFired updates the passed in event fires with the fired time and result
-func MarkEventsFired(ctx context.Context, db Queryer, fires []*EventFire, fired time.Time, result EventFireResult) error {
+func MarkEventsFired(ctx context.Context, db DBorTx, fires []*EventFire, fired time.Time, result EventFireResult) error {
 	// set fired on all our values
 	updates := make([]interface{}, 0, len(fires))
 	for _, f := range fires {
@@ -358,7 +358,7 @@ WHERE
 `
 
 // DeleteEventFires deletes all event fires passed in (used when an event has been marked as inactive)
-func DeleteEventFires(ctx context.Context, db Queryer, fires []*EventFire) error {
+func DeleteEventFires(ctx context.Context, db DBorTx, fires []*EventFire) error {
 	// build our list of ids
 	ids := make([]FireID, 0, len(fires))
 	for _, f := range fires {
@@ -399,7 +399,7 @@ type EventFire struct {
 }
 
 // LoadEventFires loads all the event fires with the passed in ids
-func LoadEventFires(ctx context.Context, db Queryer, ids []FireID) ([]*EventFire, error) {
+func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []FireID) ([]*EventFire, error) {
 	start := time.Now()
 
 	q, vs, err := sqlx.In(sqlSelectEventFires, ids)
@@ -435,7 +435,7 @@ SELECT f.id as fire_id, f.event_id as event_id, f.contact_id as contact_id, f.sc
  WHERE f.id IN(?) AND f.fired IS NULL`
 
 // DeleteUnfiredEventFires removes event fires for the passed in event and contact
-func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDelete) error {
+func DeleteUnfiredEventFires(ctx context.Context, tx DBorTx, removes []*FireDelete) error {
 	if len(removes) == 0 {
 		return nil
 	}
@@ -472,7 +472,7 @@ type FireDelete struct {
 }
 
 // DeleteUnfiredContactEvents deletes all unfired event fires for the passed in contacts
-func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+func DeleteUnfiredContactEvents(ctx context.Context, tx DBorTx, contactIDs []ContactID) error {
 	_, err := tx.ExecContext(ctx, `DELETE FROM campaigns_eventfire WHERE contact_id = ANY($1) AND fired IS NULL`, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired contact events")
@@ -493,7 +493,7 @@ type FireAdd struct {
 }
 
 // AddEventFires adds the passed in event fires to our db
-func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
+func AddEventFires(ctx context.Context, tx DBorTx, adds []*FireAdd) error {
 	if len(adds) == 0 {
 		return nil
 	}
@@ -508,7 +508,7 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 
 // DeleteUnfiredEventsForGroupRemoval deletes any unfired events for all campaigns that are
 // based on the passed in group id for all the passed in contacts.
-func DeleteUnfiredEventsForGroupRemoval(ctx context.Context, tx Queryer, oa *OrgAssets, contactIDs []ContactID, groupID GroupID) error {
+func DeleteUnfiredEventsForGroupRemoval(ctx context.Context, tx DBorTx, oa *OrgAssets, contactIDs []ContactID, groupID GroupID) error {
 	fds := make([]*FireDelete, 0, 10)
 
 	for _, c := range oa.CampaignByGroupID(groupID) {
@@ -528,7 +528,7 @@ func DeleteUnfiredEventsForGroupRemoval(ctx context.Context, tx Queryer, oa *Org
 
 // AddCampaignEventsForGroupAddition first removes the passed in contacts from any events that group change may effect, then recreates
 // the campaign events they qualify for.
-func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, oa *OrgAssets, contacts []*flows.Contact, groupID GroupID) error {
+func AddCampaignEventsForGroupAddition(ctx context.Context, tx DBorTx, oa *OrgAssets, contacts []*flows.Contact, groupID GroupID) error {
 	cids := make([]ContactID, len(contacts))
 	for i, c := range contacts {
 		cids[i] = ContactID(c.ID())
@@ -642,7 +642,7 @@ const sqlEligibleContactsForField = `
 INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
      WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND (c.fields->$2->>'datetime')::timestamptz IS NOT NULL`
 
-func campaignEventEligibleContacts(ctx context.Context, db Queryer, groupID GroupID, field *Field) ([]*eligibleContact, error) {
+func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string
 	var params []interface{}
 

@@ -104,7 +104,7 @@ RETURNING id
 `
 
 // InsertHTTPLogs inserts the passed in logs returning any errors encountered
-func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
+func InsertHTTPLogs(ctx context.Context, tx DBorTx, logs []*HTTPLog) error {
 	return BulkQuery(ctx, "inserted http logs", tx, insertHTTPLogsSQL, logs)
 }
 
@@ -137,7 +137,7 @@ func (h *HTTPLogger) Ticketer(t *Ticketer) flows.HTTPLogCallback {
 }
 
 // Insert this logger's logs into the database
-func (h *HTTPLogger) Insert(ctx context.Context, db Queryer) error {
+func (h *HTTPLogger) Insert(ctx context.Context, db DBorTx) error {
 	if len(h.logs) > 0 {
 		return InsertHTTPLogs(ctx, db, h.logs)
 	}

@@ -61,7 +61,7 @@ func NewBroadcast(orgID OrgID, translations flows.BroadcastTranslations,
 }
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
-func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
+func NewBroadcastFromEvent(ctx context.Context, tx DBorTx, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	// resolve our contact references
 	contactIDs, err := GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
 	if err != nil {
@@ -94,19 +94,19 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastB
 }
 
 // MarkBroadcastSent marks the given broadcast as sent
-func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
+func MarkBroadcastSent(ctx context.Context, db DBorTx, id BroadcastID) error {
 	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
 	return errors.Wrapf(err, "error marking broadcast #%d as sent", id)
 }
 
 // MarkBroadcastFailed marks the given broadcast as failed
-func MarkBroadcastFailed(ctx context.Context, db Queryer, id BroadcastID) error {
+func MarkBroadcastFailed(ctx context.Context, db DBorTx, id BroadcastID) error {
 	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
 	return errors.Wrapf(err, "error marking broadcast #%d as failed", id)
 }
 
 // InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
-func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
+func InsertChildBroadcast(ctx context.Context, db DBorTx, parent *Broadcast) (*Broadcast, error) {
 	child := NewBroadcast(
 		parent.OrgID,
 		parent.Translations,

@@ -2,6 +2,7 @@ package mailroom
 
 import (
 	"context"
+	"database/sql"
 	"net/url"
 	"strings"
 	"sync"
@@ -85,7 +86,7 @@ func (mr *Mailroom) Start() error {
 	log := logrus.WithFields(logrus.Fields{"state": "starting"})
 
 	var err error
-	mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
+	_, mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
 	if err != nil {
 		log.WithError(err).Error("db not reachable")
 	} else {
@@ -93,7 +94,7 @@ func (mr *Mailroom) Start() error {
 	}
 
 	if c.ReadonlyDB != "" {
-		mr.rt.ReadonlyDB, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
+		mr.rt.ReadonlyDB, _, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
 		if err != nil {
 			log.WithError(err).Error("readonly db not reachable")
 		} else {
@@ -101,7 +102,7 @@ func (mr *Mailroom) Start() error {
 		}
 	} else {
 		// if readonly DB not specified, just use default DB again
-		mr.rt.ReadonlyDB = mr.rt.DB
+		mr.rt.ReadonlyDB = mr.rt.DB.DB
 		log.Warn("no distinct readonly db configured")
 	}
 
@@ -215,10 +216,10 @@ func (mr *Mailroom) Stop() error {
 	return nil
 }
 
-func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
+func openAndCheckDBConnection(url string, maxOpenConns int) (*sql.DB, *sqlx.DB, error) {
 	db, err := sqlx.Open("postgres", url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to open database connection: '%s'", url)
+		return nil, nil, errors.Wrapf(err, "unable to open database connection: '%s'", url)
 	}
 
 	// configure our pool
@@ -231,7 +232,7 @@ func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
 	err = db.PingContext(ctx)
 	cancel()
 
-	return db, err
+	return db.DB, db, err
 }
 
 func openAndCheckRedisPool(redisUrl string) (*redis.Pool, error) {
