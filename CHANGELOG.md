@@ -1,3 +1,7 @@
+v8.3.8 (2023-08-29)
+-------------------------
+ * Use less sqlx and tidy up use of interfaces where functions can take a DB or Tx
+
 v8.3.7 (2023-08-23)
 -------------------------
  * Use input_collation when matching msg triggers
