@@ -281,8 +281,8 @@ func TestMsgEvents(t *testing.T) {
 			ContactID: contact.ID,
 			OrgID:     org.ID,
 			ChannelID: channel.ID,
-			MsgID:     models.MsgID(dbMsg.ID()),
-			MsgUUID:   dbMsg.UUID(),
+			MsgID:     dbMsg.ID,
+			MsgUUID:   dbMsg.FlowMsg.UUID(),
 			URN:       contact.URN,
 			URNID:     contact.URNID,
 			Text:      text,
@@ -295,7 +295,7 @@ func TestMsgEvents(t *testing.T) {
 		models.FlushCache()
 
 		// reset our dummy db message into an unhandled state
-		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID())
+		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID)
 
 		// run our setup hook if we have one
 		if tc.preHook != nil {
@@ -319,7 +319,7 @@ func TestMsgEvents(t *testing.T) {
 		}
 
 		// check that message is marked as handled
-		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID).
 			Columns(map[string]any{"status": "H", "msg_type": "T", "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
