@@ -131,6 +131,14 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 			}
 			err = handleTimedEvent(ctx, rt, contactEvent.Type, evt)
 
+		case MsgDeletedType:
+			evt := &MsgDeletedEvent{}
+			err = json.Unmarshal(contactEvent.Task, evt)
+			if err != nil {
+				return errors.Wrapf(err, "error unmarshalling deleted event: %s", event)
+			}
+			err = handleMsgDeletedEvent(ctx, rt, evt)
+
 		default:
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
 		}

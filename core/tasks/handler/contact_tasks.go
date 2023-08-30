@@ -37,6 +37,7 @@ const (
 	ExpirationEventType      = "expiration_event"
 	TimeoutEventType         = "timeout_event"
 	TicketClosedEventType    = "ticket_closed"
+	MsgDeletedType           = "msg_deleted"
 )
 
 // handleTimedEvent is called for timeout events
@@ -605,6 +606,11 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	return nil
 }
 
+func handleMsgDeletedEvent(ctx context.Context, rt *runtime.Runtime, event *MsgDeletedEvent) error {
+	err := models.UpdateMessageDeletedBySender(ctx, rt.DB.DB, event.OrgID, event.MsgID)
+	return errors.Wrap(err, "error deleting message")
+}
+
 // handles a message as an inbox message, i.e. no flow
 func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, attachments []utils.Attachment, logUUIDs []models.ChannelLogUUID, ticket *models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
@@ -672,6 +678,12 @@ type StopEvent struct {
 	ContactID  models.ContactID `json:"contact_id"`
 	OrgID      models.OrgID     `json:"org_id"`
 	OccurredOn time.Time        `json:"occurred_on"`
+}
+
+type MsgDeletedEvent struct {
+	OrgID      models.OrgID `json:"org_id"`
+	MsgID      models.MsgID `json:"message_id"`
+	OccurredOn time.Time    `json:"occurred_on"`
 }
 
 // creates a new event task for the passed in timeout event

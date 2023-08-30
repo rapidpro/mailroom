@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"strings"
@@ -744,6 +745,28 @@ func NewMsgOut(oa *OrgAssets, c *flows.Contact, text string, atts []utils.Attach
 	}
 
 	return flows.NewMsgOut(urn, channelRef, text, atts, qrs, nil, flows.NilMsgTopic, locale, unsendableReason), channel
+}
+
+const sqlUpdateMsgDeletedBySender = `
+UPDATE msgs_msg
+   SET visibility = 'X', text = '', attachments = '{}'
+ WHERE id = $1 AND org_id = $2 AND direction = 'I'`
+
+func UpdateMessageDeletedBySender(ctx context.Context, db *sql.DB, orgID OrgID, msgID MsgID) error {
+	res, err := db.ExecContext(ctx, sqlUpdateMsgDeletedBySender, msgID, orgID)
+	if err != nil {
+		return errors.Wrap(err, "error updating message visibility")
+	}
+
+	// if there was such a message, remove its labels too
+	if rows, _ := res.RowsAffected(); rows == 1 {
+		_, err = db.ExecContext(ctx, `DELETE FROM msgs_msg_labels WHERE msg_id = $1`, msgID)
+		if err != nil {
+			return errors.Wrap(err, "error removing message labels")
+		}
+	}
+
+	return nil
 }
 
 // NilID implementations

@@ -326,16 +326,13 @@ func TestResendMessages(t *testing.T) {
 func TestFailMessages(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData)
 
-	out1 := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusPending, false)
-	out2 := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusErrored, false)
+	testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusPending, false)
+	testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusErrored, false)
 	out3 := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
-	out4 := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusQueued, false)
+	testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusQueued, false)
 	testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.George, "hi", nil, models.MsgStatusQueued, false)
-
-	ids := []models.MsgID{models.MsgID(out1.ID()), models.MsgID(out2.ID()), models.MsgID(out3.ID()), models.MsgID(out4.ID())}
-	println(ids)
 
 	now := dates.Now()
 
@@ -343,13 +340,29 @@ func TestFailMessages(t *testing.T) {
 	err := models.FailChannelMessages(ctx, rt.DB, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
 	require.NoError(t, err)
 
-	//assert.Len(t, failedMsgs, 3)
-
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND failed_reason = 'R' AND modified_on > $1`, now).Returns(4)
-	assertdb.Query(t, rt.DB, `SELECT status FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"status": "F"})
-	assertdb.Query(t, rt.DB, `SELECT failed_reason FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"failed_reason": nil})
+	assertdb.Query(t, rt.DB, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]any{"status": "F", "failed_reason": nil})
+}
 
+func TestUpdateMessageDeletedBySender(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	in1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", models.MsgStatusHandled)
+	out1 := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusSent, false)
+
+	err := models.UpdateMessageDeletedBySender(ctx, rt.DB.DB, testdata.Org1.ID, models.MsgID(in1.ID_))
+	assert.NoError(t, err)
+
+	assertdb.Query(t, rt.DB, `SELECT visibility, text FROM msgs_msg WHERE id = $1`, in1.ID()).Columns(map[string]any{"visibility": "X", "text": ""})
+
+	// trying to delete an outgoing message is a noop
+	err = models.UpdateMessageDeletedBySender(ctx, rt.DB.DB, testdata.Org1.ID, models.MsgID(out1.ID_))
+	assert.NoError(t, err)
+
+	assertdb.Query(t, rt.DB, `SELECT visibility, text FROM msgs_msg WHERE id = $1`, out1.ID()).Columns(map[string]any{"visibility": "V", "text": "hi"})
 }
 
 func TestGetMsgRepetitions(t *testing.T) {
