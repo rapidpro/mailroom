@@ -105,7 +105,7 @@ func TestNewCourierMsg(t *testing.T) {
 		flows.NilUnsendableReason,
 	)
 	in1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
-	session.SetIncomingMsg(models.MsgID(in1.ID()), null.String("EX123"))
+	session.SetIncomingMsg(in1.ID, null.String("EX123"))
 	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 

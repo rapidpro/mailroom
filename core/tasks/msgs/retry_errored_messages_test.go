@@ -37,7 +37,7 @@ func TestRetryErroredMessages(t *testing.T) {
 	msg5 := testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
 	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
-	rt.DB.MustExec(`UPDATE msgs_msg SET status = 'I' WHERE id = $1`, msg5.ID())
+	rt.DB.MustExec(`UPDATE msgs_msg SET status = 'I' WHERE id = $1`, msg5.ID)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'I'`).Returns(1)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(4)

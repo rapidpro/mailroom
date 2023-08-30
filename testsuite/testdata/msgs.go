@@ -14,36 +14,56 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 )
 
+type Msg struct {
+	ID models.MsgID
+}
+
+type MsgIn struct {
+	Msg
+	FlowMsg *flows.MsgIn
+}
+
+func (m *MsgIn) Label(rt *runtime.Runtime, labels ...*Label) {
+	for _, l := range labels {
+		rt.DB.MustExec(`INSERT INTO msgs_msg_labels(msg_id, label_id) VALUES($1, $2)`, m.ID, l.ID)
+	}
+}
+
+type MsgOut struct {
+	Msg
+	FlowMsg *flows.MsgOut
+}
+
 type Label struct {
 	ID   models.LabelID
 	UUID assets.LabelUUID
 }
 
 // InsertIncomingMsg inserts an incoming text message
-func InsertIncomingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, status models.MsgStatus) *flows.MsgIn {
+func InsertIncomingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, status models.MsgStatus) *MsgIn {
 	msgUUID := flows.MsgUUID(uuids.New())
-	var id flows.MsgID
+	var id models.MsgID
 	must(rt.DB.Get(&id,
 		`INSERT INTO msgs_msg(uuid, text, created_on, direction, msg_type, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id, channel_id)
 	  	 VALUES($1, $2, NOW(), 'I', $3, $4, 'V', 1, 0, NOW(), $5, $6, $7, $8) RETURNING id`, msgUUID, text, models.MsgTypeText, status, contact.ID, contact.URNID, org.ID, channel.ID,
 	))
 
-	msg := flows.NewMsgIn(msgUUID, contact.URN, assets.NewChannelReference(channel.UUID, ""), text, nil)
-	msg.SetID(id)
-	return msg
+	fm := flows.NewMsgIn(msgUUID, contact.URN, assets.NewChannelReference(channel.UUID, ""), text, nil)
+	fm.SetID(flows.MsgID(id))
+	return &MsgIn{Msg: Msg{ID: id}, FlowMsg: fm}
 }
 
 // InsertOutgoingMsg inserts an outgoing text message
-func InsertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *flows.MsgOut {
+func InsertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *MsgOut {
 	return insertOutgoingMsg(rt, org, channel, contact, text, attachments, envs.Locale(`eng-US`), models.MsgTypeText, status, highPriority, 0, nil)
 }
 
 // InsertErroredOutgoingMsg inserts an ERRORED(E) outgoing text message
-func InsertErroredOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *flows.MsgOut {
+func InsertErroredOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *MsgOut {
 	return insertOutgoingMsg(rt, org, channel, contact, text, nil, envs.NilLocale, models.MsgTypeText, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
 }
 
-func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale envs.Locale, typ models.MsgType, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *flows.MsgOut {
+func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale envs.Locale, typ models.MsgType, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *MsgOut {
 	var channelRef *assets.ChannelReference
 	var channelID models.ChannelID
 	if channel != nil {
@@ -51,22 +71,23 @@ func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact 
 		channelID = channel.ID
 	}
 
-	msg := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-
 	var sentOn *time.Time
 	if status == models.MsgStatusWired || status == models.MsgStatusSent || status == models.MsgStatusDelivered {
 		t := dates.Now()
 		sentOn = &t
 	}
 
-	var id flows.MsgID
+	fm := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+
+	var id models.MsgID
 	must(rt.DB.Get(&id,
 		`INSERT INTO msgs_msg(uuid, text, attachments, locale, created_on, direction, msg_type, status, visibility, contact_id, contact_urn_id, org_id, channel_id, sent_on, msg_count, error_count, next_attempt, high_priority)
 	  	 VALUES($1, $2, $3, $4, NOW(), 'O', $5, $6, 'V', $7, $8, $9, $10, $11, 1, $12, $13, $14) RETURNING id`,
-		msg.UUID(), text, pq.Array(attachments), locale, typ, status, contact.ID, contact.URNID, org.ID, channelID, sentOn, errorCount, nextAttempt, highPriority,
+		fm.UUID(), text, pq.Array(attachments), locale, typ, status, contact.ID, contact.URNID, org.ID, channelID, sentOn, errorCount, nextAttempt, highPriority,
 	))
-	msg.SetID(id)
-	return msg
+
+	fm.SetID(flows.MsgID(id))
+	return &MsgOut{Msg: Msg{ID: id}, FlowMsg: fm}
 }
 
 func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {

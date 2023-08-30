@@ -28,7 +28,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 		status = models.MsgStatusFailed
 	}
 
-	flowMsg := testdata.InsertOutgoingMsg(rt, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
+	flowMsg := testdata.InsertOutgoingMsg(rt, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority).FlowMsg
 	msgs, err := models.GetMessagesByID(context.Background(), rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg.ID())})
 	require.NoError(t, err)
 
