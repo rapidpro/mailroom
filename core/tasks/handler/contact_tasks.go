@@ -681,9 +681,9 @@ type StopEvent struct {
 }
 
 type MsgDeletedEvent struct {
-	OrgID      models.OrgID `json:"org_id"`
-	MsgID      models.MsgID `json:"message_id"`
-	OccurredOn time.Time    `json:"occurred_on"`
+	OrgID     models.OrgID     `json:"org_id"`
+	ChannelID models.ChannelID `json:"channel_id"`
+	MsgID     models.MsgID     `json:"message_id"`
 }
 
 // creates a new event task for the passed in timeout event

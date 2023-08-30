@@ -755,7 +755,7 @@ UPDATE msgs_msg
 func UpdateMessageDeletedBySender(ctx context.Context, db *sql.DB, orgID OrgID, msgID MsgID) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return errors.Wrap(err, "error updating message visibility")
+		return errors.Wrap(err, "error beginning transaction")
 	}
 
 	res, err := tx.ExecContext(ctx, sqlUpdateMsgDeletedBySender, msgID, orgID)
