@@ -39,18 +39,18 @@ func TestInputLabelsAdded(t *testing.T) {
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy: msg1,
-				testdata.Bob:   msg2,
+				testdata.Cathy: msg1.FlowMsg,
+				testdata.Bob:   msg2.FlowMsg,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
-					Args:  []interface{}{msg1.ID()},
+					Args:  []interface{}{msg1.ID},
 					Count: 2,
 				},
 				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
-					Args:  []interface{}{msg2.ID()},
+					Args:  []interface{}{msg2.ID},
 					Count: 0,
 				},
 				{
