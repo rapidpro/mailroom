@@ -62,7 +62,7 @@ func TestMsgCreated(t *testing.T) {
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy: msg1,
+				testdata.Cathy: msg1.FlowMsg,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
