@@ -753,20 +753,25 @@ UPDATE msgs_msg
  WHERE id = $1 AND org_id = $2 AND direction = 'I'`
 
 func UpdateMessageDeletedBySender(ctx context.Context, db *sql.DB, orgID OrgID, msgID MsgID) error {
-	res, err := db.ExecContext(ctx, sqlUpdateMsgDeletedBySender, msgID, orgID)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "error updating message visibility")
+	}
+
+	res, err := tx.ExecContext(ctx, sqlUpdateMsgDeletedBySender, msgID, orgID)
 	if err != nil {
 		return errors.Wrap(err, "error updating message visibility")
 	}
 
 	// if there was such a message, remove its labels too
 	if rows, _ := res.RowsAffected(); rows == 1 {
-		_, err = db.ExecContext(ctx, `DELETE FROM msgs_msg_labels WHERE msg_id = $1`, msgID)
+		_, err = tx.ExecContext(ctx, `DELETE FROM msgs_msg_labels WHERE msg_id = $1`, msgID)
 		if err != nil {
 			return errors.Wrap(err, "error removing message labels")
 		}
 	}
 
-	return nil
+	return errors.Wrap(tx.Commit(), "error committing transaction")
 }
 
 // NilID implementations
