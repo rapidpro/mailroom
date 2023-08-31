@@ -46,7 +46,7 @@ type parseRequest struct {
 //	}
 type parseResponse struct {
 	Query        string                `json:"query"`
-	ElasticQuery interface{}           `json:"elastic_query"`
+	ElasticQuery any                   `json:"elastic_query"`
 	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
 }
 
@@ -83,7 +83,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *parseRequest)
 	normalized := parsed.String()
 	metadata := contactql.Inspect(parsed)
 
-	var elasticSource interface{}
+	var elasticSource any
 	if !r.ParseOnly {
 		eq := search.BuildElasticQuery(oa, group, models.NilContactStatus, nil, parsed)
 		elasticSource, err = eq.Source()

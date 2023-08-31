@@ -1197,10 +1197,10 @@ func UpdateContactLastSeenOn(ctx context.Context, db DBorTx, contactID ContactID
 // UpdateContactURNs updates the contact urns in our database to match the passed in changes
 func UpdateContactURNs(ctx context.Context, db DBorTx, oa *OrgAssets, changes []*ContactURNsChanged) error {
 	// keep track of all our inserts
-	inserts := make([]interface{}, 0, len(changes))
+	inserts := make([]any, 0, len(changes))
 
 	// and updates to URNs
-	updates := make([]interface{}, 0, len(changes))
+	updates := make([]any, 0, len(changes))
 
 	contactIDs := make([]ContactID, 0)
 	updatedURNIDs := make([]URNID, 0)
@@ -1375,7 +1375,7 @@ type contactStatusUpdate struct {
 func UpdateContactStatus(ctx context.Context, db DBorTx, changes []*ContactStatusChange) error {
 
 	archiveTriggersForContactIDs := make([]ContactID, 0, len(changes))
-	statusUpdates := make([]interface{}, 0, len(changes))
+	statusUpdates := make([]any, 0, len(changes))
 
 	for _, ch := range changes {
 		blocked := ch.Status == flows.ContactStatusBlocked

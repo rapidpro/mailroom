@@ -124,8 +124,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
 
 	// the event fires should be marked as fired
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f1ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f1ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
 
 	// create due fires for George and Bob for a different event that skips
 	f3ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
@@ -151,8 +151,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.Bob.ID, testdata.PickANumber.ID).Returns(1)
 
 	// the event fires should be marked as fired
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f3ID).Columns(map[string]interface{}{"fired": true, "fired_result": "S"})
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f4ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f3ID).Columns(map[string]any{"fired": true, "fired_result": "S"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f4ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
 }
 
 func TestIVRCampaigns(t *testing.T) {
@@ -208,7 +208,7 @@ func assertFireTasks(t *testing.T, rt *runtime.Runtime, org *testdata.Org, expec
 		payload, err := jsonx.DecodeGeneric(task.Task)
 		require.NoError(t, err)
 
-		taskFireInts := payload.(map[string]interface{})["fire_ids"].([]interface{})
+		taskFireInts := payload.(map[string]any)["fire_ids"].([]any)
 		taskFireIDs := make([]models.FireID, len(taskFireInts))
 		for i := range taskFireInts {
 			id, _ := strconv.Atoi(string(taskFireInts[i].(json.Number)))

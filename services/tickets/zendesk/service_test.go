@@ -104,7 +104,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]any{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})

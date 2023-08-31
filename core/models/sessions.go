@@ -397,8 +397,8 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// figure out which runs are new and which are updated
-	updatedRuns := make([]interface{}, 0, 1)
-	newRuns := make([]interface{}, 0)
+	updatedRuns := make([]any, 0, 1)
+	newRuns := make([]any, 0)
 	for _, r := range s.Runs() {
 		modified, found := s.seenRuns[r.UUID()]
 		if !found {
@@ -596,8 +596,8 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 
 	// create all our session objects
 	sessions := make([]*Session, 0, len(ss))
-	waitingSessionsI := make([]interface{}, 0, len(ss))
-	endedSessionsI := make([]interface{}, 0, len(ss))
+	waitingSessionsI := make([]any, 0, len(ss))
+	endedSessionsI := make([]any, 0, len(ss))
 	completedCallIDs := make([]CallID, 0, 1)
 
 	for i, s := range ss {
@@ -669,7 +669,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 	}
 
 	// for each session associate our run with each
-	runs := make([]interface{}, 0, len(sessions))
+	runs := make([]any, 0, len(sessions))
 	for _, s := range sessions {
 		for _, r := range s.runs {
 			runs = append(runs, &r.r)

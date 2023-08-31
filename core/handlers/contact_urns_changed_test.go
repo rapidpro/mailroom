@@ -33,23 +33,23 @@ func TestContactURNsChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'telegram' and path = '11551' and priority = 998",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+12065551212' and priority = 999 and identity = 'tel:+12065551212'",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+16055741111' and priority = 1000",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				// evan lost his 206 URN
 				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1",
-					Args:  []interface{}{testdata.George.ID},
+					Args:  []any{testdata.George.ID},
 					Count: 1,
 				},
 			},

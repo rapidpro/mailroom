@@ -172,7 +172,7 @@ func TestCloseTicket(t *testing.T) {
 		testdata.DefaultTopic.ID,
 		"Where are my cookies?",
 		models.NilUserID,
-		map[string]interface{}{
+		map[string]any{
 			"contact-display": "Cathy",
 		},
 	)

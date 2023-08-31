@@ -241,9 +241,9 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 		resumeURL += "&dial_duration=" + duration
 		resumeURL += "&sig=" + s.calculateSignature(resumeURL)
 
-		nxBody := map[string]interface{}{
+		nxBody := map[string]any{
 			"action": "transfer",
-			"destination": map[string]interface{}{
+			"destination": map[string]any{
 				"type": "ncco",
 				"url":  []string{resumeURL},
 			},
@@ -323,7 +323,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 			EventURL:     []string{url},
 			EventMethod:  http.MethodPost,
 		}
-		return json.MarshalIndent([]interface{}{input}, "", "  ")
+		return json.MarshalIndent([]any{input}, "", "  ")
 
 	case "recording_url":
 		// this is our async callback for our recording URL, we stuff it in redis and return an empty response
@@ -649,7 +649,7 @@ func (s *service) MakeEmptyResponseBody(msg string) []byte {
 	})
 }
 
-func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
+func (s *service) makeRequest(method string, sendURL string, body any) (*httpx.Trace, error) {
 	bb := jsonx.MustMarshal(body)
 	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
 	token, err := s.generateToken()
@@ -725,8 +725,8 @@ func (s *service) generateToken() (string, error) {
 // NCCO building utilities
 
 func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
-	actions := make([]interface{}, 0, 1)
-	waitActions := make([]interface{}, 0, 1)
+	actions := make([]any, 0, 1)
+	waitActions := make([]any, 0, 1)
 
 	var waitEvent flows.Event
 	for _, e := range es {

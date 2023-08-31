@@ -66,32 +66,32 @@ func TestTicketOpened(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{testdata.Cathy.ID, testdata.Mailgun.ID},
+					Args:  []any{testdata.Cathy.ID, testdata.Mailgun.ID},
 					Count: 1,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
-					Args:  []interface{}{testdata.Mailgun.ID},
+					Args:  []any{testdata.Mailgun.ID},
 					Count: 1,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%sesame%'",
-					Args:  []interface{}{testdata.Mailgun.ID},
+					Args:  []any{testdata.Mailgun.ID},
 					Count: 0,
 				},
 				{ // bob's ticket will have been created too
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{testdata.Bob.ID, testdata.Zendesk.ID},
+					Args:  []any{testdata.Bob.ID, testdata.Zendesk.ID},
 					Count: 1,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
-					Args:  []interface{}{testdata.Zendesk.ID},
+					Args:  []any{testdata.Zendesk.ID},
 					Count: 1,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
-					Args:  []interface{}{testdata.Zendesk.ID},
+					Args:  []any{testdata.Zendesk.ID},
 					Count: 0,
 				},
 				{ // and we have 2 ticket opened events for the 2 tickets opened
@@ -104,12 +104,12 @@ func TestTicketOpened(t *testing.T) {
 				},
 				{ // one of our tickets is assigned to admin
 					SQL:   "select count(*) from tickets_ticket where assignee_id = $1",
-					Args:  []interface{}{testdata.Admin.ID},
+					Args:  []any{testdata.Admin.ID},
 					Count: 1,
 				},
 				{ // admin will have a ticket assigned notification for the ticket directly assigned to them
 					SQL:   "select count(*) from notifications_notification where user_id = $1 and notification_type = 'tickets:activity'",
-					Args:  []interface{}{testdata.Admin.ID},
+					Args:  []any{testdata.Admin.ID},
 					Count: 1,
 				},
 				{ // all assignable users will have a ticket opened notification for the unassigned ticket

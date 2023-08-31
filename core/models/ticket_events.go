@@ -105,7 +105,7 @@ RETURNING
 
 func InsertTicketEvents(ctx context.Context, db DBorTx, evts []*TicketEvent) error {
 	// convert to interface arrray
-	is := make([]interface{}, len(evts))
+	is := make([]any, len(evts))
 	for i := range evts {
 		is[i] = &evts[i].e
 	}

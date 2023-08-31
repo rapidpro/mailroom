@@ -16,7 +16,7 @@ var InsertAirtimeTransfersHook models.EventCommitHook = &insertAirtimeTransfersH
 type insertAirtimeTransfersHook struct{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *insertAirtimeTransfersHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertAirtimeTransfersHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// gather all our transfers
 	transfers := make([]*models.AirtimeTransfer, 0, len(scenes))
 

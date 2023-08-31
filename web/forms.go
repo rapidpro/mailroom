@@ -24,12 +24,12 @@ func init() {
 }
 
 // Validate validates the passe din struct using our shared validator instance
-func Validate(form interface{}) error {
+func Validate(form any) error {
 	return validate.Struct(form)
 }
 
 // DecodeAndValidateForm takes the passed in request and attempts to decode it as either a URL encoded form or a multipart form
-func DecodeAndValidateForm(form interface{}, r *http.Request) error {
+func DecodeAndValidateForm(form any, r *http.Request) error {
 	var err error
 	contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 
@@ -52,6 +52,6 @@ func DecodeAndValidateForm(form interface{}, r *http.Request) error {
 	return validate.Struct(form)
 }
 
-func ReadAndValidateJSON(r *http.Request, v interface{}) error {
+func ReadAndValidateJSON(r *http.Request, v any) error {
 	return utils.UnmarshalAndValidateWithLimit(r.Body, v, maxRequestBytes)
 }

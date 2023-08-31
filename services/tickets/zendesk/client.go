@@ -34,11 +34,11 @@ type errorResponse struct {
 	Description string `json:"description"`
 }
 
-func (c *baseClient) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) post(endpoint string, payload any, response any) (*httpx.Trace, error) {
 	return c.request("POST", endpoint, payload, response)
 }
 
-func (c *baseClient) put(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) put(endpoint string, payload any, response any) (*httpx.Trace, error) {
 	return c.request("PUT", endpoint, payload, response)
 }
 
@@ -46,7 +46,7 @@ func (c *baseClient) delete(endpoint string) (*httpx.Trace, error) {
 	return c.request("DELETE", endpoint, nil, nil)
 }
 
-func (c *baseClient) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) request(method, endpoint string, payload any, response any) (*httpx.Trace, error) {
 	url := fmt.Sprintf("https://%s.zendesk.com/api/v2/%s", c.subdomain, endpoint)
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Bearer %s", c.token),

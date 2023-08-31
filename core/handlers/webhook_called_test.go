@@ -70,7 +70,7 @@ func TestWebhookCalled(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = TRUE and resthook_id = $1",
-					Args:  []interface{}{2},
+					Args:  []any{2},
 					Count: 1,
 				},
 				{
@@ -87,7 +87,7 @@ func TestWebhookCalled(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from api_webhookevent where org_id = $1",
-					Args:  []interface{}{testdata.Org1.ID},
+					Args:  []any{testdata.Org1.ID},
 					Count: 2,
 				},
 			},

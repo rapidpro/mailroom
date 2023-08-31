@@ -80,7 +80,7 @@ func InsertAirtimeTransfers(ctx context.Context, db DBorTx, transfers []*Airtime
 		return nil
 	}
 
-	ts := make([]interface{}, len(transfers))
+	ts := make([]any, len(transfers))
 	for i := range transfers {
 		ts[i] = &transfers[i].t
 	}

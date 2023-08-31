@@ -359,8 +359,8 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	return msg, nil
 }
 
-func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
-	metadata := make(map[string]interface{})
+func buildMsgMetadata(m *flows.MsgOut) map[string]any {
+	metadata := make(map[string]any)
 	if m.Templating() != nil {
 		metadata["templating"] = m.Templating()
 	}
@@ -510,7 +510,7 @@ func GetMessagesForRetry(ctx context.Context, db *sqlx.DB) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
 
-func loadMessages(ctx context.Context, db *sqlx.DB, sql string, params ...interface{}) ([]*Msg, error) {
+func loadMessages(ctx context.Context, db *sqlx.DB, sql string, params ...any) ([]*Msg, error) {
 	rows, err := db.QueryxContext(ctx, sql, params...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying msgs")
@@ -553,7 +553,7 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 
 // InsertMessages inserts the passed in messages in a single query
 func InsertMessages(ctx context.Context, tx DBorTx, msgs []*Msg) error {
-	is := make([]interface{}, len(msgs))
+	is := make([]any, len(msgs))
 	for i := range msgs {
 		is[i] = &msgs[i].m
 	}
@@ -603,7 +603,7 @@ UPDATE msgs_msg
  WHERE msgs_msg.id = m.id::bigint`
 
 func updateMessageStatus(ctx context.Context, db DBorTx, msgs []*Msg, status MsgStatus, nextAttempt *time.Time) error {
-	is := make([]interface{}, len(msgs))
+	is := make([]any, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
 		m.Status = status
@@ -636,7 +636,7 @@ func ResendMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msg
 	channels := oa.SessionAssets().Channels()
 
 	// for the bulk db updates
-	resends := make([]interface{}, 0, len(msgs))
+	resends := make([]any, 0, len(msgs))
 	refails := make([]MsgID, 0, len(msgs))
 
 	resent := make([]*Msg, 0, len(msgs))

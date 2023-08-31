@@ -37,7 +37,7 @@ func TestImportContactBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// import is still in progress
-	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "O"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]any{"status": "O"})
 
 	// perform second batch task...
 	task2 := &contacts.ImportContactBatchTask{ContactImportBatchID: batch2ID}
@@ -50,9 +50,9 @@ func TestImportContactBatch(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contact WHERE name = 'Rowan' AND language = 'spa'`).Returns(1)
 
 	// import is now complete and there is a notification for the creator
-	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "C"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]any{"status": "C"})
 	assertdb.Query(t, rt.DB, `SELECT org_id, notification_type, scope, user_id FROM notifications_notification WHERE contact_import_id = $1`, importID).
-		Columns(map[string]interface{}{
+		Columns(map[string]any{
 			"org_id":            int64(testdata.Org1.ID),
 			"notification_type": "import:finished",
 			"scope":             fmt.Sprintf("contact:%d", importID),

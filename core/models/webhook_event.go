@@ -44,7 +44,7 @@ func InsertWebhookEvents(ctx context.Context, db DBorTx, events []*WebhookEvent)
 		return nil
 	}
 
-	is := make([]interface{}, len(events))
+	is := make([]any, len(events))
 	for i := range events {
 		is[i] = &events[i].e
 	}

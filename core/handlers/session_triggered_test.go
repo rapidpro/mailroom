@@ -49,22 +49,22 @@ func TestSessionTriggered(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND status = 'C'",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL AND session_history IS NOT NULL;",
-					Args:  []interface{}{testdata.SingleMessage.ID},
+					Args:  []any{testdata.SingleMessage.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_contacts where id = 1 AND contact_id = $1",
-					Args:  []interface{}{testdata.George.ID},
+					Args:  []any{testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_groups where id = 1 AND contactgroup_id = $1",
-					Args:  []interface{}{testdata.TestersGroup.ID},
+					Args:  []any{testdata.TestersGroup.ID},
 					Count: 1,
 				},
 			},
@@ -115,7 +115,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND start_type = 'F' AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
-					Args:  []interface{}{testdata.Favorites.ID},
+					Args:  []any{testdata.Favorites.ID},
 					Count: 1,
 				},
 			},

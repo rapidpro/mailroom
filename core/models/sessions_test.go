@@ -64,7 +64,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	// check that matches what is in the db
 	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, responded, ended_on, wait_resume_on_expire FROM flows_flowsession`).
-		Columns(map[string]interface{}{
+		Columns(map[string]any{
 			"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": false,
 		})
 
@@ -120,7 +120,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	// check that matches what is in the db
 	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
-		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
+		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
 
 	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Bob.ID).Returns(nil)
 
@@ -174,7 +174,7 @@ func TestSingleSprintSession(t *testing.T) {
 
 	// check that matches what is in the db
 	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
-		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": false})
+		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": false})
 }
 
 func TestSessionWithSubflows(t *testing.T) {
@@ -223,7 +223,7 @@ func TestSessionWithSubflows(t *testing.T) {
 
 	// check that matches what is in the db
 	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, responded, ended_on, wait_resume_on_expire FROM flows_flowsession`).
-		Columns(map[string]interface{}{
+		Columns(map[string]any{
 			"status": "W", "session_type": "M", "current_flow_id": int64(child.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": true,
 		})
 
@@ -291,7 +291,7 @@ func TestSessionFailedStart(t *testing.T) {
 
 	// check that matches what is in the db
 	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
-		Columns(map[string]interface{}{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false})
+		Columns(map[string]any{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false})
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL`).Returns(1)
 
 	// check the state of all the created runs
@@ -331,7 +331,7 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 
 	// check other columns are correct on interrupted session, run and contact
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL AND wait_started_on IS NULL AND wait_expires_on IS NULL AND timeout_on IS NULL AND current_flow_id IS NULL AND id = $1`, session2ID).Returns(1)
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1`, run2ID).Columns(map[string]interface{}{"status": "I"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1`, run2ID).Columns(map[string]any{"status": "I"})
 	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Cathy.ID).Returns(nil)
 }
 
@@ -372,7 +372,7 @@ func TestInterruptSessionsForContactsTx(t *testing.T) {
 
 	// check other columns are correct on interrupted session, run and contact
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL AND wait_started_on IS NULL AND wait_expires_on IS NULL AND timeout_on IS NULL AND current_flow_id IS NULL AND id = $1`, session2ID).Returns(1)
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1`, run2ID).Columns(map[string]interface{}{"status": "I"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1`, run2ID).Columns(map[string]any{"status": "I"})
 	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Cathy.ID).Returns(nil)
 }
 
@@ -501,6 +501,6 @@ func insertSessionAndRun(rt *runtime.Runtime, contact *testdata.Contact, session
 }
 
 func assertSessionAndRunStatus(t *testing.T, rt *runtime.Runtime, sessionID models.SessionID, status models.SessionStatus) {
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID).Columns(map[string]interface{}{"status": string(status)})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE session_id = $1`, sessionID).Columns(map[string]interface{}{"status": string(status)})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID).Columns(map[string]any{"status": string(status)})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE session_id = $1`, sessionID).Columns(map[string]any{"status": string(status)})
 }

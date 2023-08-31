@@ -67,22 +67,22 @@ func TestMsgCreated(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND quick_replies[1] = 'yes' AND quick_replies[2] = 'no' AND high_priority = TRUE`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 2,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello Attachments' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
-					Args:  []interface{}{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
+					Args:  []any{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 1,
 				},
 				{
 					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND metadata = $3 AND direction = 'O' AND status = 'Q' AND channel_id = $4",
-					Args: []interface{}{
+					Args: []any{
 						testdata.Alexandria.ID,
 						`Hi Alexandia, are you still experiencing problems with tooth?`,
 						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
@@ -158,7 +158,7 @@ func TestNewURN(t *testing.T) {
 					  u.identity = $2 AND
 					  m.channel_id = $3 AND
 					  u.channel_id IS NULL`,
-					Args:  []interface{}{testdata.Cathy.ID, "telegram:12345", telegramID},
+					Args:  []any{testdata.Cathy.ID, "telegram:12345", telegramID},
 					Count: 1,
 				},
 				{
@@ -175,7 +175,7 @@ func TestNewURN(t *testing.T) {
 					  u.identity = $2 AND
 					  m.channel_id = $3 AND
 					  u.channel_id IS NULL`,
-					Args:  []interface{}{testdata.Bob.ID, "telegram:67890", telegramID},
+					Args:  []any{testdata.Bob.ID, "telegram:67890", telegramID},
 					Count: 1,
 				},
 			},

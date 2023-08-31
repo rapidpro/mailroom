@@ -36,22 +36,22 @@ func TestContactGroupsChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Cathy.ID, testdata.DoctorsGroup.ID},
+					Args:  []any{testdata.Cathy.ID, testdata.DoctorsGroup.ID},
 					Count: 0,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Cathy.ID, testdata.TestersGroup.ID},
+					Args:  []any{testdata.Cathy.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.George.ID, testdata.TestersGroup.ID},
+					Args:  []any{testdata.George.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Bob.ID, testdata.TestersGroup.ID},
+					Args:  []any{testdata.Bob.ID, testdata.TestersGroup.ID},
 					Count: 0,
 				},
 			},

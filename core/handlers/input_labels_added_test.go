@@ -45,17 +45,17 @@ func TestInputLabelsAdded(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
-					Args:  []interface{}{msg1.ID},
+					Args:  []any{msg1.ID},
 					Count: 2,
 				},
 				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
-					Args:  []interface{}{msg2.ID},
+					Args:  []any{msg2.ID},
 					Count: 0,
 				},
 				{
 					SQL:   "select count(*) from msgs_msg_labels l JOIN msgs_msg m ON l.msg_id = m.id WHERE m.contact_id = $1",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 0,
 				},
 			},

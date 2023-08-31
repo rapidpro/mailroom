@@ -66,7 +66,7 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		topicID,
 		event.Ticket.Body,
 		assigneeID,
-		map[string]interface{}{
+		map[string]any{
 			"contact-uuid":    scene.Contact().UUID(),
 			"contact-display": tickets.GetContactDisplay(oa.Env(), scene.Contact()),
 		},
