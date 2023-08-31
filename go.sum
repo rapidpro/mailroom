@@ -94,8 +94,8 @@ github.com/nyaruka/null/v2 v2.0.3 h1:rdmMRQyVzrOF3Jff/gpU/7BDR9mQX0lcLl4yImsA3kw
 github.com/nyaruka/null/v2 v2.0.3/go.mod h1:OCVeCkCXwrg5/qE6RU0c1oUVZBy+ZDrT+xYg1XSaIWA=
 github.com/nyaruka/phonenumbers v1.1.8 h1:mjFu85FeoH2Wy18aOMUvxqi1GgAqiQSJsa/cCC5yu2s=
 github.com/nyaruka/phonenumbers v1.1.8/go.mod h1:DC7jZd321FqUe+qWSNcHi10tyIyGNXGcNbfkPvdp1Vs=
-github.com/nyaruka/redisx v0.3.1 h1:vnq1tHQwDh+7oG9BANyEVkqGjacgu8wpPxKBOx/exiw=
-github.com/nyaruka/redisx v0.3.1/go.mod h1:v3PY8t0gyf/0E7S0Cxb1RpCCxYo9GUFAIQdF/RufsVw=
+github.com/nyaruka/redisx v0.4.0 h1:DZpbNPjflOZzeR7OQArcwgKx4OTt1vpNOJjT+aBSe7U=
+github.com/nyaruka/redisx v0.4.0/go.mod h1:v3PY8t0gyf/0E7S0Cxb1RpCCxYo9GUFAIQdF/RufsVw=
 github.com/nyaruka/rp-indexer/v8 v8.3.0 h1:cDgOxDHpDzaQQv/d9d8lcAqWhPl/s5AmDAaFx9ysFcI=
 github.com/nyaruka/rp-indexer/v8 v8.3.0/go.mod h1:RgPxv2Rm0m3eoG7gFXwk1K68D/v01TfPIn3Rk8n5g8U=
 github.com/olivere/elastic/v7 v7.0.32 h1:R7CXvbu8Eq+WlsLgxmKVKPox0oOwAE/2T9Si5BnvK6E=

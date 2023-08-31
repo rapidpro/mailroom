@@ -20,7 +20,7 @@ require (
 	github.com/nyaruka/goflow v0.192.1
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null/v2 v2.0.3
-	github.com/nyaruka/redisx v0.3.1
+	github.com/nyaruka/redisx v0.4.0
 	github.com/nyaruka/rp-indexer/v8 v8.3.0
 	github.com/olivere/elastic/v7 v7.0.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
