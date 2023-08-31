@@ -632,7 +632,7 @@ UPDATE msgs_msg m
  WHERE id = ANY($1)`
 
 // ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
-func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
+func ResendMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
 	channels := oa.SessionAssets().Channels()
 
 	// for the bulk db updates
@@ -647,7 +647,7 @@ func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAsset
 
 		if urnID != nil {
 			// reselect channel for this message's URN
-			urn, err := URNForID(ctx, db, oa, *urnID)
+			urn, err := URNForID(ctx, rt.DB, oa, *urnID)
 			if err != nil {
 				return nil, errors.Wrap(err, "error loading URN")
 			}
@@ -687,13 +687,13 @@ func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAsset
 	}
 
 	// update the messages that can be resent
-	err := BulkQuery(ctx, "updating messages for resending", db, sqlUpdateMsgForResending, resends)
+	err := BulkQuery(ctx, "updating messages for resending", rt.DB, sqlUpdateMsgForResending, resends)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating messages for resending")
 	}
 
 	// and update the messages that can't be
-	_, err = db.ExecContext(ctx, sqlUpdateMsgResendFailed, pq.Array(refails))
+	_, err = rt.DB.ExecContext(ctx, sqlUpdateMsgResendFailed, pq.Array(refails))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating non-resendable messages")
 	}
@@ -709,7 +709,7 @@ WITH rows AS (
 )
 UPDATE msgs_msg SET status = 'F', failed_reason = $3, modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
-func FailChannelMessages(ctx context.Context, db DBorTx, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
+func FailChannelMessages(ctx context.Context, db *sql.DB, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
 	for {
 		// and update the messages as FAILED
 		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, failedReason)

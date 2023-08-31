@@ -304,7 +304,7 @@ func TestResendMessages(t *testing.T) {
 	now := dates.Now()
 
 	// resend both msgs
-	resent, err := models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
+	resent, err := models.ResendMessages(ctx, rt, oa, msgs)
 	require.NoError(t, err)
 
 	assert.Len(t, resent, 3) // only #1, #2 and #3 can be resent
@@ -337,7 +337,7 @@ func TestFailMessages(t *testing.T) {
 	now := dates.Now()
 
 	// fail the msgs
-	err := models.FailChannelMessages(ctx, rt.DB, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
+	err := models.FailChannelMessages(ctx, rt.DB.DB, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)

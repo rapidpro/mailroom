@@ -314,11 +314,11 @@ WHERE
   t.ticketer_id = $1 AND t.external_id = $2`
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
-func LookupTicketByExternalID(ctx context.Context, db DBorTx, ticketerID TicketerID, externalID string) (*Ticket, error) {
+func LookupTicketByExternalID(ctx context.Context, db *sqlx.DB, ticketerID TicketerID, externalID string) (*Ticket, error) {
 	return lookupTicket(ctx, db, sqlSelectTicketByExternalID, ticketerID, externalID)
 }
 
-func lookupTicket(ctx context.Context, db DBorTx, query string, params ...interface{}) (*Ticket, error) {
+func lookupTicket(ctx context.Context, db *sqlx.DB, query string, params ...interface{}) (*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
