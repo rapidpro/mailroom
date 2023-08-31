@@ -85,7 +85,7 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, userID UserID, flowID FlowID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, userID UserID, flowID FlowID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]any) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -238,7 +238,7 @@ func LoadTickets(ctx context.Context, db *sqlx.DB, ids []TicketID) ([]*Ticket, e
 	return loadTickets(ctx, db, sqlSelectTicketsByID, pq.Array(ids))
 }
 
-func loadTickets(ctx context.Context, db *sqlx.DB, query string, params ...interface{}) ([]*Ticket, error) {
+func loadTickets(ctx context.Context, db *sqlx.DB, query string, params ...any) ([]*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrap(err, "error loading tickets")
@@ -314,11 +314,11 @@ WHERE
   t.ticketer_id = $1 AND t.external_id = $2`
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
-func LookupTicketByExternalID(ctx context.Context, db DBorTx, ticketerID TicketerID, externalID string) (*Ticket, error) {
+func LookupTicketByExternalID(ctx context.Context, db *sqlx.DB, ticketerID TicketerID, externalID string) (*Ticket, error) {
 	return lookupTicket(ctx, db, sqlSelectTicketByExternalID, ticketerID, externalID)
 }
 
-func lookupTicket(ctx context.Context, db DBorTx, query string, params ...interface{}) (*Ticket, error) {
+func lookupTicket(ctx context.Context, db *sqlx.DB, query string, params ...any) (*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -355,7 +355,7 @@ func InsertTickets(ctx context.Context, tx DBorTx, oa *OrgAssets, tickets []*Tic
 	openingCounts := map[string]int{scopeOrg(oa): len(tickets)} // all new tickets are open
 	assignmentCounts := make(map[string]int)
 
-	ts := make([]interface{}, len(tickets))
+	ts := make([]any, len(tickets))
 	for i, t := range tickets {
 		ts[i] = &t.t
 
@@ -793,7 +793,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db DBorTx, add map[string]s
 	}
 
 	// convert to null.Map to save
-	dbMap := make(map[string]interface{}, len(t.t.Config))
+	dbMap := make(map[string]any, len(t.t.Config))
 	for key, value := range t.t.Config {
 		dbMap[key] = value
 	}

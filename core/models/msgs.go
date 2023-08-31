@@ -359,8 +359,8 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	return msg, nil
 }
 
-func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
-	metadata := make(map[string]interface{})
+func buildMsgMetadata(m *flows.MsgOut) map[string]any {
+	metadata := make(map[string]any)
 	if m.Templating() != nil {
 		metadata["templating"] = m.Templating()
 	}
@@ -510,7 +510,7 @@ func GetMessagesForRetry(ctx context.Context, db *sqlx.DB) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
 
-func loadMessages(ctx context.Context, db *sqlx.DB, sql string, params ...interface{}) ([]*Msg, error) {
+func loadMessages(ctx context.Context, db *sqlx.DB, sql string, params ...any) ([]*Msg, error) {
 	rows, err := db.QueryxContext(ctx, sql, params...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying msgs")
@@ -553,7 +553,7 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 
 // InsertMessages inserts the passed in messages in a single query
 func InsertMessages(ctx context.Context, tx DBorTx, msgs []*Msg) error {
-	is := make([]interface{}, len(msgs))
+	is := make([]any, len(msgs))
 	for i := range msgs {
 		is[i] = &msgs[i].m
 	}
@@ -603,7 +603,7 @@ UPDATE msgs_msg
  WHERE msgs_msg.id = m.id::bigint`
 
 func updateMessageStatus(ctx context.Context, db DBorTx, msgs []*Msg, status MsgStatus, nextAttempt *time.Time) error {
-	is := make([]interface{}, len(msgs))
+	is := make([]any, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
 		m.Status = status
@@ -632,11 +632,11 @@ UPDATE msgs_msg m
  WHERE id = ANY($1)`
 
 // ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
-func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
+func ResendMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
 	channels := oa.SessionAssets().Channels()
 
 	// for the bulk db updates
-	resends := make([]interface{}, 0, len(msgs))
+	resends := make([]any, 0, len(msgs))
 	refails := make([]MsgID, 0, len(msgs))
 
 	resent := make([]*Msg, 0, len(msgs))
@@ -647,7 +647,7 @@ func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAsset
 
 		if urnID != nil {
 			// reselect channel for this message's URN
-			urn, err := URNForID(ctx, db, oa, *urnID)
+			urn, err := URNForID(ctx, rt.DB, oa, *urnID)
 			if err != nil {
 				return nil, errors.Wrap(err, "error loading URN")
 			}
@@ -687,13 +687,13 @@ func ResendMessages(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAsset
 	}
 
 	// update the messages that can be resent
-	err := BulkQuery(ctx, "updating messages for resending", db, sqlUpdateMsgForResending, resends)
+	err := BulkQuery(ctx, "updating messages for resending", rt.DB, sqlUpdateMsgForResending, resends)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating messages for resending")
 	}
 
 	// and update the messages that can't be
-	_, err = db.ExecContext(ctx, sqlUpdateMsgResendFailed, pq.Array(refails))
+	_, err = rt.DB.ExecContext(ctx, sqlUpdateMsgResendFailed, pq.Array(refails))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating non-resendable messages")
 	}
@@ -709,7 +709,7 @@ WITH rows AS (
 )
 UPDATE msgs_msg SET status = 'F', failed_reason = $3, modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
-func FailChannelMessages(ctx context.Context, db DBorTx, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
+func FailChannelMessages(ctx context.Context, db *sql.DB, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
 	for {
 		// and update the messages as FAILED
 		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, failedReason)

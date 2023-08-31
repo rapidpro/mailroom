@@ -31,7 +31,7 @@ func TestFlowEntered(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where current_flow_id = $1`,
-					Args:  []interface{}{flow.ID()},
+					Args:  []any{flow.ID()},
 					Count: 1,
 				},
 			},

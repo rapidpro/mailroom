@@ -14,7 +14,7 @@ import (
 )
 
 // AssertCourierQueues asserts the sizes of message batches in the named courier queues
-func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...interface{}) {
+func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...any) {
 	rc := getRC()
 	defer rc.Close()
 
@@ -35,7 +35,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 			// unmarshal each item in the queue as a batch of messages
 			for i := 0; i < int(size); i++ {
 				batchJSON := results[i*2].([]byte)
-				var batch []map[string]interface{}
+				var batch []map[string]any
 				err = json.Unmarshal(batchJSON, &batch)
 				require.NoError(t, err)
 
@@ -48,7 +48,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 }
 
 // AssertContactTasks asserts that the given contact has the given tasks queued for them
-func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.ContactID, expected []string, msgAndArgs ...interface{}) {
+func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.ContactID, expected []string, msgAndArgs ...any) {
 	rc := getRC()
 	defer rc.Close()
 

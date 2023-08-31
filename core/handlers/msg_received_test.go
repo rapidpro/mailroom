@@ -37,12 +37,12 @@ func TestMsgReceived(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM contacts_contact WHERE id = $1 AND last_seen_on > $2",
-					Args:  []interface{}{testdata.Cathy.ID, now},
+					Args:  []any{testdata.Cathy.ID, now},
 					Count: 1,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM contacts_contact WHERE id = $1 AND last_seen_on IS NULL",
-					Args:  []interface{}{testdata.George.ID},
+					Args:  []any{testdata.George.ID},
 					Count: 1,
 				},
 			},
@@ -60,7 +60,7 @@ func TestMsgReceived(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'I'",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 1,
 				},
 			},

@@ -32,7 +32,7 @@ func TestBulkQueryBatches(t *testing.T) {
 	// test when structs fit into one batch
 	foo1 := &foo{Name: "A", Age: 30}
 	foo2 := &foo{Name: "B", Age: 31}
-	err = models.BulkQueryBatches(ctx, "foo inserts", rt.DB, sql, 2, []interface{}{foo1, foo2})
+	err = models.BulkQueryBatches(ctx, "foo inserts", rt.DB, sql, 2, []any{foo1, foo2})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, foo1.ID)
 	assert.Equal(t, 2, foo2.ID)
@@ -45,7 +45,7 @@ func TestBulkQueryBatches(t *testing.T) {
 	foo5 := &foo{Name: "E", Age: 34}
 	foo6 := &foo{Name: "F", Age: 35}
 	foo7 := &foo{Name: "G", Age: 36}
-	err = models.BulkQueryBatches(ctx, "foo inserts", rt.DB, sql, 2, []interface{}{foo3, foo4, foo5, foo6, foo7})
+	err = models.BulkQueryBatches(ctx, "foo inserts", rt.DB, sql, 2, []any{foo3, foo4, foo5, foo6, foo7})
 	assert.NoError(t, err)
 	assert.Equal(t, 3, foo3.ID)
 	assert.Equal(t, 4, foo4.ID)

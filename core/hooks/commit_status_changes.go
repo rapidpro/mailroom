@@ -17,7 +17,7 @@ var CommitStatusChangesHook models.EventCommitHook = &commitStatusChangesHook{}
 type commitStatusChangesHook struct{}
 
 // Apply commits our contact status change
-func (h *commitStatusChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitStatusChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 
 	statusChanges := make([]*models.ContactStatusChange, 0, len(scenes))
 	for scene, es := range scenes {

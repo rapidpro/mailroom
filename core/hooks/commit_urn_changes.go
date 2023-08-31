@@ -16,7 +16,7 @@ var CommitURNChangesHook models.EventCommitHook = &commitURNChangesHook{}
 type commitURNChangesHook struct{}
 
 // Apply adds all our URNS in a batch
-func (h *commitURNChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitURNChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// gather all our urn changes, we only care about the last change for each scene
 	changes := make([]*models.ContactURNsChanged, 0, len(scenes))
 	for _, sessionChanges := range scenes {

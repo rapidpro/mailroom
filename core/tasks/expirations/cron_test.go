@@ -57,26 +57,26 @@ func TestExpirations(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Cathy's session should be expired along with its runs
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]interface{}{"status": "X"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]interface{}{"status": "X"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]any{"status": "X"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]any{"status": "X"})
 
 	// Bob's session and runs should be unchanged because it's been queued for resumption
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]interface{}{"status": "A"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]any{"status": "A"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]any{"status": "W"})
 
 	// George's session and run should be unchanged
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r4ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r4ID).Columns(map[string]any{"status": "W"})
 
 	// Alexandria's session and run should be unchanged because IVR expirations are handled separately
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s4ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r5ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s4ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r5ID).Columns(map[string]any{"status": "W"})
 
 	// blocked contact's session and runs sshould be unchanged because it's been queued for resumption.. like any other contact
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s5ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r6ID).Columns(map[string]interface{}{"status": "A"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r7ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s5ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r6ID).Columns(map[string]any{"status": "A"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r7ID).Columns(map[string]any{"status": "W"})
 
 	// should have created two expiration tasks
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
@@ -131,14 +131,14 @@ func TestExpireVoiceSessions(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Cathy's session should be expired along with its runs
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]interface{}{"status": "X"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]interface{}{"status": "X"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]any{"status": "X"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]any{"status": "X"})
 
 	// Bob's session and run should be unchanged
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]any{"status": "W"})
 
 	// Alexandria's session and run should be unchanged because message expirations are handled separately
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]interface{}{"status": "W"})
-	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]any{"status": "W"})
+	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]any{"status": "W"})
 }

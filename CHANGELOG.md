@@ -1,3 +1,8 @@
+v8.3.9 (2023-08-30)
+-------------------------
+ * Make it easier to create messages in tests
+ * Add contact task to delete a message
+
 v8.3.8 (2023-08-29)
 -------------------------
  * Use less sqlx and tidy up use of interfaces where functions can take a DB or Tx

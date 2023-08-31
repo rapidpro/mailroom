@@ -41,42 +41,42 @@ func (d *MockDB) Rebind(query string) string {
 	return d.real.Rebind(query)
 }
 
-func (d *MockDB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (d *MockDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	if err := d.check("QueryContext"); err != nil {
 		return nil, err
 	}
 	return d.real.QueryContext(ctx, query, args...)
 }
 
-func (d *MockDB) QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+func (d *MockDB) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
 	if err := d.check("QueryxContext"); err != nil {
 		return nil, err
 	}
 	return d.real.QueryxContext(ctx, query, args...)
 }
 
-func (d *MockDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (d *MockDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	if err := d.check("ExecContext"); err != nil {
 		return nil, err
 	}
 	return d.real.ExecContext(ctx, query, args...)
 }
 
-func (d *MockDB) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
+func (d *MockDB) NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error) {
 	if err := d.check("NamedExecContext"); err != nil {
 		return nil, err
 	}
 	return d.real.NamedExecContext(ctx, query, arg)
 }
 
-func (d *MockDB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+func (d *MockDB) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
 	if err := d.check("SelectContext"); err != nil {
 		return err
 	}
 	return d.real.SelectContext(ctx, dest, query, args...)
 }
 
-func (d *MockDB) GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error {
+func (d *MockDB) GetContext(ctx context.Context, value any, query string, args ...any) error {
 	if err := d.check("GetContext"); err != nil {
 		return err
 	}
