@@ -50,7 +50,7 @@ type Assertion func(t *testing.T, rt *runtime.Runtime) error
 
 type SQLAssertion struct {
 	SQL   string
-	Args  []interface{}
+	Args  []any
 	Count int
 }
 

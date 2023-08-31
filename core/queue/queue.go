@@ -66,7 +66,7 @@ func Size(rc redis.Conn, queue string) (int, error) {
 }
 
 // AddTask adds the passed in task to our queue for execution
-func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task interface{}, priority Priority) error {
+func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task any, priority Priority) error {
 	score := strconv.FormatFloat(float64(time.Now().UnixNano()/int64(time.Microsecond))/float64(1000000)+float64(priority), 'f', 6, 64)
 
 	taskBody, err := json.Marshal(task)

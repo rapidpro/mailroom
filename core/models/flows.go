@@ -146,7 +146,7 @@ func LoadFlowByID(ctx context.Context, db *sql.DB, orgID OrgID, flowID FlowID) (
 }
 
 // loads the flow with the passed in UUID
-func loadFlow(ctx context.Context, db *sql.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+func loadFlow(ctx context.Context, db *sql.DB, sql string, orgID OrgID, arg any) (*Flow, error) {
 	start := time.Now()
 	flow := &Flow{}
 

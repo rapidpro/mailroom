@@ -47,7 +47,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 		ExpectedStatus       models.MsgStatus
 		ExpectedFailedReason models.MsgFailedReason
-		ExpectedMetadata     map[string]interface{}
+		ExpectedMetadata     map[string]any
 		ExpectedMsgCount     int
 		ExpectedPriority     bool
 	}{
@@ -61,7 +61,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ResponseTo:           models.MsgID(123425),
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
-			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMetadata:     map[string]any{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     true,
 		},
@@ -76,7 +76,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.SingleMessage,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
-			ExpectedMetadata:     map[string]interface{}{"topic": "purchase"},
+			ExpectedMetadata:     map[string]any{"topic": "purchase"},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
 		},
@@ -90,7 +90,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.Favorites,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
-			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMetadata:     map[string]any{},
 			ExpectedMsgCount:     2,
 			ExpectedPriority:     false,
 		},
@@ -104,7 +104,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			SuspendedOrg:         true,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedSuspended,
-			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMetadata:     map[string]any{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
 		},
@@ -118,7 +118,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.Favorites,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedNoDestination,
-			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMetadata:     map[string]any{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
 		},
@@ -132,7 +132,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.Favorites,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedContact,
-			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMetadata:     map[string]any{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
 		},
@@ -501,7 +501,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{dbMsg})
 	require.NoError(t, err)
 
-	assertdb.Query(t, rt.DB, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
+	assertdb.Query(t, rt.DB, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]any{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
 }
 
 func TestNewMsgOut(t *testing.T) {

@@ -3,11 +3,12 @@ package rocketchat
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/pkg/errors"
-	"io"
-	"net/http"
 )
 
 // Client is a basic RocketChat app client
@@ -32,7 +33,7 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func (c *Client) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *Client) request(method, endpoint string, payload any, response any) (*httpx.Trace, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, endpoint)
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Token %s", c.secret),
@@ -73,20 +74,20 @@ func (c *Client) request(method, endpoint string, payload interface{}, response 
 	return trace, nil
 }
 
-func (c *Client) get(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *Client) get(endpoint string, payload any, response any) (*httpx.Trace, error) {
 	return c.request("GET", endpoint, payload, response)
 }
 
-func (c *Client) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+func (c *Client) post(endpoint string, payload any, response any) (*httpx.Trace, error) {
 	return c.request("POST", endpoint, payload, response)
 }
 
 type Visitor struct {
-	Token        string            `json:"token"`
-	ContactUUID  string            `json:"contactUUID,omitempty"`
-	Name         string            `json:"name,omitempty"`
-	Email        string            `json:"email,omitempty"`
-	Phone        string            `json:"phone,omitempty"`
+	Token       string `json:"token"`
+	ContactUUID string `json:"contactUUID,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Email       string `json:"email,omitempty"`
+	Phone       string `json:"phone,omitempty"`
 }
 
 type Room struct {

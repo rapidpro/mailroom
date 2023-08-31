@@ -18,7 +18,7 @@ var UpdateCampaignEventsHook models.EventCommitHook = &updateCampaignEventsHook{
 type updateCampaignEventsHook struct{}
 
 // Apply will update all the campaigns for the passed in scene, minimizing the number of queries to do so
-func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 

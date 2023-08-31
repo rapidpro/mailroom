@@ -76,7 +76,7 @@ func TestTickets(t *testing.T) {
 		testdata.DefaultTopic.ID,
 		"Where are my cookies?",
 		testdata.Admin.ID,
-		map[string]interface{}{
+		map[string]any{
 			"contact-display": "Cathy",
 		},
 	)
@@ -220,9 +220,9 @@ func TestTicketsAssign(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket3].EventType())
 
 	// check tickets are now assigned
-	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket1.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
-	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket2.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
-	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket3.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket1.ID).Columns(map[string]any{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket2.ID).Columns(map[string]any{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, rt.DB, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket3.ID).Columns(map[string]any{"assignee_id": int64(testdata.Agent.ID)})
 
 	// and there are new assigned events with notifications
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A'`).Returns(3)
@@ -334,7 +334,7 @@ func TestCloseTickets(t *testing.T) {
 
 	// and there's closed event for it
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
-		[]interface{}{testdata.Org1.ID, ticket1.ID}, 1)
+		[]any{testdata.Org1.ID, ticket1.ID}, 1)
 
 	// and the logger has an http log it can insert for that ticketer
 	require.NoError(t, logger.Insert(ctx, rt.DB))

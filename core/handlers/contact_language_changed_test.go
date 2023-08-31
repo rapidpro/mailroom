@@ -32,22 +32,22 @@ func TestContactLanguageChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'eng'",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'spa'",
-					Args:  []interface{}{testdata.George.ID},
+					Args:  []any{testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
-					Args:  []interface{}{testdata.Alexandria.ID},
+					Args:  []any{testdata.Alexandria.ID},
 					Count: 1,
 				},
 			},

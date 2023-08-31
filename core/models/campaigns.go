@@ -333,7 +333,7 @@ WHERE
 // MarkEventsFired updates the passed in event fires with the fired time and result
 func MarkEventsFired(ctx context.Context, db DBorTx, fires []*EventFire, fired time.Time, result EventFireResult) error {
 	// set fired on all our values
-	updates := make([]interface{}, 0, len(fires))
+	updates := make([]any, 0, len(fires))
 	for _, f := range fires {
 		f.Fired = &fired
 		f.FiredResult = result
@@ -441,7 +441,7 @@ func DeleteUnfiredEventFires(ctx context.Context, tx DBorTx, removes []*FireDele
 	}
 
 	// convert to list of interfaces
-	is := make([]interface{}, len(removes))
+	is := make([]any, len(removes))
 	for i := range removes {
 		is[i] = removes[i]
 	}
@@ -499,7 +499,7 @@ func AddEventFires(ctx context.Context, tx DBorTx, adds []*FireAdd) error {
 	}
 
 	// convert to list of interfaces
-	is := make([]interface{}, len(adds))
+	is := make([]any, len(adds))
 	for i := range adds {
 		is[i] = adds[i]
 	}
@@ -644,18 +644,18 @@ INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
 
 func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string
-	var params []interface{}
+	var params []any
 
 	switch field.Key() {
 	case CreatedOnKey:
 		query = sqlEligibleContactsForCreatedOn
-		params = []interface{}{groupID}
+		params = []any{groupID}
 	case LastSeenOnKey:
 		query = sqlEligibleContactsForLastSeenOn
-		params = []interface{}{groupID}
+		params = []any{groupID}
 	default:
 		query = sqlEligibleContactsForField
-		params = []interface{}{groupID, field.UUID()}
+		params = []any{groupID, field.UUID()}
 	}
 
 	rows, err := db.QueryxContext(ctx, query, params...)

@@ -18,8 +18,8 @@ type Scene struct {
 	session *Session
 	userID  UserID
 
-	preCommits  map[EventCommitHook][]interface{}
-	postCommits map[EventCommitHook][]interface{}
+	preCommits  map[EventCommitHook][]any
+	postCommits map[EventCommitHook][]any
 }
 
 // NewSceneForSession creates a new scene for the passed in session
@@ -28,8 +28,8 @@ func NewSceneForSession(session *Session) *Scene {
 		contact: session.Contact(),
 		session: session,
 
-		preCommits:  make(map[EventCommitHook][]interface{}),
-		postCommits: make(map[EventCommitHook][]interface{}),
+		preCommits:  make(map[EventCommitHook][]any),
+		postCommits: make(map[EventCommitHook][]any),
 	}
 }
 
@@ -39,8 +39,8 @@ func NewSceneForContact(contact *flows.Contact, userID UserID) *Scene {
 		contact: contact,
 		userID:  userID,
 
-		preCommits:  make(map[EventCommitHook][]interface{}),
-		postCommits: make(map[EventCommitHook][]interface{}),
+		preCommits:  make(map[EventCommitHook][]any),
+		postCommits: make(map[EventCommitHook][]any),
 	}
 }
 
@@ -63,12 +63,12 @@ func (s *Scene) Session() *Session { return s.session }
 func (s *Scene) UserID() UserID { return s.userID }
 
 // AppendToEventPreCommitHook adds a new event to be handled by a pre commit hook
-func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event interface{}) {
+func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event any) {
 	s.preCommits[hook] = append(s.preCommits[hook], event)
 }
 
 // AppendToEventPostCommitHook adds a new event to be handled by a post commit hook
-func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event interface{}) {
+func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event any) {
 	s.postCommits[hook] = append(s.postCommits[hook], event)
 }
 
@@ -131,18 +131,18 @@ func ApplyPreWriteEvent(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 
 // EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
 type EventCommitHook interface {
-	Apply(context.Context, *runtime.Runtime, *sqlx.Tx, *OrgAssets, map[*Scene][]interface{}) error
+	Apply(context.Context, *runtime.Runtime, *sqlx.Tx, *OrgAssets, map[*Scene][]any) error
 }
 
 // ApplyEventPreCommitHooks runs through all the pre event hooks for the passed in sessions and applies their events
 func ApplyEventPreCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
-	preHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	preHooks := make(map[EventCommitHook]map[*Scene][]any)
 	for _, s := range scenes {
 		for hook, args := range s.preCommits {
 			sessionMap, found := preHooks[hook]
 			if !found {
-				sessionMap = make(map[*Scene][]interface{}, len(scenes))
+				sessionMap = make(map[*Scene][]any, len(scenes))
 				preHooks[hook] = sessionMap
 			}
 			sessionMap[s] = args
@@ -163,12 +163,12 @@ func ApplyEventPreCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 // ApplyEventPostCommitHooks runs through all the post event hooks for the passed in sessions and applies their events
 func ApplyEventPostCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
-	postHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	postHooks := make(map[EventCommitHook]map[*Scene][]any)
 	for _, s := range scenes {
 		for hook, args := range s.postCommits {
 			sprintMap, found := postHooks[hook]
 			if !found {
-				sprintMap = make(map[*Scene][]interface{}, len(scenes))
+				sprintMap = make(map[*Scene][]any, len(scenes))
 				postHooks[hook] = sprintMap
 			}
 			sprintMap[s] = args

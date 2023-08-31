@@ -31,7 +31,7 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 			Token:       fcmID,
 			Priority:    "high",
 			CollapseKey: "sync",
-			Data:        map[string]interface{}{"msg": "sync"},
+			Data:        map[string]any{"msg": "sync"},
 		}
 
 		start := time.Now()

@@ -136,7 +136,7 @@ func TestResponseForSprint(t *testing.T) {
 	// the dial action will have made a call to the calls endpoint
 	assert.Equal(t, 1, len(mockVonage.Requests()))
 	body, _ := io.ReadAll(mockVonage.Requests()[0].Body)
-	var decodedBody map[string]interface{}
+	var decodedBody map[string]any
 	jsonx.MustUnmarshal(body, &decodedBody)
 	assert.Equal(t, float64(60), decodedBody["ringing_timer"])
 	assert.Equal(t, float64(7200), decodedBody["length_timer"])

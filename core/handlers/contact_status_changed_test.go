@@ -23,7 +23,7 @@ func TestContactStatusChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'B'`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},
@@ -35,7 +35,7 @@ func TestContactStatusChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'S'`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},
@@ -47,12 +47,12 @@ func TestContactStatusChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A'`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A'`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},

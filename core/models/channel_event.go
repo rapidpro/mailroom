@@ -58,7 +58,7 @@ func (e *ChannelEvent) ChannelID() ChannelID  { return e.e.ChannelID }
 func (e *ChannelEvent) IsNewContact() bool    { return e.e.NewContact }
 func (e *ChannelEvent) OccurredOn() time.Time { return e.e.OccurredOn }
 
-func (e *ChannelEvent) Extra() map[string]interface{} {
+func (e *ChannelEvent) Extra() map[string]any {
 	return e.e.Extra
 }
 
@@ -85,11 +85,11 @@ INSERT INTO channels_channelevent(event_type, extra, occurred_on, created_on, ch
 // Insert inserts this channel event to our DB. The ID of the channel event will be
 // set if no error is returned
 func (e *ChannelEvent) Insert(ctx context.Context, db DBorTx) error {
-	return BulkQuery(ctx, "insert channel event", db, sqlInsertChannelEvent, []interface{}{&e.e})
+	return BulkQuery(ctx, "insert channel event", db, sqlInsertChannelEvent, []any{&e.e})
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it
-func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]interface{}, isNewContact bool) *ChannelEvent {
+func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]any, isNewContact bool) *ChannelEvent {
 	event := &ChannelEvent{}
 	e := &event.e
 

@@ -272,7 +272,7 @@ func TestServer(t *testing.T) {
 		// if this was a success, save our session
 		if resp.StatusCode == 200 {
 			// save the session for use in a resume
-			parsed := make(map[string]interface{})
+			parsed := make(map[string]any)
 			jsonx.MustUnmarshal(content, &parsed)
 			session = jsonx.MustMarshal(parsed["session"])
 

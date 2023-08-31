@@ -36,12 +36,12 @@ type Dial struct {
 }
 
 type Gather struct {
-	XMLName     string        `xml:"Gather"`
-	NumDigits   int           `xml:"numDigits,attr,omitempty"`
-	FinishOnKey string        `xml:"finishOnKey,attr,omitempty"`
-	Timeout     int           `xml:"timeout,attr,omitempty"`
-	Action      string        `xml:"action,attr,omitempty"`
-	Commands    []interface{} `xml:",innerxml"`
+	XMLName     string `xml:"Gather"`
+	NumDigits   int    `xml:"numDigits,attr,omitempty"`
+	FinishOnKey string `xml:"finishOnKey,attr,omitempty"`
+	Timeout     int    `xml:"timeout,attr,omitempty"`
+	Action      string `xml:"action,attr,omitempty"`
+	Commands    []any  `xml:",innerxml"`
 }
 
 type Record struct {
@@ -51,8 +51,8 @@ type Record struct {
 }
 
 type Response struct {
-	XMLName  string        `xml:"Response"`
-	Message  string        `xml:",comment"`
-	Gather   *Gather       `xml:"Gather"`
-	Commands []interface{} `xml:",innerxml"`
+	XMLName  string  `xml:"Response"`
+	Message  string  `xml:",comment"`
+	Gather   *Gather `xml:"Gather"`
+	Commands []any   `xml:",innerxml"`
 }

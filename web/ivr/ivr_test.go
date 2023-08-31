@@ -312,7 +312,7 @@ func TestTwilioIVR(t *testing.T) {
 
 		for connExtID, expStatus := range tc.expectedConnStatus {
 			assertdb.Query(t, rt.DB, `SELECT status FROM ivr_call WHERE external_id = $1`, connExtID).
-				Columns(map[string]interface{}{"status": expStatus}, "status mismatch for connection '%s' in test '%s'", connExtID, tc.label)
+				Columns(map[string]any{"status": expStatus}, "status mismatch for connection '%s' in test '%s'", connExtID, tc.label)
 		}
 	}
 

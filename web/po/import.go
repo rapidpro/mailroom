@@ -56,5 +56,5 @@ func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 		return err, http.StatusBadRequest, nil
 	}
 
-	return map[string]interface{}{"flows": flows}, http.StatusOK, nil
+	return map[string]any{"flows": flows}, http.StatusOK, nil
 }

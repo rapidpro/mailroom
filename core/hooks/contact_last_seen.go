@@ -17,7 +17,7 @@ var ContactLastSeenHook models.EventCommitHook = &contactLastSeenHook{}
 type contactLastSeenHook struct{}
 
 // Apply squashes and updates modified_on on all the contacts passed in
-func (h *contactLastSeenHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *contactLastSeenHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 
 	for scene, evts := range scenes {
 		lastEvent := evts[len(evts)-1].(flows.Event)

@@ -56,7 +56,7 @@ type Channel struct {
 		MatchPrefixes      []string                 `json:"match_prefixes"`
 		AllowInternational bool                     `json:"allow_international"`
 		MachineDetection   bool                     `json:"machine_detection"`
-		Config             map[string]interface{}   `json:"config"`
+		Config             map[string]any           `json:"config"`
 	}
 }
 
@@ -103,7 +103,7 @@ func (c *Channel) MachineDetection() bool { return c.c.MachineDetection }
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
 // Config returns the config for this channel
-func (c *Channel) Config() map[string]interface{} { return c.c.Config }
+func (c *Channel) Config() map[string]any { return c.c.Config }
 
 // ConfigValue returns the config value for the passed in key
 func (c *Channel) ConfigValue(key string, def string) string {

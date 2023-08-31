@@ -318,7 +318,7 @@ func TestArchiveContactTriggers(t *testing.T) {
 	assertTriggerArchived(georgeOnlyID, false)
 }
 
-func assertTrigger(t *testing.T, expected models.TriggerID, actual *models.Trigger, msgAndArgs ...interface{}) {
+func assertTrigger(t *testing.T, expected models.TriggerID, actual *models.Trigger, msgAndArgs ...any) {
 	if actual == nil {
 		assert.Equal(t, expected, models.NilTriggerID, msgAndArgs...)
 	} else {

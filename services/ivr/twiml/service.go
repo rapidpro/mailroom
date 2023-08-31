@@ -455,7 +455,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
-	commands := make([]interface{}, 0)
+	commands := make([]any, 0)
 	hasWait := false
 
 	for _, e := range es {

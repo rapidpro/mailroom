@@ -57,7 +57,7 @@ func BulkQuery[T any](ctx context.Context, label string, tx DBorTx, sql string, 
 }
 
 // BulkQueryBatches runs the given query as a bulk operation, in batches of the given size
-func BulkQueryBatches(ctx context.Context, label string, tx DBorTx, sql string, batchSize int, structs []interface{}) error {
+func BulkQueryBatches(ctx context.Context, label string, tx DBorTx, sql string, batchSize int, structs []any) error {
 	start := time.Now()
 
 	batches := ChunkSlice(structs, batchSize)

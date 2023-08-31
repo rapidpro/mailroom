@@ -301,12 +301,12 @@ func TestAirtimeTransferred(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'S'`,
-					Args:  []interface{}{testdata.Org1.ID, testdata.Cathy.ID},
+					Args:  []any{testdata.Org1.ID, testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = FALSE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
-					Args:  []interface{}{testdata.Org1.ID},
+					Args:  []any{testdata.Org1.ID},
 					Count: 3,
 				},
 			},
@@ -320,12 +320,12 @@ func TestAirtimeTransferred(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
-					Args:  []interface{}{testdata.Org1.ID, testdata.George.ID},
+					Args:  []any{testdata.Org1.ID, testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = TRUE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
-					Args:  []interface{}{testdata.Org1.ID},
+					Args:  []any{testdata.Org1.ID},
 					Count: 1,
 				},
 			},

@@ -71,9 +71,9 @@ func TestSyncAndroidChannels(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Android channels
-	testChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
-	testChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
-	testChannel3 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
+	testChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]any{"FCM_ID": ""})       // no FCM ID
+	testChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID2"}) // invalid FCM ID
+	testChannel3 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID3"}) // valid FCM ID
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 
 	assert.Equal(t, "high", mockFCM.Messages[0].Priority)
 	assert.Equal(t, "sync", mockFCM.Messages[0].CollapseKey)
-	assert.Equal(t, map[string]interface{}{"msg": "sync"}, mockFCM.Messages[0].Data)
+	assert.Equal(t, map[string]any{"msg": "sync"}, mockFCM.Messages[0].Data)
 }
 
 func TestCreateFCMClient(t *testing.T) {

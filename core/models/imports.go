@@ -186,7 +186,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db *sqlx.D
 
 	for _, imp := range imports {
 		addModifier := func(m flows.Modifier) { imp.mods = append(imp.mods, m) }
-		addError := func(s string, args ...interface{}) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
+		addError := func(s string, args ...any) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
 		spec := imp.spec
 
 		isActive := spec.Status == "" || spec.Status == flows.ContactStatusActive
