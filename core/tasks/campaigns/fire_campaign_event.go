@@ -68,7 +68,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
 		for _, id := range t.FireIDs {
-			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", id))
+			rerr := campaignsMarker.Rem(rc, fmt.Sprintf("%d", id))
 			if rerr != nil {
 				log.WithError(rerr).WithField("fire_id", id).Error("error unmarking campaign fire")
 			}
@@ -100,7 +100,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 
 	for _, f := range fires {
 		if !handledSet[f] {
-			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", f.FireID))
+			rerr := campaignsMarker.Rem(rc, fmt.Sprintf("%d", f.FireID))
 			if rerr != nil {
 				log.WithError(rerr).WithField("fire_id", f.FireID).Error("error unmarking campaign fire")
 			}

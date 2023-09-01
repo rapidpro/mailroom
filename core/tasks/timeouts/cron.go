@@ -48,7 +48,7 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 
 		// check whether we've already queued this
 		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
-		queued, err := marker.Contains(rc, taskID)
+		queued, err := marker.IsMember(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether task is queued")
 		}

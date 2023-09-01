@@ -62,7 +62,7 @@ func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 
 		// check whether this event has already been queued to fire
 		taskID := fmt.Sprintf("%d", row.FireID)
-		dupe, err := campaignsMarker.Contains(rc, taskID)
+		dupe, err := campaignsMarker.IsMember(rc, taskID)
 		if err != nil {
 			return errors.Wrap(err, "error checking task lock")
 		}

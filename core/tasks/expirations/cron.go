@@ -73,7 +73,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 
 		// create a contact task to resume this session
 		taskID := fmt.Sprintf("%d:%s", expiredWait.SessionID, expiredWait.WaitExpiresOn.Format(time.RFC3339))
-		queued, err := expirationsMarker.Contains(rc, taskID)
+		queued, err := expirationsMarker.IsMember(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether expiration is queued")
 		}
