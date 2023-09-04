@@ -13,9 +13,9 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
@@ -104,7 +104,7 @@ type Msg struct {
 		Text         string         `db:"text"`
 		Attachments  pq.StringArray `db:"attachments"`
 		QuickReplies pq.StringArray `db:"quick_replies"`
-		Locale       envs.Locale    `db:"locale"`
+		Locale       i18n.Locale    `db:"locale"`
 
 		HighPriority bool          `db:"high_priority"`
 		Direction    MsgDirection  `db:"direction"`
@@ -141,7 +141,7 @@ func (m *Msg) BroadcastID() BroadcastID      { return m.m.BroadcastID }
 func (m *Msg) UUID() flows.MsgUUID           { return m.m.UUID }
 func (m *Msg) Text() string                  { return m.m.Text }
 func (m *Msg) QuickReplies() []string        { return m.m.QuickReplies }
-func (m *Msg) Locale() envs.Locale           { return m.m.Locale }
+func (m *Msg) Locale() i18n.Locale           { return m.m.Locale }
 func (m *Msg) HighPriority() bool            { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time          { return m.m.CreatedOn }
 func (m *Msg) ModifiedOn() time.Time         { return m.m.ModifiedOn }
@@ -724,7 +724,7 @@ func FailChannelMessages(ctx context.Context, db *sql.DB, orgID OrgID, channelID
 	return nil
 }
 
-func NewMsgOut(oa *OrgAssets, c *flows.Contact, text string, atts []utils.Attachment, qrs []string, locale envs.Locale) (*flows.MsgOut, *Channel) {
+func NewMsgOut(oa *OrgAssets, c *flows.Contact, text string, atts []utils.Attachment, qrs []string, locale i18n.Locale) (*flows.MsgOut, *Channel) {
 	// resolve URN + channel for this contact
 	urn := urns.NilURN
 	var channel *Channel

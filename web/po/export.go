@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/middleware"
-	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/flows/translation"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -27,7 +27,7 @@ func init() {
 type exportRequest struct {
 	OrgID    models.OrgID    `json:"org_id"  validate:"required"`
 	FlowIDs  []models.FlowID `json:"flow_ids" validate:"required"`
-	Language envs.Language   `json:"language" validate:"omitempty,language"`
+	Language i18n.Language   `json:"language" validate:"omitempty,language"`
 }
 
 func handleExport(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {

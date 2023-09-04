@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/search"
@@ -70,7 +70,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 
 	if start.CreateContact {
 		// if we are meant to create a new contact, do so
-		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", i18n.NilLanguage, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}

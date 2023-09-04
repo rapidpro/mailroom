@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/goflow/envs"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -25,7 +25,7 @@ func TestExpirations(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create a blocked contact
-	blake := testdata.InsertContact(rt, testdata.Org1, "9eef59ef-21b3-4f51-a296-937529a30e38", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
+	blake := testdata.InsertContact(rt, testdata.Org1, "9eef59ef-21b3-4f51-a296-937529a30e38", "Blake", i18n.NilLanguage, models.ContactStatusBlocked)
 
 	// create single run session for Cathy, no parent to resume
 	s1ID := testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)

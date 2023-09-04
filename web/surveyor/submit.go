@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -112,7 +112,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 			return nil, 0, errors.Wrapf(err, "unable to look up contact")
 		}
 	} else {
-		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", i18n.NilLanguage, nil)
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "unable to create contact")
 		}

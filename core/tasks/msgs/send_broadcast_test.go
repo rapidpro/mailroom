@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	_ "github.com/nyaruka/mailroom/core/handlers"
@@ -33,7 +33,7 @@ func TestSendBroadcastTask(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	eng := envs.Language("eng")
+	eng := i18n.Language("eng")
 	basic := flows.BroadcastTranslations{
 		eng: {
 			Text:         "hello world",
@@ -55,7 +55,7 @@ func TestSendBroadcastTask(t *testing.T) {
 
 	tcs := []struct {
 		translations       flows.BroadcastTranslations
-		baseLanguage       envs.Language
+		baseLanguage       i18n.Language
 		groups             []*assets.GroupReference
 		contacts           []*flows.ContactReference
 		urns               []urns.URN
@@ -191,7 +191,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
-	eng := envs.Language("eng")
+	eng := i18n.Language("eng")
 
 	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
@@ -202,7 +202,7 @@ func TestBroadcastTask(t *testing.T) {
 	tcs := []struct {
 		Translations  flows.BroadcastTranslations
 		TemplateState models.TemplateState
-		BaseLanguage  envs.Language
+		BaseLanguage  i18n.Language
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
