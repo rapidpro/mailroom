@@ -66,6 +66,6 @@ func buildRecipientsQuery(env envs.Environment, flow *models.Flow, groups []*mod
 // formats a date for use in a query
 func formatQueryDate(env envs.Environment, t time.Time) string {
 	d := dates.ExtractDate(t.In(env.Timezone()))
-	s, _ := d.Format(string(env.DateFormat()), envs.ToBCP47(env.DefaultLocale()))
+	s, _ := d.Format(string(env.DateFormat()), env.DefaultLocale())
 	return s
 }
