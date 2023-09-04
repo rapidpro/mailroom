@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -27,7 +27,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		testdata.Org1.ID,
 		translations,
 		models.TemplateStateUnevaluated,
-		envs.Language("eng"),
+		"eng",
 		[]urns.URN{"tel:+593979012345"},
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
@@ -37,7 +37,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	assert.Equal(t, models.NilBroadcastID, bcast.ID)
 	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, i18n.Language("eng"), bcast.BaseLanguage)
 	assert.Equal(t, translations, bcast.Translations)
 	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
 	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs)
@@ -48,7 +48,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID)
 	assert.Equal(t, testdata.Org1.ID, batch.OrgID)
-	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage)
+	assert.Equal(t, i18n.Language("eng"), batch.BaseLanguage)
 	assert.Equal(t, translations, batch.Translations)
 	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState)
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs)
@@ -72,7 +72,7 @@ func TestBroadcastTranslations(t *testing.T) {
 		rt.DB.MustExec(`DELETE FROM msgs_broadcast`)
 	}()
 
-	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[i18n.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 
 	type TestStruct struct {
 		Translations flows.BroadcastTranslations `json:"translations"`
@@ -103,21 +103,21 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// we need a broadcast id to insert messages but the content here is ignored
-	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[i18n.Language]string{"eng": "Test"}, models.NilScheduleID, nil, nil)
 
 	tcs := []struct {
-		contactLanguage      envs.Language
+		contactLanguage      i18n.Language
 		translations         flows.BroadcastTranslations
-		baseLanguage         envs.Language
+		baseLanguage         i18n.Language
 		templateState        models.TemplateState
 		expectedText         string
 		expectedAttachments  []utils.Attachment
 		expectedQuickReplies []string
-		expectedLocale       envs.Locale
+		expectedLocale       i18n.Locale
 		expectedError        string
 	}{
 		{
-			contactLanguage:      envs.NilLanguage,
+			contactLanguage:      i18n.NilLanguage,
 			translations:         flows.BroadcastTranslations{"eng": {Text: "Hi @Cathy"}},
 			baseLanguage:         "eng",
 			templateState:        models.TemplateStateEvaluated,
@@ -128,7 +128,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 		},
 		{
 			// contact language not set, uses base language
-			contactLanguage:      envs.NilLanguage,
+			contactLanguage:      i18n.NilLanguage,
 			translations:         flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
 			baseLanguage:         "eng",
 			templateState:        models.TemplateStateUnevaluated,
@@ -139,7 +139,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 		},
 		{
 			// contact language iggnored if it isn't a valid org language, even if translation exists
-			contactLanguage:      envs.Language("spa"),
+			contactLanguage:      "spa",
 			translations:         flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
 			baseLanguage:         "eng",
 			templateState:        models.TemplateStateUnevaluated,
@@ -150,7 +150,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 		},
 		{
 			// contact language used
-			contactLanguage: envs.Language("fra"),
+			contactLanguage: "fra",
 			translations: flows.BroadcastTranslations{
 				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []string{"yes", "no"}},
 				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []string{"oui", "no"}},
@@ -164,7 +164,7 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 		},
 		{
 			// broken broadcast with no translation in base language
-			contactLanguage: envs.NilLanguage,
+			contactLanguage: i18n.NilLanguage,
 			translations:    flows.BroadcastTranslations{"fra": {Text: "Bonjour @contact.name"}},
 			baseLanguage:    "eng",
 			templateState:   models.TemplateStateUnevaluated,

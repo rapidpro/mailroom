@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -41,7 +41,7 @@ func (t *Template) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 type TemplateTranslation struct {
 	t struct {
 		Channel       assets.ChannelReference `json:"channel"         validate:"required"`
-		Language      envs.Language           `json:"language"        validate:"required"`
+		Language      i18n.Language           `json:"language"        validate:"required"`
 		Country       null.String             `json:"country"`
 		Namespace     string                  `json:"namespace"`
 		Content       string                  `json:"content"         validate:"required"`
@@ -56,8 +56,8 @@ func (t *TemplateTranslation) UnmarshalJSON(data []byte) error { return json.Unm
 func (t *TemplateTranslation) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 
 func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Channel }
-func (t *TemplateTranslation) Locale() envs.Locale {
-	return envs.NewLocale(t.t.Language, envs.Country(t.t.Country))
+func (t *TemplateTranslation) Locale() i18n.Locale {
+	return i18n.NewLocale(t.t.Language, i18n.Country(t.t.Country))
 }
 func (t *TemplateTranslation) Content() string    { return t.t.Content }
 func (t *TemplateTranslation) Namespace() string  { return t.t.Namespace }

@@ -3,9 +3,9 @@ package testdata
 import (
 	"context"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -46,7 +46,7 @@ type Field struct {
 }
 
 // InsertContact inserts a contact
-func InsertContact(rt *runtime.Runtime, org *Org, uuid flows.ContactUUID, name string, language envs.Language, status models.ContactStatus) *Contact {
+func InsertContact(rt *runtime.Runtime, org *Org, uuid flows.ContactUUID, name string, language i18n.Language, status models.ContactStatus) *Contact {
 	var id models.ContactID
 	must(rt.DB.Get(&id,
 		`INSERT INTO contacts_contact (org_id, is_active, ticket_count, uuid, name, language, status, created_on, modified_on, created_by_id, modified_by_id) 

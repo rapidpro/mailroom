@@ -5,9 +5,9 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -55,15 +55,15 @@ func InsertIncomingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact 
 
 // InsertOutgoingMsg inserts an outgoing text message
 func InsertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *MsgOut {
-	return insertOutgoingMsg(rt, org, channel, contact, text, attachments, envs.Locale(`eng-US`), models.MsgTypeText, status, highPriority, 0, nil)
+	return insertOutgoingMsg(rt, org, channel, contact, text, attachments, i18n.Locale(`eng-US`), models.MsgTypeText, status, highPriority, 0, nil)
 }
 
 // InsertErroredOutgoingMsg inserts an ERRORED(E) outgoing text message
 func InsertErroredOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *MsgOut {
-	return insertOutgoingMsg(rt, org, channel, contact, text, nil, envs.NilLocale, models.MsgTypeText, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
+	return insertOutgoingMsg(rt, org, channel, contact, text, nil, i18n.NilLocale, models.MsgTypeText, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
 }
 
-func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale envs.Locale, typ models.MsgType, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *MsgOut {
+func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, locale i18n.Locale, typ models.MsgType, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *MsgOut {
 	var channelRef *assets.ChannelReference
 	var channelID models.ChannelID
 	if channel != nil {
@@ -77,7 +77,7 @@ func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact 
 		sentOn = &t
 	}
 
-	fm := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	fm := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
 
 	var id models.MsgID
 	must(rt.DB.Get(&id,
@@ -90,7 +90,7 @@ func insertOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact 
 	return &MsgOut{Msg: Msg{ID: id}, FlowMsg: fm}
 }
 
-func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
+func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage i18n.Language, text map[i18n.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
 	translations := make(flows.BroadcastTranslations)
 	for lang, t := range text {
 		translations[lang] = &flows.BroadcastTranslation{Text: t}
