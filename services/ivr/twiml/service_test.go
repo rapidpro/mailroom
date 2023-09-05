@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -29,7 +28,7 @@ func TestResponseForSprint(t *testing.T) {
 	urn := urns.URN("tel:+12067799294")
 	expiresOn := time.Now().Add(time.Hour)
 	channelRef := assets.NewChannelReference(assets.ChannelUUID(uuids.New()), "Twilio Channel")
-	env := envs.NewBuilder().WithAllowedLanguages([]i18n.Language{"eng", "spa"}).WithDefaultCountry("US").Build()
+	env := envs.NewBuilder().WithAllowedLanguages("eng", "spa").WithDefaultCountry("US").Build()
 
 	resumeURL := "http://temba.io/resume?session=1"
 
