@@ -1,3 +1,7 @@
+v8.3.11 (2023-09-05)
+-------------------------
+ * Update to latest goflow
+
 v8.3.10 (2023-09-04)
 -------------------------
  * Update Twilio's list of supported language codes for IVR and do a better job of picking one
