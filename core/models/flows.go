@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -58,7 +58,7 @@ type Flow struct {
 		OrgID          OrgID           `json:"org_id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
-		Config         null.Map        `json:"config"`
+		Config         null.Map[any]   `json:"config"`
 		Version        string          `json:"version"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`

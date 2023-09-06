@@ -22,7 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -189,7 +189,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
 
 	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraValue("referrer_id"))
+		trigger = models.FindMatchingReferralTrigger(oa, channel, event.Extra()["referrer_id"])
 
 	case models.MOMissEventType:
 		trigger = models.FindMatchingMissedCallTrigger(oa)

@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

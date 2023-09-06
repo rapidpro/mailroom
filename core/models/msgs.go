@@ -19,7 +19,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -115,7 +115,7 @@ type Msg struct {
 		CreatedOn    time.Time     `db:"created_on"`
 		ModifiedOn   time.Time     `db:"modified_on"`
 		ExternalID   null.String   `db:"external_id"`
-		Metadata     null.Map      `db:"metadata"`
+		Metadata     null.Map[any] `db:"metadata"`
 		ChannelID    ChannelID     `db:"channel_id"`
 		ContactID    ContactID     `db:"contact_id"`
 		ContactURNID *URNID        `db:"contact_urn_id"`
@@ -305,7 +305,7 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	m.MsgCount = 1
 	m.CreatedOn = createdOn
 	m.CreatedByID = userID
-	m.Metadata = null.Map(buildMsgMetadata(out))
+	m.Metadata = null.Map[any](buildMsgMetadata(out))
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())

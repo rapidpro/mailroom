@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 
 	"github.com/pkg/errors"
 )

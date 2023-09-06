@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 )
 
 type ChannelEventType string
@@ -39,7 +39,7 @@ type ChannelEvent struct {
 		ChannelID  ChannelID        `json:"channel_id"   db:"channel_id"`
 		ContactID  ContactID        `json:"contact_id"   db:"contact_id"`
 		URNID      URNID            `json:"urn_id"       db:"contact_urn_id"`
-		Extra      null.Map         `json:"extra"        db:"extra"`
+		Extra      null.Map[string] `json:"extra"        db:"extra"`
 		OccurredOn time.Time        `json:"occurred_on"  db:"occurred_on"`
 
 		// only in JSON representation
@@ -50,22 +50,14 @@ type ChannelEvent struct {
 	}
 }
 
-func (e *ChannelEvent) ID() ChannelEventID    { return e.e.ID }
-func (e *ChannelEvent) ContactID() ContactID  { return e.e.ContactID }
-func (e *ChannelEvent) URNID() URNID          { return e.e.URNID }
-func (e *ChannelEvent) OrgID() OrgID          { return e.e.OrgID }
-func (e *ChannelEvent) ChannelID() ChannelID  { return e.e.ChannelID }
-func (e *ChannelEvent) IsNewContact() bool    { return e.e.NewContact }
-func (e *ChannelEvent) OccurredOn() time.Time { return e.e.OccurredOn }
-
-func (e *ChannelEvent) Extra() map[string]any {
-	return e.e.Extra
-}
-
-func (e *ChannelEvent) ExtraValue(key string) string {
-	v, _ := e.e.Extra[key].(string)
-	return v
-}
+func (e *ChannelEvent) ID() ChannelEventID       { return e.e.ID }
+func (e *ChannelEvent) ContactID() ContactID     { return e.e.ContactID }
+func (e *ChannelEvent) URNID() URNID             { return e.e.URNID }
+func (e *ChannelEvent) OrgID() OrgID             { return e.e.OrgID }
+func (e *ChannelEvent) ChannelID() ChannelID     { return e.e.ChannelID }
+func (e *ChannelEvent) IsNewContact() bool       { return e.e.NewContact }
+func (e *ChannelEvent) OccurredOn() time.Time    { return e.e.OccurredOn }
+func (e *ChannelEvent) Extra() map[string]string { return e.e.Extra }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (e *ChannelEvent) MarshalJSON() ([]byte, error) {
@@ -89,7 +81,7 @@ func (e *ChannelEvent) Insert(ctx context.Context, db DBorTx) error {
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it
-func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]any, isNewContact bool) *ChannelEvent {
+func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]string, isNewContact bool) *ChannelEvent {
 	event := &ChannelEvent{}
 	e := &event.e
 
@@ -101,9 +93,9 @@ func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelI
 	e.NewContact = isNewContact
 
 	if extra == nil {
-		e.Extra = null.Map{}
+		e.Extra = null.Map[string]{}
 	} else {
-		e.Extra = null.Map(extra)
+		e.Extra = null.Map[string](extra)
 	}
 
 	now := time.Now()
