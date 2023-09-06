@@ -427,7 +427,7 @@ func TestChannelEvents(t *testing.T) {
 		URNID          models.URNID
 		OrgID          models.OrgID
 		ChannelID      models.ChannelID
-		Extra          map[string]any
+		Extra          map[string]string
 		Response       string
 		UpdateLastSeen bool
 	}{

@@ -18,7 +18,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -73,7 +73,7 @@ type Ticket struct {
 		TopicID        TopicID          `db:"topic_id"`
 		Body           string           `db:"body"`
 		AssigneeID     UserID           `db:"assignee_id"`
-		Config         null.Map         `db:"config"`
+		Config         null.Map[any]    `db:"config"`
 		OpenedOn       time.Time        `db:"opened_on"`
 		OpenedByID     UserID           `db:"opened_by_id"`
 		OpenedInID     FlowID           `db:"opened_in_id"`
@@ -98,7 +98,7 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, userID UserID, flowID FlowID,
 	t.t.TopicID = topicID
 	t.t.Body = body
 	t.t.AssigneeID = assigneeID
-	t.t.Config = null.Map(config)
+	t.t.Config = null.Map[any](config)
 	return t
 }
 
@@ -798,7 +798,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db DBorTx, add map[string]s
 		dbMap[key] = value
 	}
 
-	_, err := db.ExecContext(ctx, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.Map(dbMap))
+	_, err := db.ExecContext(ctx, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.Map[any](dbMap))
 	return errors.Wrap(err, "error updating ticketer config")
 }
 

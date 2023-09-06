@@ -19,7 +19,7 @@ require (
 	github.com/nyaruka/gocommon v1.41.1
 	github.com/nyaruka/goflow v0.193.1
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
-	github.com/nyaruka/null/v2 v2.0.3
+	github.com/nyaruka/null/v3 v3.0.0
 	github.com/nyaruka/redisx v0.5.0
 	github.com/nyaruka/rp-indexer/v8 v8.3.0
 	github.com/olivere/elastic/v7 v7.0.32
@@ -53,6 +53,7 @@ require (
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1 // indirect
 	github.com/nyaruka/librato v1.0.0 // indirect
+	github.com/nyaruka/null/v2 v2.0.3 // indirect
 	github.com/nyaruka/phonenumbers v1.1.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
