@@ -35,7 +35,7 @@ func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {
 		return errors.Wrap(err, "error marking messages as queued")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	msgio.QueueMessages(ctx, rt, rt.DB, nil, msgs)
 
 	logrus.WithField("count", len(msgs)).WithField("elapsed", time.Since(start)).Info("retried errored messages")
 

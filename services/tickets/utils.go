@@ -122,7 +122,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 		return nil, errors.Wrap(err, "error recording ticket reply")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, []*models.Msg{msg})
+	msgio.QueueMessages(ctx, rt, rt.DB, nil, []*models.Msg{msg})
 	return msg, nil
 }
 

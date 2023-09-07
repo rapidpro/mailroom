@@ -54,6 +54,6 @@ func (t *SendBroadcastBatchTask) Perform(ctx context.Context, rt *runtime.Runtim
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	msgio.QueueMessages(ctx, rt, rt.DB, nil, msgs)
 	return nil
 }
