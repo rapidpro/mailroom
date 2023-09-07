@@ -128,7 +128,7 @@ func TestTwilioIVR(t *testing.T) {
 			url:                fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=1", testdata.TwilioChannel.UUID),
 			form:               nil,
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say>Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
+			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say language="en-US">Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -140,7 +140,7 @@ func TestTwilioIVR(t *testing.T) {
 				"timeout":    []string{"true"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say>Sorry, that is not one or two, try again.</Say>`},
+			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say language="en-US">Sorry, that is not one or two, try again.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -152,7 +152,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"1"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather timeout="30"`, `<Say>Great! You said One. Ok, now enter a number 1 to 100 then press pound.</Say>`},
+			expectedContains:   []string{`<Gather timeout="30"`, `<Say language="en-US">Great! You said One. Ok, now enter a number 1 to 100 then press pound.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -164,7 +164,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"101"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather timeout="30"`, `<Say>Sorry, that&#39;s too big. Enter a number 1 to 100 then press pound.</Say>`},
+			expectedContains:   []string{`<Gather timeout="30"`, `<Say language="en-US">Sorry, that&#39;s too big. Enter a number 1 to 100 then press pound.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -176,7 +176,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"56"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Say>You picked the number 56, excellent choice. Ok now tell me briefly why you are happy today.</Say>`, `<Record action=`},
+			expectedContains:   []string{`<Say language="en-US">You picked the number 56, excellent choice. Ok now tell me briefly why you are happy today.</Say>`, `<Record action=`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -189,8 +189,8 @@ func TestTwilioIVR(t *testing.T) {
 			},
 			expectedStatus: 200,
 			expectedContains: []string{
-				`<Say>You said</Say>`,
-				`<Say>I hope hearing that makes you feel better. Good day and good bye.</Say>`,
+				`<Say language="en-US">You said</Say>`,
+				`<Say language="en-US">I hope hearing that makes you feel better. Good day and good bye.</Say>`,
 				`<Dial action=`,
 				`>+12065551212</Dial>`,
 			},
@@ -205,7 +205,7 @@ func TestTwilioIVR(t *testing.T) {
 				"wait_type":      []string{"dial"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Say>Great, they answered.</Say>`, `<Hangup></Hangup>`},
+			expectedContains:   []string{`<Say language="en-US">Great, they answered.</Say>`, `<Hangup></Hangup>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{

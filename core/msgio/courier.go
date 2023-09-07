@@ -12,10 +12,10 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -51,7 +51,7 @@ type Msg struct {
 	Text                 string                `json:"text"`
 	Attachments          []utils.Attachment    `json:"attachments,omitempty"`
 	QuickReplies         []string              `json:"quick_replies,omitempty"`
-	Locale               envs.Locale           `json:"locale,omitempty"`
+	Locale               i18n.Locale           `json:"locale,omitempty"`
 	HighPriority         bool                  `json:"high_priority"`
 	MsgCount             int                   `json:"tps_cost"`
 	CreatedOn            time.Time             `json:"created_on"`

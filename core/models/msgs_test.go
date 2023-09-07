@@ -8,16 +8,16 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/nyaruka/redisx/assertredis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	blake := testdata.InsertContact(rt, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
+	blake := testdata.InsertContact(rt, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", i18n.NilLanguage, models.ContactStatusBlocked)
 	blakeURNID := testdata.InsertContactURN(rt, testdata.Org1, blake, "tel:++250700000007", 1)
 
 	tcs := []struct {
@@ -163,7 +163,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			session.SetIncomingMsg(tc.ResponseTo, null.NullString)
 		}
 
-		flowMsg := flows.NewMsgOut(tc.URN, chRef, tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
+		flowMsg := flows.NewMsgOut(tc.URN, chRef, tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, i18n.NilLocale, tc.Unsendable)
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), ch, session, flow, flowMsg, now)
 
 		assert.NoError(t, err)
@@ -215,7 +215,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 	// check that msg loop detection triggers after 20 repeats of the same text
 	newOutgoing := func(text string) *models.Msg {
-		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
 		require.NoError(t, err)
 		return msg
@@ -382,10 +382,10 @@ func TestGetMsgRepetitions(t *testing.T) {
 	_, cathy := testdata.Cathy.Load(rt, oa)
 	_, george := testdata.George.Load(rt, oa)
 
-	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "FOO", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-	msg3 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
-	msg4 := flows.NewMsgOut(testdata.George.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
+	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "FOO", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
+	msg3 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
+	msg4 := flows.NewMsgOut(testdata.George.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
 
 	assertRepetitions := func(contact *flows.Contact, m *flows.MsgOut, expected int) {
 		count, err := models.GetMsgRepetitions(rt.RP, contact, m)
@@ -494,7 +494,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	assert.Equal(t, models.MsgTypeVoice, dbMsg.Type())
 	assert.Equal(t, "Hello", dbMsg.Text())
 	assert.Equal(t, []utils.Attachment{"audio:http://example.com/hi.mp3"}, dbMsg.Attachments())
-	assert.Equal(t, envs.Locale("eng-US"), dbMsg.Locale())
+	assert.Equal(t, i18n.Locale("eng-US"), dbMsg.Locale())
 	assert.Equal(t, createdOn, dbMsg.CreatedOn())
 	assert.Equal(t, &createdOn, dbMsg.SentOn())
 
@@ -512,16 +512,16 @@ func TestNewMsgOut(t *testing.T) {
 
 	_, cathy := testdata.Cathy.Load(rt, oa)
 
-	out, ch := models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	out, ch := models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
 	assert.Equal(t, "hello", out.Text())
 	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
 	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
-	assert.Equal(t, envs.Locale(`eng-US`), out.Locale())
+	assert.Equal(t, i18n.Locale(`eng-US`), out.Locale())
 	assert.Equal(t, "Twilio", ch.Name())
 
 	cathy.SetStatus(flows.ContactStatusBlocked)
 
-	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
 	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
 	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
 	assert.Equal(t, "Twilio", ch.Name())
@@ -530,7 +530,7 @@ func TestNewMsgOut(t *testing.T) {
 	cathy.SetStatus(flows.ContactStatusActive)
 	cathy.ClearURNs()
 
-	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, envs.Locale(`eng-US`))
+	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
 	assert.Equal(t, urns.NilURN, out.URN())
 	assert.Nil(t, out.Channel())
 	assert.Nil(t, ch)

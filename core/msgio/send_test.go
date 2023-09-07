@@ -42,7 +42,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 	return msg
 }
 
-func TestSendMessages(t *testing.T) {
+func TestQueueMessages(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 	rc := rt.RP.Get()
 	defer rc.Close()
@@ -160,7 +160,7 @@ func TestSendMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, rt, rt.DB, fc, msgs)
+		msgio.QueueMessages(ctx, rt, rt.DB, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
@@ -170,7 +170,7 @@ func TestSendMessages(t *testing.T) {
 			actualTokens[i] = mockFCM.Messages[i].Token
 		}
 
-		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
+		assert.ElementsMatch(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
 		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'I'`).Returns(tc.UnqueuedMsgs, `initializing messages mismatch in '%s'`, tc.Description)
 	}

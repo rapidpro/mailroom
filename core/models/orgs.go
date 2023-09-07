@@ -23,7 +23,7 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -67,9 +67,9 @@ const (
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	o struct {
-		ID        OrgID    `json:"id"`
-		Suspended bool     `json:"is_suspended"`
-		Config    null.Map `json:"config"`
+		ID        OrgID         `json:"id"`
+		Suspended bool          `json:"is_suspended"`
+		Config    null.Map[any] `json:"config"`
 	}
 	env envs.Environment
 }

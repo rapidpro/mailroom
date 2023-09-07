@@ -15,7 +15,9 @@ import (
 	"strings"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
@@ -62,34 +64,70 @@ const (
 )
 
 // https://www.twilio.com/docs/voice/twiml/say
-var supportedSayLanguages = utils.Set([]string{
+var supportedSayLanguages = i18n.NewBCP47Matcher(
+	"af-ZA",
+	"ar-AE",
+	"ar-XA",
+	"arb",
+	"bg-BG",
+	"ca-ES",
+	"cmn-CN",
+	"cmn-TW",
+	"cs-CZ",
+	"cy-GB",
 	"da-DK",
+	"de-AT",
 	"de-DE",
+	"el-GR",
 	"en-AU",
-	"en-CA",
 	"en-GB",
 	"en-IN",
+	"en-NZ",
 	"en-US",
-	"ca-ES",
+	"en-ZA",
 	"es-ES",
 	"es-MX",
+	"es-US",
+	"eu-ES",
 	"fi-FI",
+	"fil-PH",
 	"fr-CA",
 	"fr-FR",
+	"gl-ES",
+	"he-IL",
+	"hi-IN",
+	"hu-HU",
+	"id-ID",
+	"is-IS",
 	"it-IT",
 	"ja-JP",
 	"ko-KR",
+	"lt-LT",
+	"lv-LV",
+	"ml-IN",
+	"mr-IN",
+	"ms-MY",
 	"nb-NO",
+	"nl-BE",
 	"nl-NL",
+	"pa-IN",
 	"pl-PL",
 	"pt-BR",
 	"pt-PT",
+	"ro-RO",
 	"ru-RU",
+	"sk-SK",
+	"sr-RS",
 	"sv-SE",
-	"zh-CN",
-	"zh-HK",
-	"zh-TW",
-})
+	"ta-IN",
+	"te-IN",
+	"th-TH",
+	"tr-TR",
+	"uk-UA",
+	"vi-VN",
+	"yue-CN",
+	"yue-HK",
+)
 
 type service struct {
 	httpClient   *http.Client
@@ -352,7 +390,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -365,7 +403,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := ResponseForSprint(rt.Config, number, resumeURL, sprint.Events(), true)
+	response, err := ResponseForSprint(rt, oa.Env(), number, resumeURL, sprint.Events(), true)
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -453,7 +491,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
+func ResponseForSprint(rt *runtime.Runtime, env envs.Environment, urn urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
 	commands := make([]any, 0)
 	hasWait := false
@@ -462,16 +500,17 @@ func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es [
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				// only send locale if it's a supported say language for Twilio
-				msgLocaleCode := event.Msg.Locale().ToBCP47()
-				if _, valid := supportedSayLanguages[msgLocaleCode]; !valid {
-					msgLocaleCode = ""
+				var locales []i18n.Locale
+				if event.Msg.Locale() != "" {
+					locales = append(locales, event.Msg.Locale())
 				}
+				locales = append(locales, env.DefaultLocale())
+				lang := supportedSayLanguages.ForLocales(locales...)
 
-				commands = append(commands, &Say{Text: event.Msg.Text(), Language: msgLocaleCode})
+				commands = append(commands, &Say{Text: event.Msg.Text(), Language: lang})
 			} else {
 				for _, a := range event.Msg.Attachments() {
-					a = models.NormalizeAttachment(cfg, a)
+					a = models.NormalizeAttachment(rt.Config, a)
 					commands = append(commands, Play{URL: a.URL()})
 				}
 			}

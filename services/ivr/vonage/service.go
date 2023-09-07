@@ -589,7 +589,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")

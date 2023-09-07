@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/flows/translation"
-	"github.com/nyaruka/goflow/utils/i18n"
+	"github.com/nyaruka/goflow/utils/po"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -27,7 +27,7 @@ func init() {
 type importForm struct {
 	OrgID    models.OrgID    `form:"org_id"  validate:"required"`
 	FlowIDs  []models.FlowID `form:"flow_ids" validate:"required"`
-	Language envs.Language   `form:"language" validate:"required"`
+	Language i18n.Language   `form:"language" validate:"required"`
 }
 
 func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
@@ -41,7 +41,7 @@ func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 		return errors.Wrapf(err, "missing po file on request"), http.StatusBadRequest, nil
 	}
 
-	po, err := i18n.ReadPO(poFile)
+	p, err := po.ReadPO(poFile)
 	if err != nil {
 		return errors.Wrapf(err, "invalid po file"), http.StatusBadRequest, nil
 	}
@@ -51,7 +51,7 @@ func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 		return err, http.StatusBadRequest, nil
 	}
 
-	err = translation.ImportIntoFlows(po, form.Language, excludeProperties, flows...)
+	err = translation.ImportIntoFlows(p, form.Language, excludeProperties, flows...)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

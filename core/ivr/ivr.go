@@ -25,7 +25,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -67,7 +67,7 @@ type Service interface {
 
 	HangupCall(externalID string) (*httpx.Trace, error)
 
-	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
+	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 	WriteRejectResponse(w http.ResponseWriter) error
 	WriteErrorResponse(w http.ResponseWriter, err error) error
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
@@ -390,7 +390,7 @@ func StartIVRFlow(
 	}
 
 	// have our service output our session status
-	err = svc.WriteSessionResponse(ctx, rt, channel, call, sessions[0], urn, resumeURL, r, w)
+	err = svc.WriteSessionResponse(ctx, rt, oa, channel, call, sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -506,7 +506,7 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.CallStatusInProgress {
-		err = svc.WriteSessionResponse(ctx, rt, channel, call, session, urn, resumeURL, r, w)
+		err = svc.WriteSessionResponse(ctx, rt, oa, channel, call, session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}

@@ -10,14 +10,14 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 )
 
@@ -223,7 +223,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db *sqlx.D
 			addModifier(modifiers.NewName(*spec.Name))
 		}
 		if spec.Language != nil {
-			lang, err := envs.ParseLanguage(*spec.Language)
+			lang, err := i18n.ParseLanguage(*spec.Language)
 			if err != nil {
 				addError("'%s' is not a valid language code", *spec.Language)
 			} else {

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -151,20 +151,20 @@ func TestCreateContact(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	contact, flowContact, err := models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Rich", envs.Language(`kin`), []urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:200002")})
+	contact, flowContact, err := models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Rich", `kin`, []urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:200002")})
 	require.NoError(t, err)
 
 	assert.Equal(t, "Rich", contact.Name())
-	assert.Equal(t, envs.Language(`kin`), contact.Language())
+	assert.Equal(t, i18n.Language(`kin`), contact.Language())
 	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, contact.URNs())
 
 	assert.Equal(t, "Rich", flowContact.Name())
-	assert.Equal(t, envs.Language(`kin`), flowContact.Language())
+	assert.Equal(t, i18n.Language(`kin`), flowContact.Language())
 	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, flowContact.URNs().RawURNs())
 	assert.Len(t, flowContact.Groups().All(), 1)
 	assert.Equal(t, assets.GroupUUID("d636c966-79c1-4417-9f1c-82ad629773a2"), flowContact.Groups().All()[0].UUID())
 
-	_, _, err = models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Rich", envs.Language(`kin`), []urns.URN{urns.URN("telegram:200001")})
+	_, _, err = models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Rich", `kin`, []urns.URN{urns.URN("telegram:200001")})
 	assert.EqualError(t, err, "URNs in use by other contacts")
 }
 
@@ -189,7 +189,7 @@ func TestCreateContactRace(t *testing.T) {
 	var errs [2]error
 
 	test.RunConcurrently(2, func(i int) {
-		contacts[i], _, errs[i] = models.CreateContact(ctx, mdb, oa, models.UserID(1), "", envs.NilLanguage, []urns.URN{urns.URN("telegram:100007")})
+		contacts[i], _, errs[i] = models.CreateContact(ctx, mdb, oa, models.UserID(1), "", i18n.NilLanguage, []urns.URN{urns.URN("telegram:100007")})
 	})
 
 	// one should return a contact, the other should error

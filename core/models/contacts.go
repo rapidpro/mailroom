@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -19,7 +20,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -76,7 +77,7 @@ type Contact struct {
 	id            ContactID
 	uuid          flows.ContactUUID
 	name          string
-	language      envs.Language
+	language      i18n.Language
 	status        ContactStatus
 	fields        map[string]*flows.Value
 	groups        []*Group
@@ -91,7 +92,7 @@ type Contact struct {
 func (c *Contact) ID() ContactID                   { return c.id }
 func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
 func (c *Contact) Name() string                    { return c.name }
-func (c *Contact) Language() envs.Language         { return c.language }
+func (c *Contact) Language() i18n.Language         { return c.language }
 func (c *Contact) Status() ContactStatus           { return c.status }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
@@ -461,7 +462,7 @@ type contactEnvelope struct {
 	ID       ContactID         `json:"id"`
 	UUID     flows.ContactUUID `json:"uuid"`
 	Name     string            `json:"name"`
-	Language envs.Language     `json:"language"`
+	Language i18n.Language     `json:"language"`
 	Status   ContactStatus     `json:"status"`
 	Fields   map[assets.FieldUUID]struct {
 		Text     types.XText       `json:"text"`
@@ -566,7 +567,7 @@ WHERE
 `
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
-func CreateContact(ctx context.Context, db DB, oa *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+func CreateContact(ctx context.Context, db DB, oa *OrgAssets, userID UserID, name string, language i18n.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
@@ -762,7 +763,7 @@ func getOrCreateContact(ctx context.Context, db DB, orgID OrgID, urnz []urns.URN
 		return uniqueOwners[0], false, nil
 	}
 
-	contactID, err := tryInsertContactAndURNs(ctx, db, orgID, UserID(1), "", envs.NilLanguage, urnz, channelID)
+	contactID, err := tryInsertContactAndURNs(ctx, db, orgID, UserID(1), "", i18n.NilLanguage, urnz, channelID)
 	if err == nil {
 		return contactID, true, nil
 	}
@@ -803,7 +804,7 @@ func uniqueContactIDs(urnMap map[urns.URN]ContactID) []ContactID {
 
 // Tries to create a new contact for the passed in org with the passed in URNs. Returned error can be tested with `dbutil.IsUniqueViolation` to
 // determine if problem was one or more of the URNs already exist and are assigned to other contacts.
-func tryInsertContactAndURNs(ctx context.Context, db DB, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
+func tryInsertContactAndURNs(ctx context.Context, db DB, orgID OrgID, userID UserID, name string, language i18n.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
 	// check the URNs are valid
 	for _, urn := range urnz {
 		if err := urn.Validate(); err != nil {
@@ -831,7 +832,7 @@ func tryInsertContactAndURNs(ctx context.Context, db DB, orgID OrgID, userID Use
 	return contactID, nil
 }
 
-func insertContactAndURNs(ctx context.Context, db DBorTx, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
+func insertContactAndURNs(ctx context.Context, db DBorTx, orgID OrgID, userID UserID, name string, language i18n.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
 	if userID == NilUserID {
 		userID = UserID(1)
 	}

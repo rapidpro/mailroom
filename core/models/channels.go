@@ -10,9 +10,9 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -82,7 +82,7 @@ func (c *Channel) TPS() int { return c.c.TPS }
 func (c *Channel) Address() string { return c.c.Address }
 
 // Country returns the contry code for this channel
-func (c *Channel) Country() envs.Country { return envs.Country(string(c.c.Country)) }
+func (c *Channel) Country() i18n.Country { return i18n.Country(string(c.c.Country)) }
 
 // Schemes returns the schemes this channel supports
 func (c *Channel) Schemes() []string { return c.c.Schemes }

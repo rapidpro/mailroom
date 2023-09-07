@@ -32,6 +32,6 @@ func (h *sendMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *s
 		msgs = append(msgs, sceneMsgs...)
 	}
 
-	msgio.SendMessages(ctx, rt, tx, nil, msgs)
+	msgio.QueueMessages(ctx, rt, tx, nil, msgs)
 	return nil
 }

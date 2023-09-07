@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -277,7 +278,7 @@ func TestSpecToCreation(t *testing.T) {
 	c, err := contact.SpecToCreation(s, env, sa)
 	assert.NoError(t, err)
 	assert.Equal(t, "", c.Name)
-	assert.Equal(t, envs.NilLanguage, c.Language)
+	assert.Equal(t, i18n.NilLanguage, c.Language)
 	assert.Equal(t, 0, len(c.URNs))
 	assert.Equal(t, 0, len(c.Mods))
 

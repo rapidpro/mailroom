@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -38,18 +39,18 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.DateFormatDayMonthYear, org.Environment().DateFormat())
 	assert.Equal(t, envs.TimeFormatHourMinute, org.Environment().TimeFormat())
 	assert.Equal(t, envs.RedactionPolicyNone, org.Environment().RedactionPolicy())
-	assert.Equal(t, string(envs.Country("US")), string(org.Environment().DefaultCountry()))
+	assert.Equal(t, "US", string(org.Environment().DefaultCountry()))
 	assert.Equal(t, tz, org.Environment().Timezone())
-	assert.Equal(t, []envs.Language{"fra", "eng"}, org.Environment().AllowedLanguages())
-	assert.Equal(t, envs.Language("fra"), org.Environment().DefaultLanguage())
-	assert.Equal(t, "fr-US", org.Environment().DefaultLocale().ToBCP47())
+	assert.Equal(t, []i18n.Language{"fra", "eng"}, org.Environment().AllowedLanguages())
+	assert.Equal(t, i18n.Language("fra"), org.Environment().DefaultLanguage())
+	assert.Equal(t, i18n.Locale("fra-US"), org.Environment().DefaultLocale())
 
 	org, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org2.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, envs.DateFormatMonthDayYear, org.Environment().DateFormat())
-	assert.Equal(t, []envs.Language{}, org.Environment().AllowedLanguages())
-	assert.Equal(t, envs.NilLanguage, org.Environment().DefaultLanguage())
-	assert.Equal(t, "", org.Environment().DefaultLocale().ToBCP47())
+	assert.Equal(t, []i18n.Language{}, org.Environment().AllowedLanguages())
+	assert.Equal(t, i18n.NilLanguage, org.Environment().DefaultLanguage())
+	assert.Equal(t, i18n.NilLocale, org.Environment().DefaultLocale())
 
 	_, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, 99)
 	assert.Error(t, err)

@@ -67,7 +67,7 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 		// our key is built such that we will only retry once an hour
 		key := fmt.Sprintf("%d_%d", msgID, time.Now().Hour())
 
-		dupe, err := retriedMsgs.Contains(rc, key)
+		dupe, err := retriedMsgs.IsMember(rc, key)
 		if err != nil {
 			return errors.Wrapf(err, "error checking for dupe retry")
 		}

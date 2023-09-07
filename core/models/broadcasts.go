@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 )
 
@@ -35,7 +35,7 @@ type Broadcast struct {
 	OrgID         OrgID                       `json:"org_id"                  db:"org_id"`
 	Translations  flows.BroadcastTranslations `json:"translations"            db:"translations"`
 	TemplateState TemplateState               `json:"template_state"`
-	BaseLanguage  envs.Language               `json:"base_language"           db:"base_language"`
+	BaseLanguage  i18n.Language               `json:"base_language"           db:"base_language"`
 	URNs          []urns.URN                  `json:"urns,omitempty"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
 	GroupIDs      []GroupID                   `json:"group_ids,omitempty"`
@@ -46,7 +46,7 @@ type Broadcast struct {
 
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(orgID OrgID, translations flows.BroadcastTranslations,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, query string, createdByID UserID) *Broadcast {
+	state TemplateState, baseLanguage i18n.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, query string, createdByID UserID) *Broadcast {
 
 	return &Broadcast{
 		OrgID:         orgID,
@@ -177,7 +177,7 @@ type BroadcastBatch struct {
 	BroadcastID   BroadcastID                 `json:"broadcast_id,omitempty"`
 	OrgID         OrgID                       `json:"org_id"`
 	Translations  flows.BroadcastTranslations `json:"translations"`
-	BaseLanguage  envs.Language               `json:"base_language"`
+	BaseLanguage  i18n.Language               `json:"base_language"`
 	TemplateState TemplateState               `json:"template_state"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
 	CreatedByID   UserID                      `json:"created_by_id"`
@@ -230,7 +230,7 @@ func (b *BroadcastBatch) createMessage(rt *runtime.Runtime, oa *OrgAssets, c *Co
 	text := trans.Text
 	attachments := trans.Attachments
 	quickReplies := trans.QuickReplies
-	locale := envs.NewLocale(lang, envs.NilCountry)
+	locale := i18n.NewLocale(lang, i18n.NilCountry)
 
 	if b.TemplateState == TemplateStateUnevaluated {
 		// build up the minimum viable context for templates

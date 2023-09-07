@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -26,7 +26,7 @@ func TestGetExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+	testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[i18n.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
 
@@ -87,7 +87,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()
 	assert.NotNil(t, bcast)
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, i18n.Language("eng"), bcast.BaseLanguage)
 	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
 	assert.Equal(t, "Test message", bcast.Translations["eng"].Text)
 	assert.Equal(t, "Un Message", bcast.Translations["fra"].Text)

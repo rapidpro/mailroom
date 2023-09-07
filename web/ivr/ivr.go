@@ -148,7 +148,7 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 		resumeURL := buildResumeURL(rt.Config, ch, call, urn)
 
 		// have our client output our session status
-		err = svc.WriteSessionResponse(ctx, rt, ch, call, session, urn, resumeURL, r, w)
+		err = svc.WriteSessionResponse(ctx, rt, oa, ch, call, session, urn, resumeURL, r, w)
 		if err != nil {
 			return call, errors.Wrapf(err, "error writing ivr response for start")
 		}
