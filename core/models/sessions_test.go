@@ -29,7 +29,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
-	modelContact, _ := testdata.Bob.Load(rt, oa)
+	modelContact, _, _ := testdata.Bob.Load(rt, oa)
 
 	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
@@ -69,7 +69,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 		})
 
 	// reload contact and check current flow is set
-	modelContact, _ = testdata.Bob.Load(rt, oa)
+	modelContact, _, _ = testdata.Bob.Load(rt, oa)
 	assert.Equal(t, flow.ID, modelContact.CurrentFlowID())
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
@@ -125,7 +125,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Bob.ID).Returns(nil)
 
 	// reload contact and check current flow is cleared
-	modelContact, _ = testdata.Bob.Load(rt, oa)
+	modelContact, _, _ = testdata.Bob.Load(rt, oa)
 	assert.Equal(t, models.NilFlowID, modelContact.CurrentFlowID())
 }
 
@@ -140,7 +140,7 @@ func TestSingleSprintSession(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
-	modelContact, _ := testdata.Bob.Load(rt, oa)
+	modelContact, _, _ := testdata.Bob.Load(rt, oa)
 
 	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
@@ -188,7 +188,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
-	modelContact, _ := testdata.Cathy.Load(rt, oa)
+	modelContact, _, _ := testdata.Cathy.Load(rt, oa)
 
 	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(parent.UUID).
 		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
@@ -261,7 +261,7 @@ func TestSessionFailedStart(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
-	modelContact, _ := testdata.Cathy.Load(rt, oa)
+	modelContact, _, _ := testdata.Cathy.Load(rt, oa)
 
 	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(ping.UUID).
 		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
@@ -468,7 +468,7 @@ func TestClearWaitTimeout(t *testing.T) {
 
 	oa := testdata.Org1.Load(rt)
 
-	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	expiresOn := time.Now().Add(time.Hour)
 	timeoutOn := time.Now().Add(time.Minute)

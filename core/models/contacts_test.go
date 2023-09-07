@@ -364,7 +364,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	// add an orphaned URN
 	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
-	cathy, _ := testdata.Cathy.Load(rt, oa)
+	cathy, _, _ := testdata.Cathy.Load(rt, oa)
 
 	tcs := []struct {
 		orgID   models.OrgID

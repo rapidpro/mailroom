@@ -419,13 +419,14 @@ func queryContactIDs(ctx context.Context, db Queryer, query string, args ...any)
 }
 
 type ContactURN struct {
-	ID        URNID     `json:"id"          db:"id"`
-	Priority  int       `json:"priority"    db:"priority"`
-	Scheme    string    `json:"scheme"      db:"scheme"`
-	Path      string    `json:"path"        db:"path"`
-	Display   string    `json:"display"     db:"display"`
-	Auth      string    `json:"auth"        db:"auth"`
-	ChannelID ChannelID `json:"channel_id"  db:"channel_id"`
+	ID        URNID       `json:"id"          db:"id"`
+	Priority  int         `json:"priority"    db:"priority"`
+	Identity  urns.URN    `json:"identity"    db:"identity"`
+	Scheme    string      `json:"scheme"      db:"scheme"`
+	Path      string      `json:"path"        db:"path"`
+	Display   null.String `json:"display"     db:"display"`
+	Auth      null.String `json:"auth"        db:"auth"`
+	ChannelID ChannelID   `json:"channel_id"  db:"channel_id"`
 }
 
 // AsURN returns a full URN representation including the query parameters needed by goflow and mailroom
@@ -445,11 +446,11 @@ func (u *ContactURN) AsURN(oa *OrgAssets) (urns.URN, error) {
 		query["channel"] = []string{string(channel.UUID())}
 	}
 	if u.Auth != "" {
-		query["auth"] = []string{u.Auth}
+		query["auth"] = []string{string(u.Auth)}
 	}
 
 	// create our URN
-	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), u.Display)
+	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), string(u.Display))
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "invalid URN %s:%s", u.Scheme, u.Path)
 	}
@@ -1103,6 +1104,30 @@ const sqlMarkContactStopped = `
 UPDATE contacts_contact
    SET status = 'S', modified_on = NOW()
  WHERE id = $1`
+
+const sqlSelectURNsByID = `
+SELECT id, identity, priority, scheme, path, display, auth, channel_id 
+  FROM contacts_contacturn 
+ WHERE id = ANY($1)`
+
+func LoadContactURNs(ctx context.Context, db DBorTx, ids []URNID) ([]*ContactURN, error) {
+	rows, err := db.QueryxContext(ctx, sqlSelectURNsByID, pq.Array(ids))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying URNs")
+	}
+	defer rows.Close()
+
+	urns := make([]*ContactURN, 0)
+	for rows.Next() {
+		u := &ContactURN{}
+		err = rows.StructScan(&u)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning URN row")
+		}
+		urns = append(urns, u)
+	}
+	return urns, nil
+}
 
 func GetURNInt(urn urns.URN, key string) int {
 	values, err := urn.Query()
