@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -14,8 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/edganiukov/fcm"
 )
 
 type MockFCMEndpoint struct {
@@ -42,7 +41,7 @@ func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{}`))
 	} else {
-		w.WriteHeader(200)
+		w.WriteHeader(401)
 		w.Write([]byte(`{"error": "bad_token"}`))
 	}
 }
@@ -62,7 +61,7 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 	return mock
 }
 
-func TestSyncAndroidChannels(t *testing.T) {
+func TestSyncAndroidChannel(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
@@ -82,7 +81,14 @@ func TestSyncAndroidChannels(t *testing.T) {
 	channel2 := oa.ChannelByID(testChannel2.ID)
 	channel3 := oa.ChannelByID(testChannel3.ID)
 
-	msgio.SyncAndroidChannels(fc, []*models.Channel{channel1, channel2, channel3})
+	err = msgio.SyncAndroidChannel(nil, channel1)
+	assert.EqualError(t, err, "instance has no FCM configuration")
+	err = msgio.SyncAndroidChannel(fc, channel1)
+	assert.EqualError(t, err, "channel has no FCM ID")
+	err = msgio.SyncAndroidChannel(fc, channel2)
+	assert.EqualError(t, err, "error syncing channel: 401 error: 401 Unauthorized")
+	err = msgio.SyncAndroidChannel(fc, channel3)
+	assert.NoError(t, err)
 
 	// check that we try to sync the 2 channels with FCM IDs, even tho one fails
 	assert.Equal(t, 2, len(mockFCM.Messages))
