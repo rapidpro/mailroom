@@ -63,7 +63,7 @@ func TestContacts(t *testing.T) {
 
 	assert.Equal(t, "Cathy", cathy.Name())
 	assert.Equal(t, len(cathy.URNs()), 1)
-	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
+	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000")
 	assert.Equal(t, 1, cathy.Groups().Count())
 	assert.NotNil(t, cathy.Ticket())
 
@@ -79,8 +79,8 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "Bob", bob.Name())
 	assert.NotNil(t, bob.Fields()["joined"].QueryValue())
 	assert.Equal(t, 2, len(bob.URNs()))
-	assert.Equal(t, "tel:+16055742222?id=10001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "tel:+16055742222?id=10001", bob.URNs()[0].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[1].String())
 	assert.Equal(t, 0, bob.Groups().Count())
 	assert.Nil(t, bob.Ticket()) // because ticketer no longer exists
 
@@ -97,8 +97,8 @@ func TestContacts(t *testing.T) {
 
 	bob, err = modelContacts[1].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001", bob.URNs()[0].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[1].String())
 
 	// add another tel urn to bob
 	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
@@ -113,9 +113,9 @@ func TestContacts(t *testing.T) {
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[2].String())
 
 	// no op this time
 	err = modelContacts[0].UpdatePreferredURN(ctx, rt.DB, org, models.URNID(30001), channel)
@@ -123,9 +123,9 @@ func TestContacts(t *testing.T) {
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[2].String())
 
 	// calling with no channel is a noop on the channel
 	err = modelContacts[0].UpdatePreferredURN(ctx, rt.DB, org, models.URNID(30001), nil)
@@ -133,9 +133,9 @@ func TestContacts(t *testing.T) {
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[2].String())
 }
 
 func TestCreateContact(t *testing.T) {
@@ -156,11 +156,11 @@ func TestCreateContact(t *testing.T) {
 
 	assert.Equal(t, "Rich", contact.Name())
 	assert.Equal(t, i18n.Language(`kin`), contact.Language())
-	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, contact.URNs())
+	assert.Equal(t, []urns.URN{"telegram:200001?id=30001", "telegram:200002?id=30000"}, contact.URNs())
 
 	assert.Equal(t, "Rich", flowContact.Name())
 	assert.Equal(t, i18n.Language(`kin`), flowContact.Language())
-	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, flowContact.URNs().RawURNs())
+	assert.Equal(t, []urns.URN{"telegram:200001?id=30001", "telegram:200002?id=30000"}, flowContact.URNs().RawURNs())
 	assert.Len(t, flowContact.Groups().All(), 1)
 	assert.Equal(t, assets.GroupUUID("d636c966-79c1-4417-9f1c-82ad629773a2"), flowContact.Groups().All()[0].UUID())
 
@@ -229,7 +229,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{testdata.Cathy.URN},
 			testdata.Cathy.ID,
 			false,
-			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+			[]urns.URN{"tel:+16055741111?id=10000"},
 			models.NilChannelID,
 			[]assets.GroupUUID{testdata.DoctorsGroup.UUID},
 		},
@@ -238,7 +238,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
 			testdata.Cathy.ID, // only URN identity is considered
 			false,
-			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+			[]urns.URN{"tel:+16055741111?id=10000"},
 			models.NilChannelID,
 			[]assets.GroupUUID{testdata.DoctorsGroup.UUID},
 		},
@@ -247,7 +247,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100001")},
 			newContact(), // creates new contact
 			true,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002"},
 			testdata.TwilioChannel.ID,
 			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
@@ -256,7 +256,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100001")},
 			prevContact(), // returns the same created contact
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002"},
 			models.NilChannelID,
 			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
@@ -265,7 +265,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")},
 			prevContact(), // same again as other URNs don't exist
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002"},
 			models.NilChannelID,
 			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
@@ -274,7 +274,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs don't exist
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002"},
 			models.NilChannelID,
 			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
@@ -283,7 +283,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs are orphaned
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002"},
 			models.NilChannelID,
 			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
@@ -292,7 +292,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100003"), urns.URN("telegram:100004")}, // 2 new URNs
 			newContact(),
 			true,
-			[]urns.URN{"telegram:100003?id=30003&priority=1000", "telegram:100004?id=30004&priority=999"},
+			[]urns.URN{"telegram:100003?id=30003", "telegram:100004?id=30004"},
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},
@@ -301,7 +301,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100005"), urns.URN("telegram:200002")}, // 1 new, 1 orphaned
 			newContact(),
 			true,
-			[]urns.URN{"telegram:100005?id=30005&priority=1000", "telegram:200002?id=30001&priority=999"},
+			[]urns.URN{"telegram:100005?id=30005", "telegram:200002?id=30001"},
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},

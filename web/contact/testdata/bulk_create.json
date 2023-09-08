@@ -93,7 +93,7 @@
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
-                        "tel:+16055700001?id=30000&priority=1000"
+                        "tel:+16055700001?id=30000"
                     ],
                     "groups": [
                         {

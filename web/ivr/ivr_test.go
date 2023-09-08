@@ -85,7 +85,7 @@ func TestTwilioIVR(t *testing.T) {
 		"contact": {
 			"id": 10000, 
 			"name": "Cathy", 
-			"urns": ["tel:+16055741111?id=10000&priority=50"], 
+			"urns": ["tel:+16055741111?id=10000"], 
 			"uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", 
 			"fields": {"gender": {"text": "F"}}, 
 			"groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], 
@@ -441,7 +441,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=1&urn=tel%3A%2B16055741111%3Fid%3D10000%26priority%3D1000&wait_type=gather&sig=O9Lq3OdBw1EoZ1KD6XSjIaKvuRg%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=1&urn=tel%3A%2B16055741111%3Fid%3D10000&wait_type=gather&sig=0znh%2FxV9L0OD0ITKr6%2FDfpbNbXE%3D"
 					],
 					"maxDigits": 1,
 					"submitOnHash": true,
@@ -533,7 +533,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=uY7YwwGJn79IhdQUaKpQ932Fbss%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002&wait_type=gather&sig=5t5yQU0hZ8%2BWz1qNBDNT%2BRggYJM%3D"
 					],
 					"maxDigits": 1,
 					"submitOnHash": true,
@@ -556,7 +556,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=uY7YwwGJn79IhdQUaKpQ932Fbss%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002&wait_type=gather&sig=5t5yQU0hZ8%2BWz1qNBDNT%2BRggYJM%3D"
 					],
 					"maxDigits": 20,
 					"submitOnHash": true,
