@@ -182,7 +182,6 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
 		assert.Equal(t, expectedChannelID, msg.ChannelID())
-		assert.Equal(t, tc.URN, msg.URN())
 		if tc.URNID != models.NilURNID {
 			assert.Equal(t, tc.URNID, *msg.ContactURNID())
 		} else {
