@@ -613,6 +613,18 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
 }
 
+func TestLoadContactURNs(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	oa := testdata.Org1.Load(rt)
+	_, _, cathyURNs := testdata.Cathy.Load(rt, oa)
+	_, _, bobURNs := testdata.Bob.Load(rt, oa)
+
+	urns, err := models.LoadContactURNs(ctx, rt.DB, []models.URNID{cathyURNs[0].ID, bobURNs[0].ID})
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []*models.ContactURN{cathyURNs[0], bobURNs[0]}, urns)
+}
+
 func TestLockContacts(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 

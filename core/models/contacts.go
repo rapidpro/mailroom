@@ -1107,6 +1107,7 @@ SELECT id, org_id, contact_id, identity, priority, scheme, path, display, auth, 
   FROM contacts_contacturn 
  WHERE id = ANY($1)`
 
+// LoadContactURNs fetches contact URNs by their ids
 func LoadContactURNs(ctx context.Context, db DBorTx, ids []URNID) ([]*ContactURN, error) {
 	rows, err := db.QueryxContext(ctx, sqlSelectURNsByID, pq.Array(ids))
 	if err != nil {
