@@ -1,3 +1,7 @@
+v8.3.14 (2023-09-11)
+-------------------------
+ * Remove support for delegate channels
+
 v8.3.13 (2023-09-11)
 -------------------------
  * Just noop if trying to sync an Android channel that doesn't have an FM ID
