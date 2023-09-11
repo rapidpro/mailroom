@@ -1,3 +1,10 @@
+v8.3.12 (2023-09-11)
+-------------------------
+ * Remove encoding URN priority in URN strings as it's not used
+ * Remove having auth as a URN param
+ * Rework message sending so that URNs are loaded before queueing
+ * Update to latest null library and use Map[string] for channel events extra
+
 v8.3.11 (2023-09-05)
 -------------------------
  * Update to latest goflow
