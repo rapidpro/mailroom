@@ -42,21 +42,20 @@ const (
 type Channel struct {
 	// inner struct for privacy and so we don't collide with method names
 	c struct {
-		ID                 ChannelID                `json:"id"`
-		UUID               assets.ChannelUUID       `json:"uuid"`
-		OrgID              OrgID                    `json:"org_id"`
-		Parent             *assets.ChannelReference `json:"parent"`
-		Name               string                   `json:"name"`
-		Address            string                   `json:"address"`
-		ChannelType        ChannelType              `json:"channel_type"`
-		TPS                int                      `json:"tps"`
-		Country            null.String              `json:"country"`
-		Schemes            []string                 `json:"schemes"`
-		Roles              []assets.ChannelRole     `json:"roles"`
-		MatchPrefixes      []string                 `json:"match_prefixes"`
-		AllowInternational bool                     `json:"allow_international"`
-		MachineDetection   bool                     `json:"machine_detection"`
-		Config             map[string]any           `json:"config"`
+		ID                 ChannelID            `json:"id"`
+		UUID               assets.ChannelUUID   `json:"uuid"`
+		OrgID              OrgID                `json:"org_id"`
+		Name               string               `json:"name"`
+		Address            string               `json:"address"`
+		ChannelType        ChannelType          `json:"channel_type"`
+		TPS                int                  `json:"tps"`
+		Country            null.String          `json:"country"`
+		Schemes            []string             `json:"schemes"`
+		Roles              []assets.ChannelRole `json:"roles"`
+		MatchPrefixes      []string             `json:"match_prefixes"`
+		AllowInternational bool                 `json:"allow_international"`
+		MachineDetection   bool                 `json:"machine_detection"`
+		Config             map[string]any       `json:"config"`
 	}
 }
 
@@ -98,9 +97,6 @@ func (c *Channel) AllowInternational() bool { return c.c.AllowInternational }
 
 // MachineDetection returns whether this channel should do answering machine detection (only applies to IVR)
 func (c *Channel) MachineDetection() bool { return c.c.MachineDetection }
-
-// Parent returns a reference to the parent channel of this channel (if any)
-func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
 // Config returns the config for this channel
 func (c *Channel) Config() map[string]any { return c.c.Config }
@@ -197,7 +193,6 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
 	c.org_id as org_id,
-	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
 	c.name as name,
 	c.channel_type as channel_type,
 	COALESCE(c.tps, 10) as tps,
