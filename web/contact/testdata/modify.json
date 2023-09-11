@@ -1083,7 +1083,7 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000&priority=1000"
+                            "tel:+255788555111?id=30000"
                         ]
                     },
                     "events": [
@@ -1134,7 +1134,7 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000&priority=1000",
+                            "tel:+255788555111?id=30000",
                             "tel:+255788555222"
                         ]
                     },
@@ -1143,7 +1143,7 @@
                             "type": "contact_urns_changed",
                             "created_on": "2018-07-06T12:30:00.123456789Z",
                             "urns": [
-                                "tel:+255788555111?id=30000&priority=1000",
+                                "tel:+255788555111?id=30000",
                                 "tel:+255788555222"
                             ]
                         }
@@ -1191,8 +1191,8 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000&priority=1000",
-                            "tel:+255788555222?id=30001&priority=999"
+                            "tel:+255788555111?id=30000",
+                            "tel:+255788555222?id=30001"
                         ]
                     },
                     "events": []
@@ -1239,7 +1239,7 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000&priority=1000"
+                            "tel:+255788555111?id=30000"
                         ]
                     },
                     "events": [
@@ -1247,7 +1247,7 @@
                             "type": "contact_urns_changed",
                             "created_on": "2018-07-06T12:30:00.123456789Z",
                             "urns": [
-                                "tel:+255788555111?id=30000&priority=1000"
+                                "tel:+255788555111?id=30000"
                             ]
                         }
                     ]
@@ -1641,7 +1641,7 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000&priority=1000"
+                            "tel:+255788555111?id=30000"
                         ],
                         "groups": [
                             {

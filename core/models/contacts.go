@@ -151,22 +151,20 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db DBorTx, oa *OrgAsse
 	topURN := urns.NilURN
 	newURNs := make([]urns.URN, 0, len(c.urns))
 
-	priority := topURNPriority - 1
 	for _, urn := range c.urns {
 		id := URNID(GetURNInt(urn, "id"))
 		if id == urnID {
-			updated, err := updateURNChannelPriority(urn, channel, topURNPriority)
+			updated, err := updateURNChannel(urn, channel)
 			if err != nil {
 				return errors.Wrapf(err, "error updating channel on urn")
 			}
 			topURN = updated
 		} else {
-			updated, err := updateURNChannelPriority(urn, nil, priority)
+			updated, err := updateURNChannel(urn, nil)
 			if err != nil {
 				return errors.Wrapf(err, "error updating priority on urn")
 			}
 			newURNs = append(newURNs, updated)
-			priority--
 		}
 	}
 
@@ -422,7 +420,7 @@ type ContactURN struct {
 	ID        URNID       `json:"id"          db:"id"`
 	OrgID     OrgID       `                   db:"org_id"`
 	ContactID ContactID   `                   db:"contact_id"`
-	Priority  int         `json:"priority"    db:"priority"`
+	Priority  int         `                   db:"priority"`
 	Identity  urns.URN    `json:"identity"    db:"identity"`
 	Scheme    string      `json:"scheme"      db:"scheme"`
 	Path      string      `json:"path"        db:"path"`
@@ -434,10 +432,7 @@ type ContactURN struct {
 // AsURN returns a full URN representation including the query parameters needed by goflow and mailroom
 func (u *ContactURN) AsURN(oa *OrgAssets) (urns.URN, error) {
 	// id needed to turn msg_created events into database messages
-	query := url.Values{
-		"id":       []string{fmt.Sprintf("%d", u.ID)},
-		"priority": []string{fmt.Sprintf("%d", u.Priority)},
-	}
+	query := url.Values{"id": []string{fmt.Sprintf("%d", u.ID)}}
 
 	// channel needed by goflow URN/channel selection
 	if u.ChannelID != NilChannelID {
@@ -447,7 +442,7 @@ func (u *ContactURN) AsURN(oa *OrgAssets) (urns.URN, error) {
 		}
 	}
 
-	// create our URN
+	// re-encode our URN
 	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), string(u.Display))
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "invalid URN %s:%s", u.Scheme, u.Path)
@@ -521,15 +516,7 @@ LEFT JOIN (
 	SELECT 
 		contact_id, 
 		array_agg(
-			json_build_object(
-				'id', u.id, 
-				'scheme', u.scheme,
-				'path', path,
-				'display', display,
-            	'auth', auth,
-				'channel_id', channel_id,
-				'priority', priority
-			) ORDER BY priority DESC, id ASC
+			json_build_object('id', u.id, 'scheme', u.scheme, 'path', path, 'display', display, 'channel_id', channel_id) ORDER BY priority DESC, id ASC
 		) as urns 
 	FROM 
 		contacts_contacturn u 
@@ -1170,7 +1157,7 @@ func GetURNID(urn urns.URN) URNID {
 	return URNID(urnID)
 }
 
-func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urns.URN, error) {
+func updateURNChannel(urn urns.URN, channel *Channel) (urns.URN, error) {
 	query, err := urn.Query()
 	if err != nil {
 		return urns.NilURN, errors.Errorf("error parsing query from URN: %s", urn)
@@ -1178,8 +1165,6 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 	if channel != nil {
 		query["channel"] = []string{string(channel.UUID())}
 	}
-	query["priority"] = []string{strconv.FormatInt(int64(priority), 10)}
-
 	urn, err = urns.NewURNFromParts(urn.Scheme(), urn.Path(), query.Encode(), urn.Display())
 	if err != nil {
 		return urns.NilURN, errors.Wrap(err, "unable to create new urn")
