@@ -21,7 +21,7 @@ func SyncAndroidChannel(fc *fcm.Client, channel *models.Channel) error {
 	// no FCM ID for this channel, noop, we can't trigger a sync
 	fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
 	if fcmID == "" {
-		return errors.New("channel has no FCM ID")
+		return nil
 	}
 
 	sync := &fcm.Message{
