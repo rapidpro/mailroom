@@ -417,16 +417,17 @@ func queryContactIDs(ctx context.Context, db Queryer, query string, args ...any)
 }
 
 type ContactURN struct {
-	ID        URNID       `json:"id"          db:"id"`
-	OrgID     OrgID       `                   db:"org_id"`
-	ContactID ContactID   `                   db:"contact_id"`
-	Priority  int         `                   db:"priority"`
-	Identity  urns.URN    `json:"identity"    db:"identity"`
-	Scheme    string      `json:"scheme"      db:"scheme"`
-	Path      string      `json:"path"        db:"path"`
-	Display   null.String `json:"display"     db:"display"`
-	Auth      null.String `json:"auth"        db:"auth"`
-	ChannelID ChannelID   `json:"channel_id"  db:"channel_id"`
+	ID         URNID            `json:"id"          db:"id"`
+	OrgID      OrgID            `                   db:"org_id"`
+	ContactID  ContactID        `                   db:"contact_id"`
+	Priority   int              `                   db:"priority"`
+	Identity   urns.URN         `json:"identity"    db:"identity"`
+	Scheme     string           `json:"scheme"      db:"scheme"`
+	Path       string           `json:"path"        db:"path"`
+	Display    null.String      `json:"display"     db:"display"`
+	Auth       null.String      `json:"auth"        db:"auth"`
+	AuthTokens null.Map[string] `json:"auth_tokens" db:"auth_tokens"`
+	ChannelID  ChannelID        `json:"channel_id"  db:"channel_id"`
 }
 
 // AsURN returns a full URN representation including the query parameters needed by goflow and mailroom
@@ -871,7 +872,7 @@ func insertContactAndURNs(ctx context.Context, db DBorTx, orgID OrgID, userID Us
 func URNForURN(ctx context.Context, db Queryer, oa *OrgAssets, u urns.URN) (urns.URN, error) {
 	urn := &ContactURN{}
 	rows, err := db.QueryContext(ctx,
-		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
+		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, auth_tokens, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
 		u.Identity(), oa.OrgID(),
 	)
 	if err != nil {
@@ -931,7 +932,7 @@ func GetOrCreateURN(ctx context.Context, db DBorTx, oa *OrgAssets, contactID Con
 func URNForID(ctx context.Context, db Queryer, oa *OrgAssets, urnID URNID) (urns.URN, error) {
 	urn := &ContactURN{}
 	rows, err := db.QueryContext(ctx,
-		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
+		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, auth_tokens, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
 		urnID,
 	)
 	if err != nil {
@@ -1090,7 +1091,7 @@ UPDATE contacts_contact
  WHERE id = $1`
 
 const sqlSelectURNsByID = `
-SELECT id, org_id, contact_id, identity, priority, scheme, path, display, auth, channel_id 
+SELECT id, org_id, contact_id, identity, priority, scheme, path, display, auth, auth_tokens, channel_id 
   FROM contacts_contacturn 
  WHERE id = ANY($1)`
 
@@ -1316,8 +1317,8 @@ WHERE
 
 const sqlInsertContactURN = `
 INSERT INTO
-	contacts_contacturn(contact_id, identity, path, display, auth, scheme, priority, org_id)
-				 VALUES(:contact_id, :identity, :path, :display, :auth, :scheme, :priority, :org_id)
+	contacts_contacturn(contact_id, identity, path, display, auth, auth_tokens, scheme, priority, org_id)
+				 VALUES(:contact_id, :identity, :path, :display, :auth, :auth_tokens, :scheme, :priority, :org_id)
 ON CONFLICT(identity, org_id)
 DO 
 	UPDATE
