@@ -419,37 +419,36 @@ func queryContactIDs(ctx context.Context, db Queryer, query string, args ...any)
 }
 
 type ContactURN struct {
-	ID        URNID     `json:"id"          db:"id"`
-	Priority  int       `json:"priority"    db:"priority"`
-	Scheme    string    `json:"scheme"      db:"scheme"`
-	Path      string    `json:"path"        db:"path"`
-	Display   string    `json:"display"     db:"display"`
-	Auth      string    `json:"auth"        db:"auth"`
-	ChannelID ChannelID `json:"channel_id"  db:"channel_id"`
+	ID        URNID       `json:"id"          db:"id"`
+	OrgID     OrgID       `                   db:"org_id"`
+	ContactID ContactID   `                   db:"contact_id"`
+	Priority  int         `json:"priority"    db:"priority"`
+	Identity  urns.URN    `json:"identity"    db:"identity"`
+	Scheme    string      `json:"scheme"      db:"scheme"`
+	Path      string      `json:"path"        db:"path"`
+	Display   null.String `json:"display"     db:"display"`
+	Auth      null.String `json:"auth"        db:"auth"`
+	ChannelID ChannelID   `json:"channel_id"  db:"channel_id"`
 }
 
 // AsURN returns a full URN representation including the query parameters needed by goflow and mailroom
 func (u *ContactURN) AsURN(oa *OrgAssets) (urns.URN, error) {
-	// load any channel if present
-	var channel *Channel
-	if u.ChannelID != ChannelID(0) {
-		channel = oa.ChannelByID(u.ChannelID)
-	}
-
-	// we build our query from a combination of preferred channel and auth
+	// id needed to turn msg_created events into database messages
 	query := url.Values{
 		"id":       []string{fmt.Sprintf("%d", u.ID)},
 		"priority": []string{fmt.Sprintf("%d", u.Priority)},
 	}
-	if channel != nil {
-		query["channel"] = []string{string(channel.UUID())}
-	}
-	if u.Auth != "" {
-		query["auth"] = []string{u.Auth}
+
+	// channel needed by goflow URN/channel selection
+	if u.ChannelID != NilChannelID {
+		channel := oa.ChannelByID(u.ChannelID)
+		if channel != nil {
+			query["channel"] = []string{string(channel.UUID())}
+		}
 	}
 
 	// create our URN
-	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), u.Display)
+	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), string(u.Display))
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "invalid URN %s:%s", u.Scheme, u.Path)
 	}
@@ -865,9 +864,9 @@ func insertContactAndURNs(ctx context.Context, db DBorTx, orgID OrgID, userID Us
 			}
 		} else {
 			_, err := db.ExecContext(ctx,
-				`INSERT INTO contacts_contacturn(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
-			     VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-				orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, channelID, contactID,
+				`INSERT INTO contacts_contacturn(org_id, identity, path, scheme, display, priority, channel_id, contact_id)
+			     VALUES($1, $2, $3, $4, $5, $6, $7, $8)`,
+				orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), priority, channelID, contactID,
 			)
 			if err != nil {
 				return NilContactID, err
@@ -920,15 +919,14 @@ func GetOrCreateURN(ctx context.Context, db DBorTx, oa *OrgAssets, contactID Con
 	}
 
 	// otherwise we need to insert it
-	insert := &urnInsert{
+	insert := &ContactURN{
+		OrgID:     oa.OrgID(),
 		ContactID: contactID,
-		Identity:  u.Identity().String(),
+		Scheme:    u.Scheme(),
+		Identity:  u.Identity(),
 		Path:      u.Path(),
 		Display:   null.String(u.Display()),
-		Auth:      GetURNAuth(u),
-		Scheme:    u.Scheme(),
 		Priority:  defaultURNPriority,
-		OrgID:     oa.OrgID(),
 	}
 
 	_, err := db.NamedExecContext(ctx, sqlInsertContactURN, insert)
@@ -1104,6 +1102,31 @@ UPDATE contacts_contact
    SET status = 'S', modified_on = NOW()
  WHERE id = $1`
 
+const sqlSelectURNsByID = `
+SELECT id, org_id, contact_id, identity, priority, scheme, path, display, auth, channel_id 
+  FROM contacts_contacturn 
+ WHERE id = ANY($1)`
+
+// LoadContactURNs fetches contact URNs by their ids
+func LoadContactURNs(ctx context.Context, db DBorTx, ids []URNID) ([]*ContactURN, error) {
+	rows, err := db.QueryxContext(ctx, sqlSelectURNsByID, pq.Array(ids))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying URNs")
+	}
+	defer rows.Close()
+
+	urns := make([]*ContactURN, 0)
+	for rows.Next() {
+		u := &ContactURN{}
+		err = rows.StructScan(&u)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning URN row")
+		}
+		urns = append(urns, u)
+	}
+	return urns, nil
+}
+
 func GetURNInt(urn urns.URN, key string) int {
 	values, err := urn.Query()
 	if err != nil {
@@ -1112,19 +1135,6 @@ func GetURNInt(urn urns.URN, key string) int {
 
 	value, _ := strconv.Atoi(values.Get(key))
 	return value
-}
-
-func GetURNAuth(urn urns.URN) null.String {
-	values, err := urn.Query()
-	if err != nil {
-		return null.NullString
-	}
-
-	value := values.Get("auth")
-	if value == "" {
-		return null.NullString
-	}
-	return null.String(value)
 }
 
 func GetURNChannelID(oa *OrgAssets, urn urns.URN) ChannelID {
@@ -1235,15 +1245,14 @@ func UpdateContactURNs(ctx context.Context, db DBorTx, oa *OrgAssets, changes []
 				updatedURNIDs = append(updatedURNIDs, urnID)
 			} else {
 				// new URN, add it instead
-				inserts = append(inserts, &urnInsert{
+				inserts = append(inserts, &ContactURN{
+					OrgID:     oa.OrgID(),
 					ContactID: change.ContactID,
-					Identity:  urn.Identity().String(),
+					Identity:  urn.Identity(),
+					Scheme:    urn.Scheme(),
 					Path:      urn.Path(),
 					Display:   null.String(urn.Display()),
-					Auth:      GetURNAuth(urn),
-					Scheme:    urn.Scheme(),
 					Priority:  priority,
-					OrgID:     oa.OrgID(),
 				})
 
 				identities = append(identities, urn.Identity().String())
@@ -1319,18 +1328,6 @@ AS
 WHERE
 	u.id = r.id::int
 `
-
-// urnInsert is our object that represents a single contact URN addition
-type urnInsert struct {
-	ContactID ContactID   `db:"contact_id"`
-	Identity  string      `db:"identity"`
-	Path      string      `db:"path"`
-	Display   null.String `db:"display"`
-	Auth      null.String `db:"auth"`
-	Scheme    string      `db:"scheme"`
-	Priority  int         `db:"priority"`
-	OrgID     OrgID       `db:"org_id"`
-}
 
 const sqlInsertContactURN = `
 INSERT INTO

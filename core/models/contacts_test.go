@@ -364,7 +364,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	// add an orphaned URN
 	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
-	cathy, _ := testdata.Cathy.Load(rt, oa)
+	cathy, _, _ := testdata.Cathy.Load(rt, oa)
 
 	tcs := []struct {
 		orgID   models.OrgID
@@ -611,6 +611,18 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
+}
+
+func TestLoadContactURNs(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	oa := testdata.Org1.Load(rt)
+	_, _, cathyURNs := testdata.Cathy.Load(rt, oa)
+	_, _, bobURNs := testdata.Bob.Load(rt, oa)
+
+	urns, err := models.LoadContactURNs(ctx, rt.DB, []models.URNID{cathyURNs[0].ID, bobURNs[0].ID})
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []*models.ContactURN{cathyURNs[0], bobURNs[0]}, urns)
 }
 
 func TestLockContacts(t *testing.T) {

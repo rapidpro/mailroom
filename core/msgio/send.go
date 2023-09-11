@@ -7,8 +7,14 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
+
+type Send struct {
+	Msg *models.Msg
+	URN *models.ContactURN
+}
 
 type contactAndChannel struct {
 	contactID models.ContactID
@@ -40,66 +46,87 @@ func tryToQueue(ctx context.Context, rt *runtime.Runtime, db models.DBorTx, fc *
 	// messages that have been successfully queued
 	queued := make([]*models.Msg, 0, len(msgs))
 
-	// organize messages by org
-	msgsByOrg := make(map[models.OrgID][]*models.Msg)
-	for _, m := range msgs {
-		msgsByOrg[m.OrgID()] = append(msgsByOrg[m.OrgID()], m)
+	// fetch URNs and organize by id
+	urnIDs := getMessageURNIDs(msgs)
+	urnsByID := make(map[models.URNID]*models.ContactURN, len(urnIDs))
+	for _, batch := range models.ChunkSlice(urnIDs, 1000) {
+		urns, err := models.LoadContactURNs(ctx, db, batch)
+		if err != nil {
+			logrus.WithError(err).Error("error getting contact URNs")
+			return nil
+		}
+		for _, u := range urns {
+			urnsByID[u.ID] = u
+		}
 	}
 
-	for orgID, orgMsgs := range msgsByOrg {
+	// organize what we have to send by org
+	sendsByOrg := make(map[models.OrgID][]Send)
+	for _, m := range msgs {
+		orgID := m.OrgID()
+		var urn *models.ContactURN
+		if m.ContactURNID() != nil {
+			urn = urnsByID[*m.ContactURNID()]
+		}
+		sendsByOrg[orgID] = append(sendsByOrg[orgID], Send{Msg: m, URN: urn})
+	}
+
+	for orgID, orgSends := range sendsByOrg {
 		oa, err := models.GetOrgAssets(ctx, rt, orgID)
 		if err != nil {
 			logrus.WithError(err).Error("error getting org assets")
 		} else {
-			queued = append(queued, tryToQueueForOrg(ctx, rt, db, fc, oa, orgMsgs)...)
+			queued = append(queued, tryToQueueForOrg(ctx, rt, db, fc, oa, orgSends)...)
 		}
 	}
 
 	return queued
 }
 
-func tryToQueueForOrg(ctx context.Context, rt *runtime.Runtime, db models.DBorTx, fc *fcm.Client, oa *models.OrgAssets, msgs []*models.Msg) []*models.Msg {
-	// messages to be sent by courier, organized by contact+channel
-	courierMsgs := make(map[contactAndChannel][]*models.Msg, 100)
+func tryToQueueForOrg(ctx context.Context, rt *runtime.Runtime, db models.DBorTx, fc *fcm.Client, oa *models.OrgAssets, sends []Send) []*models.Msg {
+	// sends by courier, organized by contact+channel
+	courierSends := make(map[contactAndChannel][]Send, 100)
 
 	// android channels that need to be notified to sync
 	androidMsgs := make(map[*models.Channel][]*models.Msg, 100)
 
 	// messages that have been successfully queued
-	queued := make([]*models.Msg, 0, len(msgs))
+	queued := make([]*models.Msg, 0, len(sends))
 
-	for _, msg := range msgs {
+	for _, s := range sends {
 		// ignore any message already marked as failed (maybe org is suspended)
-		if msg.Status() == models.MsgStatusFailed {
-			queued = append(queued, msg) // so that we don't try to requeue
+		if s.Msg.Status() == models.MsgStatusFailed {
+			queued = append(queued, s.Msg) // so that we don't try to requeue
 			continue
 		}
 
-		channel := oa.ChannelByID(msg.ChannelID())
+		channel := oa.ChannelByID(s.Msg.ChannelID())
 
 		if channel != nil {
 			if channel.Type() == models.ChannelTypeAndroid {
-				androidMsgs[channel] = append(androidMsgs[channel], msg)
+				androidMsgs[channel] = append(androidMsgs[channel], s.Msg)
 			} else {
-				cc := contactAndChannel{msg.ContactID(), channel}
-				courierMsgs[cc] = append(courierMsgs[cc], msg)
+				cc := contactAndChannel{s.Msg.ContactID(), channel}
+				courierSends[cc] = append(courierSends[cc], s)
 			}
 		}
 	}
 
 	// if there are courier messages to queue, do so
-	if len(courierMsgs) > 0 {
+	if len(courierSends) > 0 {
 		rc := rt.RP.Get()
 		defer rc.Close()
 
-		for cc, contactMsgs := range courierMsgs {
-			err := QueueCourierMessages(rc, oa, cc.contactID, cc.channel, contactMsgs)
+		for cc, contactSends := range courierSends {
+			err := QueueCourierMessages(rc, oa, cc.contactID, cc.channel, contactSends)
 
 			// just log the error and continue to try - messages that weren't queued will be retried later
 			if err != nil {
 				logrus.WithField("channel_uuid", cc.channel.UUID()).WithField("contact_id", cc.contactID).WithError(err).Error("error queuing messages")
 			} else {
-				queued = append(queued, contactMsgs...)
+				for _, s := range contactSends {
+					queued = append(queued, s.Msg)
+				}
 			}
 		}
 	}
@@ -122,6 +149,18 @@ func tryToQueueForOrg(ctx context.Context, rt *runtime.Runtime, db models.DBorTx
 	}
 
 	return queued
+}
+
+// extracts the unique, non-nil contact URN ids for the given messages
+func getMessageURNIDs(msgs []*models.Msg) []models.URNID {
+	ids := make(map[models.URNID]bool, len(msgs))
+	for _, m := range msgs {
+		uid := m.ContactURNID()
+		if uid != nil {
+			ids[*uid] = true
+		}
+	}
+	return maps.Keys(ids)
 }
 
 func assert(c bool, m string) {

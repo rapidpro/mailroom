@@ -19,14 +19,23 @@ type Contact struct {
 	URNID models.URNID
 }
 
-func (c *Contact) Load(rt *runtime.Runtime, oa *models.OrgAssets) (*models.Contact, *flows.Contact) {
-	contacts, err := models.LoadContacts(context.Background(), rt.DB, oa, []models.ContactID{c.ID})
+func (c *Contact) Load(rt *runtime.Runtime, oa *models.OrgAssets) (*models.Contact, *flows.Contact, []*models.ContactURN) {
+	ctx := context.Background()
+
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{c.ID})
 	must(err, len(contacts) == 1)
 
 	flowContact, err := contacts[0].FlowContact(oa)
 	must(err)
 
-	return contacts[0], flowContact
+	var urnIDs []models.URNID
+	err = rt.DB.SelectContext(ctx, &urnIDs, `SELECT id FROM contacts_contacturn WHERE contact_id = $1`, c.ID)
+	must(err)
+
+	urns, err := models.LoadContactURNs(ctx, rt.DB, urnIDs)
+	must(err)
+
+	return contacts[0], flowContact, urns
 }
 
 type Group struct {

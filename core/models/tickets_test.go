@@ -315,7 +315,7 @@ func TestCloseTickets(t *testing.T) {
 	ticket2 := testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
 	modelTicket2 := ticket2.Load(rt)
 
-	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{cathy})
 	require.NoError(t, err)
@@ -342,7 +342,7 @@ func TestCloseTickets(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
 	// reload Cathy and check they're no longer in the tickets group
-	_, cathy = testdata.Cathy.Load(rt, oa)
+	_, cathy, _ = testdata.Cathy.Load(rt, oa)
 	assert.Equal(t, 1, len(cathy.Groups().All()))
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
 
@@ -406,7 +406,7 @@ func TestReopenTickets(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
 
 	// check Cathy is now in the open tickets group
-	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
 	assert.Equal(t, 2, len(cathy.Groups().All()))
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
 	assert.Equal(t, "Open Tickets", cathy.Groups().All()[1].Name())
