@@ -1,3 +1,7 @@
+v8.3.13 (2023-09-11)
+-------------------------
+ * Just noop if trying to sync an Android channel that doesn't have an FM ID
+
 v8.3.12 (2023-09-11)
 -------------------------
  * Remove encoding URN priority in URN strings as it's not used
