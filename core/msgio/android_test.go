@@ -84,7 +84,7 @@ func TestSyncAndroidChannel(t *testing.T) {
 	err = msgio.SyncAndroidChannel(nil, channel1)
 	assert.EqualError(t, err, "instance has no FCM configuration")
 	err = msgio.SyncAndroidChannel(fc, channel1)
-	assert.EqualError(t, err, "channel has no FCM ID")
+	assert.NoError(t, err)
 	err = msgio.SyncAndroidChannel(fc, channel2)
 	assert.EqualError(t, err, "error syncing channel: 401 error: 401 Unauthorized")
 	err = msgio.SyncAndroidChannel(fc, channel3)
