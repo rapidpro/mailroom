@@ -513,7 +513,7 @@ func TestNewMsgOut(t *testing.T) {
 
 	out, ch := models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
 	assert.Equal(t, "hello", out.Text())
-	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
+	assert.Equal(t, urns.URN("tel:+16055741111?id=10000"), out.URN())
 	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
 	assert.Equal(t, i18n.Locale(`eng-US`), out.Locale())
 	assert.Equal(t, "Twilio", ch.Name())
@@ -521,7 +521,7 @@ func TestNewMsgOut(t *testing.T) {
 	cathy.SetStatus(flows.ContactStatusBlocked)
 
 	out, ch = models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
-	assert.Equal(t, urns.URN("tel:+16055741111?id=10000&priority=1000"), out.URN())
+	assert.Equal(t, urns.URN("tel:+16055741111?id=10000"), out.URN())
 	assert.Equal(t, assets.NewChannelReference("74729f45-7f29-4868-9dc4-90e491e3c7d8", "Twilio"), out.Channel())
 	assert.Equal(t, "Twilio", ch.Name())
 	assert.Equal(t, flows.UnsendableReasonContactStatus, out.UnsendableReason())
