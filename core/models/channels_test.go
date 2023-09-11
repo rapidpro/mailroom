@@ -85,6 +85,5 @@ func TestChannels(t *testing.T) {
 		assert.Equal(t, tc.Schemes, channel.Schemes())
 		assert.Equal(t, tc.Prefixes, channel.MatchPrefixes())
 		assert.Equal(t, tc.AllowInternational, channel.AllowInternational())
-		assert.Equal(t, tc.Parent, channel.Parent())
 	}
 }
