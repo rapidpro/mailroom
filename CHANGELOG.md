@@ -1,3 +1,7 @@
+v8.3.15 (2023-09-11)
+-------------------------
+ * Start reading and writing ContactURN.auth_tokens
+
 v8.3.14 (2023-09-11)
 -------------------------
  * Remove support for delegate channels
