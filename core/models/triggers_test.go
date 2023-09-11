@@ -135,9 +135,9 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 	testdata.DoctorsGroup.Add(rt, testdata.Bob)
 	testdata.TestersGroup.Add(rt, testdata.Bob)
 
-	_, cathy := testdata.Cathy.Load(rt, oa)
-	_, george := testdata.George.Load(rt, oa)
-	_, bob := testdata.Bob.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
+	_, george, _ := testdata.George.Load(rt, oa)
+	_, bob, _ := testdata.Bob.Load(rt, oa)
 
 	tcs := []struct {
 		text              string
@@ -182,10 +182,10 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 	testdata.DoctorsGroup.Add(rt, testdata.Bob)
 	testdata.TestersGroup.Add(rt, testdata.Bob, testdata.Alexandria)
 
-	_, cathy := testdata.Cathy.Load(rt, oa)
-	_, bob := testdata.Bob.Load(rt, oa)
-	_, george := testdata.George.Load(rt, oa)
-	_, alexa := testdata.Alexandria.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
+	_, bob, _ := testdata.Bob.Load(rt, oa)
+	_, george, _ := testdata.George.Load(rt, oa)
+	_, alexa, _ := testdata.Alexandria.Load(rt, oa)
 
 	tcs := []struct {
 		contact           *flows.Contact

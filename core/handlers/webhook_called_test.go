@@ -135,7 +135,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	require.NoError(t, err)
 
 	env := envs.NewBuilder().Build()
-	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	// webhook service with a 2 second delay
 	svc := &failingWebhookService{delay: 2 * time.Second}

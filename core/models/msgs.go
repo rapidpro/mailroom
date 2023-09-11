@@ -119,8 +119,6 @@ type Msg struct {
 		ChannelID    ChannelID     `db:"channel_id"`
 		ContactID    ContactID     `db:"contact_id"`
 		ContactURNID *URNID        `db:"contact_urn_id"`
-		URN          urns.URN      `db:"urn_urn"`
-		URNAuth      null.String   `db:"urn_auth"`
 
 		SentOn       *time.Time      `db:"sent_on"`
 		QueuedOn     time.Time       `db:"queued_on"`
@@ -158,8 +156,6 @@ func (m *Msg) ExternalID() null.String       { return m.m.ExternalID }
 func (m *Msg) Metadata() map[string]any      { return m.m.Metadata }
 func (m *Msg) MsgCount() int                 { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID          { return m.m.ChannelID }
-func (m *Msg) URN() urns.URN                 { return m.m.URN }
-func (m *Msg) URNAuth() null.String          { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                  { return m.m.OrgID }
 func (m *Msg) FlowID() FlowID                { return m.m.FlowID }
 func (m *Msg) TicketID() TicketID            { return m.m.TicketID }
@@ -180,8 +176,6 @@ func (m *Msg) SetURN(urn urns.URN) error {
 		return nil
 	}
 
-	m.m.URN = urn
-
 	// set our ID if we have one
 	urnInt := GetURNInt(urn, "id")
 	if urnInt == 0 {
@@ -190,7 +184,6 @@ func (m *Msg) SetURN(urn urns.URN) error {
 
 	urnID := URNID(urnInt)
 	m.m.ContactURNID = &urnID
-	m.m.URNAuth = GetURNAuth(urn)
 
 	return nil
 }
@@ -251,8 +244,6 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	urnID := call.ContactURNID()
 	m.ContactURNID = &urnID
 	m.ChannelID = call.ChannelID()
-
-	m.URN = out.URN()
 
 	m.OrgID = orgID
 	m.CreatedOn = createdOn
@@ -344,7 +335,7 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
-	if m.URN.Scheme() == urns.TelScheme {
+	if out.URN().Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
 	}
 
@@ -490,13 +481,9 @@ SELECT
 	m.channel_id,
 	m.contact_id,
 	m.contact_urn_id,
-	m.org_id,
-	u.identity AS "urn_urn",
-	u.auth AS "urn_auth"
+	m.org_id
 FROM
 	msgs_msg m
-INNER JOIN 
-	contacts_contacturn u ON u.id = m.contact_urn_id
 INNER JOIN 
 	channels_channel c ON c.id = m.channel_id
 WHERE
@@ -651,8 +638,6 @@ func ResendMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msg
 			if err != nil {
 				return nil, errors.Wrap(err, "error loading URN")
 			}
-			msg.m.URN = urn // needs to be set for queueing to courier
-
 			contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
 			if err != nil {
 				return nil, errors.Wrap(err, "error parsing URN")

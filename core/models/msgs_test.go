@@ -182,7 +182,6 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
 		assert.Equal(t, expectedChannelID, msg.ChannelID())
-		assert.Equal(t, tc.URN, msg.URN())
 		if tc.URNID != models.NilURNID {
 			assert.Equal(t, tc.URNID, *msg.ContactURNID())
 		} else {
@@ -379,8 +378,8 @@ func TestGetMsgRepetitions(t *testing.T) {
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 13, 3, 234567, time.UTC)))
 
 	oa := testdata.Org1.Load(rt)
-	_, cathy := testdata.Cathy.Load(rt, oa)
-	_, george := testdata.George.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
+	_, george, _ := testdata.George.Load(rt, oa)
 
 	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
 	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "FOO", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
@@ -510,7 +509,7 @@ func TestNewMsgOut(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	_, cathy := testdata.Cathy.Load(rt, oa)
+	_, cathy, _ := testdata.Cathy.Load(rt, oa)
 
 	out, ch := models.NewMsgOut(oa, cathy, "hello", nil, nil, `eng-US`)
 	assert.Equal(t, "hello", out.Text())
@@ -543,7 +542,7 @@ func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, o
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	_, flowContact := contact.Load(rt, oa)
+	_, flowContact, _ := contact.Load(rt, oa)
 
 	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
 	require.NoError(t, err)
