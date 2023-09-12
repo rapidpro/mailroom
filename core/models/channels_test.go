@@ -19,9 +19,6 @@ func TestChannels(t *testing.T) {
 	// add some tel specific config to channel 2
 	rt.DB.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, testdata.VonageChannel.ID)
 
-	// make twitter channel have a parent of twilio channel
-	rt.DB.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, testdata.TwilioChannel.ID, testdata.TwitterChannel.ID)
-
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, 1, models.RefreshChannels)
 	require.NoError(t, err)
 
@@ -37,7 +34,6 @@ func TestChannels(t *testing.T) {
 		Roles              []assets.ChannelRole
 		Prefixes           []string
 		AllowInternational bool
-		Parent             *assets.ChannelReference
 	}{
 		{
 			testdata.TwilioChannel.ID,
@@ -48,7 +44,6 @@ func TestChannels(t *testing.T) {
 			[]assets.ChannelRole{"send", "receive", "call", "answer"},
 			nil,
 			false,
-			nil,
 		},
 		{
 			testdata.VonageChannel.ID,
@@ -59,7 +54,6 @@ func TestChannels(t *testing.T) {
 			[]assets.ChannelRole{"send", "receive"},
 			[]string{"250", "251"},
 			true,
-			nil,
 		},
 		{
 			testdata.TwitterChannel.ID,
@@ -70,7 +64,6 @@ func TestChannels(t *testing.T) {
 			[]assets.ChannelRole{"send", "receive"},
 			nil,
 			false,
-			assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"),
 		},
 	}
 
