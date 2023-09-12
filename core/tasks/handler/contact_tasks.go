@@ -189,7 +189,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
 
 	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(oa, channel, event.Extra()["referrer_id"])
+		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraString("referrer_id"))
 
 	case models.MOMissEventType:
 		trigger = models.FindMatchingMissedCallTrigger(oa)
