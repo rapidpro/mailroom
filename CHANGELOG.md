@@ -1,3 +1,8 @@
+v8.3.17 (2023-09-12)
+-------------------------
+ * Fix not supporting channel events with extra with non-string values
+ * Update test database based on https://github.com/nyaruka/rapidpro/pull/4819
+
 v8.3.16 (2023-09-12)
 -------------------------
  * Stop reading ContactURN.auth and remove from model
