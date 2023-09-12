@@ -1,3 +1,7 @@
+v8.3.16 (2023-09-12)
+-------------------------
+ * Stop reading ContactURN.auth and remove from model
+
 v8.3.15 (2023-09-11)
 -------------------------
  * Start reading and writing ContactURN.auth_tokens
