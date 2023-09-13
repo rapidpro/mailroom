@@ -91,7 +91,7 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 		// hand off to the appropriate handler
 		switch contactEvent.Type {
 
-		case StopEventType:
+		case string(models.EventTypeStopContact):
 			evt := &StopEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
@@ -99,7 +99,7 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 			}
 			err = handleStopEvent(ctx, rt, evt)
 
-		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
+		case string(models.EventTypeNewConversation), string(models.EventTypeReferral), string(models.EventTypeMissedCall), string(models.EventTypeWelcomeMessage):
 			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {

@@ -116,7 +116,7 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), ch.ID(), contact.ID(), urnID, nil, false)
+	event := models.NewChannelEvent(models.EventTypeIncomingCall, oa.OrgID(), ch.ID(), contact.ID(), urnID, nil, false)
 
 	externalID, err := svc.CallIDForRequest(r)
 	if err != nil {
@@ -130,7 +130,7 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, rt, models.MOCallEventType, event, call)
+	session, err := handler.HandleChannelEvent(ctx, rt, models.EventTypeIncomingCall, event, call)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 

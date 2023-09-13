@@ -13,21 +13,21 @@ type ChannelEventID int64
 
 // channel event types
 const (
-	NewConversationEventType = ChannelEventType("new_conversation")
-	WelcomeMessageEventType  = ChannelEventType("welcome_message")
-	ReferralEventType        = ChannelEventType("referral")
-	MOMissEventType          = ChannelEventType("mo_miss")
-	MOCallEventType          = ChannelEventType("mo_call")
-	StopContactEventType     = ChannelEventType("stop_contact")
+	EventTypeNewConversation ChannelEventType = "new_conversation"
+	EventTypeWelcomeMessage  ChannelEventType = "welcome_message"
+	EventTypeReferral        ChannelEventType = "referral"
+	EventTypeMissedCall      ChannelEventType = "mo_miss"
+	EventTypeIncomingCall    ChannelEventType = "mo_call"
+	EventTypeStopContact     ChannelEventType = "stop_contact"
 )
 
 // ContactSeenEvents are those which count as the contact having been seen
 var ContactSeenEvents = map[ChannelEventType]bool{
-	NewConversationEventType: true,
-	ReferralEventType:        true,
-	MOMissEventType:          true,
-	MOCallEventType:          true,
-	StopContactEventType:     true,
+	EventTypeNewConversation: true,
+	EventTypeReferral:        true,
+	EventTypeMissedCall:      true,
+	EventTypeIncomingCall:    true,
+	EventTypeStopContact:     true,
 }
 
 // ChannelEvent represents an event that occurred associated with a channel, such as a referral, missed call, etc..

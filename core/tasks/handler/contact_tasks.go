@@ -28,16 +28,11 @@ import (
 )
 
 const (
-	MOMissEventType          = string(models.MOMissEventType)
-	NewConversationEventType = "new_conversation"
-	WelcomeMessageEventType  = "welcome_message"
-	ReferralEventType        = "referral"
-	StopEventType            = "stop_event"
-	MsgEventType             = "msg_event"
-	ExpirationEventType      = "expiration_event"
-	TimeoutEventType         = "timeout_event"
-	TicketClosedEventType    = "ticket_closed"
-	MsgDeletedType           = "msg_deleted"
+	MsgEventType          = "msg_event"
+	ExpirationEventType   = "expiration_event"
+	TimeoutEventType      = "timeout_event"
+	TicketClosedEventType = "ticket_closed"
+	MsgDeletedType        = "msg_deleted"
 )
 
 // handleTimedEvent is called for timeout events
@@ -185,19 +180,19 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 
 	switch eventType {
 
-	case models.NewConversationEventType:
+	case models.EventTypeNewConversation:
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
 
-	case models.ReferralEventType:
+	case models.EventTypeReferral:
 		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraString("referrer_id"))
 
-	case models.MOMissEventType:
+	case models.EventTypeMissedCall:
 		trigger = models.FindMatchingMissedCallTrigger(oa)
 
-	case models.MOCallEventType:
+	case models.EventTypeIncomingCall:
 		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
 
-	case models.WelcomeMessageEventType:
+	case models.EventTypeWelcomeMessage:
 		trigger = nil
 
 	default:
@@ -253,13 +248,13 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	var flowTrigger flows.Trigger
 	switch eventType {
 
-	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
+	case models.EventTypeNewConversation, models.EventTypeReferral, models.EventTypeMissedCall:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
 			WithParams(params).
 			Build()
 
-	case models.MOCallEventType:
+	case models.EventTypeIncomingCall:
 		urn := contacts[0].URNForID(event.URNID())
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
