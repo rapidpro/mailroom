@@ -207,7 +207,7 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 func TestFindMatchingMissedCallTrigger(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	testdata.InsertCatchallTrigger(rt, testdata.Org1, testdata.SingleMessage, nil, nil)
 
@@ -230,7 +230,7 @@ func TestFindMatchingMissedCallTrigger(t *testing.T) {
 func TestFindMatchingNewConversationTrigger(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	twilioTriggerID := testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
 	noChTriggerID := testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, nil)
@@ -257,7 +257,7 @@ func TestFindMatchingNewConversationTrigger(t *testing.T) {
 func TestFindMatchingReferralTrigger(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	fooID := testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.Favorites, "foo", testdata.TwitterChannel)
 	barID := testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.Favorites, "bar", nil)
@@ -284,6 +284,60 @@ func TestFindMatchingReferralTrigger(t *testing.T) {
 	for i, tc := range tcs {
 		channel := oa.ChannelByID(tc.channelID)
 		trigger := models.FindMatchingReferralTrigger(oa, channel, tc.referrerID)
+
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch in test case #%d", i)
+	}
+}
+
+func TestFindMatchingOptInTrigger(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	twilioTriggerID := testdata.InsertOptInTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
+	noChTriggerID := testdata.InsertOptInTrigger(rt, testdata.Org1, testdata.Favorites, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		channelID         models.ChannelID
+		expectedTriggerID models.TriggerID
+	}{
+		{testdata.TwilioChannel.ID, twilioTriggerID},
+		{testdata.VonageChannel.ID, noChTriggerID},
+	}
+
+	for i, tc := range tcs {
+		channel := oa.ChannelByID(tc.channelID)
+		trigger := models.FindMatchingOptInTrigger(oa, channel)
+
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch in test case #%d", i)
+	}
+}
+
+func TestFindMatchingOptOutTrigger(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	twilioTriggerID := testdata.InsertOptOutTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
+	noChTriggerID := testdata.InsertOptOutTrigger(rt, testdata.Org1, testdata.Favorites, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		channelID         models.ChannelID
+		expectedTriggerID models.TriggerID
+	}{
+		{testdata.TwilioChannel.ID, twilioTriggerID},
+		{testdata.VonageChannel.ID, noChTriggerID},
+	}
+
+	for i, tc := range tcs {
+		channel := oa.ChannelByID(tc.channelID)
+		trigger := models.FindMatchingOptOutTrigger(oa, channel)
 
 		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch in test case #%d", i)
 	}
