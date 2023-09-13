@@ -20,7 +20,7 @@ func TestChannelEvents(t *testing.T) {
 	start := time.Now()
 
 	// no extra
-	e := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, nil, false)
+	e := models.NewChannelEvent(models.EventTypeMissedCall, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, nil, false)
 	err := e.Insert(ctx, rt.DB)
 	assert.NoError(t, err)
 	assert.NotZero(t, e.ID())
@@ -28,7 +28,7 @@ func TestChannelEvents(t *testing.T) {
 	assert.True(t, e.OccurredOn().After(start))
 
 	// with extra
-	e2 := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, map[string]any{"referral_id": "foobar"}, false)
+	e2 := models.NewChannelEvent(models.EventTypeMissedCall, testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, map[string]any{"referral_id": "foobar"}, false)
 	err = e2.Insert(ctx, rt.DB)
 	assert.NoError(t, err)
 	assert.NotZero(t, e2.ID())

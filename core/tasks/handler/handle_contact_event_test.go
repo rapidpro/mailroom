@@ -431,11 +431,11 @@ func TestChannelEvents(t *testing.T) {
 		Response       string
 		UpdateLastSeen bool
 	}{
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
-		{handler.WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
+		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
+		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
+		{models.EventTypeWelcomeMessage, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
+		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
+		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -523,7 +523,7 @@ func TestStopEvent(t *testing.T) {
 	eventJSON, err := json.Marshal(event)
 	require.NoError(t, err)
 	task := &queue.Task{
-		Type:  handler.StopEventType,
+		Type:  string(models.EventTypeStopContact),
 		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}
