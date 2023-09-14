@@ -1,3 +1,7 @@
+v8.3.19 (2023-09-14)
+-------------------------
+ * Fix stop contact task name
+
 v8.3.18 (2023-09-14)
 -------------------------
  * Add support for optin/optout triggers and channel events
