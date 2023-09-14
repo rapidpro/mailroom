@@ -88,7 +88,7 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 		// hand off to the appropriate handler
 		switch contactEvent.Type {
 
-		case string(models.EventTypeStopContact):
+		case string(models.EventTypeStopContact), "stop_event":
 			evt := &StopEvent{}
 			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleStopEvent(ctx, rt, evt)
