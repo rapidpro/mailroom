@@ -1,3 +1,7 @@
+v8.3.18 (2023-09-14)
+-------------------------
+ * Add support for optin/optout triggers and channel events
+
 v8.3.17 (2023-09-12)
 -------------------------
  * Fix not supporting channel events with extra with non-string values
