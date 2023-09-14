@@ -93,7 +93,7 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleStopEvent(ctx, rt, evt)
 
-		case string(models.EventTypeNewConversation), string(models.EventTypeReferral), string(models.EventTypeMissedCall), string(models.EventTypeWelcomeMessage):
+		case string(models.EventTypeNewConversation), string(models.EventTypeReferral), string(models.EventTypeMissedCall), string(models.EventTypeWelcomeMessage), string(models.EventTypeOptIn), string(models.EventTypeOptOut):
 			evt := &models.ChannelEvent{}
 			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			_, err = HandleChannelEvent(ctx, rt, models.ChannelEventType(contactEvent.Type), evt, nil)

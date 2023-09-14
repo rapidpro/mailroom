@@ -250,6 +250,7 @@ DELETE FROM tickets_ticketevent;
 DELETE FROM tickets_ticket;
 DELETE FROM triggers_trigger_contacts WHERE trigger_id >= 30000;
 DELETE FROM triggers_trigger_groups WHERE trigger_id >= 30000;
+DELETE FROM triggers_trigger_exclude_groups WHERE trigger_id >= 30000;
 DELETE FROM triggers_trigger WHERE id >= 30000;
 DELETE FROM channels_channelcount;
 DELETE FROM msgs_msg;

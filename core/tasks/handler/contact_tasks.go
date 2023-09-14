@@ -179,22 +179,20 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	var trigger *models.Trigger
 
 	switch eventType {
-
 	case models.EventTypeNewConversation:
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
-
 	case models.EventTypeReferral:
 		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraString("referrer_id"))
-
 	case models.EventTypeMissedCall:
 		trigger = models.FindMatchingMissedCallTrigger(oa)
-
 	case models.EventTypeIncomingCall:
 		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
-
+	case models.EventTypeOptIn:
+		trigger = models.FindMatchingOptInTrigger(oa, channel)
+	case models.EventTypeOptOut:
+		trigger = models.FindMatchingOptOutTrigger(oa, channel)
 	case models.EventTypeWelcomeMessage:
 		trigger = nil
-
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -246,23 +244,18 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 
 	// build our flow trigger
 	var flowTrigger flows.Trigger
-	switch eventType {
 
-	case models.EventTypeNewConversation, models.EventTypeReferral, models.EventTypeMissedCall:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
-			WithParams(params).
-			Build()
-
-	case models.EventTypeIncomingCall:
+	if eventType == models.EventTypeIncomingCall {
 		urn := contacts[0].URNForID(event.URNID())
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
 			WithCall(urn).
 			Build()
-
-	default:
-		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	} else {
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
+			WithParams(params).
+			Build()
 	}
 
 	// if we have a channel connection we set the connection on the session before our event hooks fire

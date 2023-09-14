@@ -36,6 +36,8 @@ const (
 	IncomingCallTriggerType    = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
 	TicketClosedTriggerType    = TriggerType("T")
+	OptInTriggerType           = TriggerType("I")
+	OptOutTriggerType          = TriggerType("O")
 )
 
 // match type constants
@@ -163,6 +165,20 @@ func FindMatchingMissedCallTrigger(oa *OrgAssets) *Trigger {
 // FindMatchingNewConversationTrigger finds the best match trigger for new conversation channel events
 func FindMatchingNewConversationTrigger(oa *OrgAssets, channel *Channel) *Trigger {
 	candidates := findTriggerCandidates(oa, NewConversationTriggerType, nil)
+
+	return findBestTriggerMatch(candidates, channel, nil)
+}
+
+// FindMatchingOptInTrigger finds the best match trigger for optin channel events
+func FindMatchingOptInTrigger(oa *OrgAssets, channel *Channel) *Trigger {
+	candidates := findTriggerCandidates(oa, OptInTriggerType, nil)
+
+	return findBestTriggerMatch(candidates, channel, nil)
+}
+
+// FindMatchingOptOutTrigger finds the best match trigger for optout channel events
+func FindMatchingOptOutTrigger(oa *OrgAssets, channel *Channel) *Trigger {
+	candidates := findTriggerCandidates(oa, OptOutTriggerType, nil)
 
 	return findBestTriggerMatch(candidates, channel, nil)
 }

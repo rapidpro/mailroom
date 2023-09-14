@@ -19,6 +19,8 @@ const (
 	EventTypeMissedCall      ChannelEventType = "mo_miss"
 	EventTypeIncomingCall    ChannelEventType = "mo_call"
 	EventTypeStopContact     ChannelEventType = "stop_contact"
+	EventTypeOptIn           ChannelEventType = "optin"
+	EventTypeOptOut          ChannelEventType = "optout"
 )
 
 // ContactSeenEvents are those which count as the contact having been seen
@@ -28,6 +30,8 @@ var ContactSeenEvents = map[ChannelEventType]bool{
 	EventTypeMissedCall:      true,
 	EventTypeIncomingCall:    true,
 	EventTypeStopContact:     true,
+	EventTypeOptIn:           true,
+	EventTypeOptOut:          true,
 }
 
 // ChannelEvent represents an event that occurred associated with a channel, such as a referral, missed call, etc..
