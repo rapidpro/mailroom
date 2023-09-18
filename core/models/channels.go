@@ -214,7 +214,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		END 
 		FROM unnest(regexp_split_to_array(c.role,'')) AS r)
 	) as roles,
-	CASE WHEN channel_type IN ('FBA') THEN {'optins'}::text[] ELSE {}::text[] END,
+	CASE WHEN channel_type IN ('FBA') THEN '{"optins"}'::text[] ELSE '{}'::text[] END,
 	jsonb_extract_path(c.config, 'matching_prefixes') AS match_prefixes,
 	jsonb_extract_path(c.config, 'allow_international') AS allow_international,
 	jsonb_extract_path(c.config, 'machine_detection') AS machine_detection
