@@ -8,6 +8,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -242,20 +243,24 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
+	var optIn *flows.OptIn
+	if eventType == models.EventTypeOptIn || eventType == models.EventTypeOptOut {
+		optIn = oa.SessionAssets().OptIns().Get(assets.OptInUUID(event.ExtraString("optin_uuid")))
+	}
+
 	// build our flow trigger
-	var flowTrigger flows.Trigger
+	tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact)
+	var trig flows.Trigger
 
 	if eventType == models.EventTypeIncomingCall {
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
-			WithCall(urn).
-			Build()
+		trig = tb.Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).WithCall(urn).Build()
+	} else if eventType == models.EventTypeOptIn && optIn != nil {
+		trig = tb.OptIn(optIn, triggers.OptInEventTypeStarted).Build()
+	} else if eventType == models.EventTypeOptOut && optIn != nil {
+		trig = tb.OptIn(optIn, triggers.OptInEventTypeStopped).Build()
 	} else {
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
-			WithParams(params).
-			Build()
+		trig = tb.Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).WithParams(params).Build()
 	}
 
 	// if we have a channel connection we set the connection on the session before our event hooks fire
@@ -270,7 +275,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trig}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
