@@ -1,3 +1,39 @@
+v8.3.19 (2023-09-14)
+-------------------------
+ * Fix stop contact task name
+
+v8.3.18 (2023-09-14)
+-------------------------
+ * Add support for optin/optout triggers and channel events
+
+v8.3.17 (2023-09-12)
+-------------------------
+ * Fix not supporting channel events with extra with non-string values
+ * Update test database based on https://github.com/nyaruka/rapidpro/pull/4819
+
+v8.3.16 (2023-09-12)
+-------------------------
+ * Stop reading ContactURN.auth and remove from model
+
+v8.3.15 (2023-09-11)
+-------------------------
+ * Start reading and writing ContactURN.auth_tokens
+
+v8.3.14 (2023-09-11)
+-------------------------
+ * Remove support for delegate channels
+
+v8.3.13 (2023-09-11)
+-------------------------
+ * Just noop if trying to sync an Android channel that doesn't have an FM ID
+
+v8.3.12 (2023-09-11)
+-------------------------
+ * Remove encoding URN priority in URN strings as it's not used
+ * Remove having auth as a URN param
+ * Rework message sending so that URNs are loaded before queueing
+ * Update to latest null library and use Map[string] for channel events extra
+
 v8.3.11 (2023-09-05)
 -------------------------
  * Update to latest goflow

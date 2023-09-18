@@ -89,7 +89,7 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 		ContactURNID: *m.ContactURNID(),
 		ChannelUUID:  ch.UUID(),
 		URN:          u.Identity,
-		URNAuth:      string(u.Auth),
+		URNAuth:      string(u.AuthTokens["default"]),
 		Metadata:     m.Metadata(),
 		IsResend:     m.IsResend,
 	}

@@ -2,13 +2,13 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
@@ -83,60 +83,39 @@ func (t *HandleContactEventTask) Perform(ctx context.Context, rt *runtime.Runtim
 
 		// decode our event, this is a normal task at its top level
 		contactEvent := &queue.Task{}
-		err = json.Unmarshal([]byte(event), contactEvent)
-		if err != nil {
-			return errors.Wrapf(err, "error unmarshalling contact event: %s", event)
-		}
+		jsonx.MustUnmarshal([]byte(event), contactEvent)
 
 		// hand off to the appropriate handler
 		switch contactEvent.Type {
 
-		case StopEventType:
+		case string(models.EventTypeStopContact), "stop_event":
 			evt := &StopEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleStopEvent(ctx, rt, evt)
 
-		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
+		case string(models.EventTypeNewConversation), string(models.EventTypeReferral), string(models.EventTypeMissedCall), string(models.EventTypeWelcomeMessage), string(models.EventTypeOptIn), string(models.EventTypeOptOut):
 			evt := &models.ChannelEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			_, err = HandleChannelEvent(ctx, rt, models.ChannelEventType(contactEvent.Type), evt, nil)
 
 		case MsgEventType:
 			msg := &MsgEvent{}
-			err = json.Unmarshal(contactEvent.Task, msg)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, msg)
 			err = handleMsgEvent(ctx, rt, msg)
 
 		case TicketClosedEventType:
 			evt := &models.TicketEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling ticket event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleTicketEvent(ctx, rt, evt)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling timeout event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleTimedEvent(ctx, rt, contactEvent.Type, evt)
 
 		case MsgDeletedType:
 			evt := &MsgDeletedEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling deleted event: %s", event)
-			}
+			jsonx.MustUnmarshal(contactEvent.Task, evt)
 			err = handleMsgDeletedEvent(ctx, rt, evt)
 
 		default:

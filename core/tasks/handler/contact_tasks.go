@@ -28,16 +28,11 @@ import (
 )
 
 const (
-	MOMissEventType          = string(models.MOMissEventType)
-	NewConversationEventType = "new_conversation"
-	WelcomeMessageEventType  = "welcome_message"
-	ReferralEventType        = "referral"
-	StopEventType            = "stop_event"
-	MsgEventType             = "msg_event"
-	ExpirationEventType      = "expiration_event"
-	TimeoutEventType         = "timeout_event"
-	TicketClosedEventType    = "ticket_closed"
-	MsgDeletedType           = "msg_deleted"
+	MsgEventType          = "msg_event"
+	ExpirationEventType   = "expiration_event"
+	TimeoutEventType      = "timeout_event"
+	TicketClosedEventType = "ticket_closed"
+	MsgDeletedType        = "msg_deleted"
 )
 
 // handleTimedEvent is called for timeout events
@@ -184,22 +179,20 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	var trigger *models.Trigger
 
 	switch eventType {
-
-	case models.NewConversationEventType:
+	case models.EventTypeNewConversation:
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
-
-	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(oa, channel, event.Extra()["referrer_id"])
-
-	case models.MOMissEventType:
+	case models.EventTypeReferral:
+		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraString("referrer_id"))
+	case models.EventTypeMissedCall:
 		trigger = models.FindMatchingMissedCallTrigger(oa)
-
-	case models.MOCallEventType:
+	case models.EventTypeIncomingCall:
 		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
-
-	case models.WelcomeMessageEventType:
+	case models.EventTypeOptIn:
+		trigger = models.FindMatchingOptInTrigger(oa, channel)
+	case models.EventTypeOptOut:
+		trigger = models.FindMatchingOptOutTrigger(oa, channel)
+	case models.EventTypeWelcomeMessage:
 		trigger = nil
-
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -251,23 +244,18 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 
 	// build our flow trigger
 	var flowTrigger flows.Trigger
-	switch eventType {
 
-	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
-			WithParams(params).
-			Build()
-
-	case models.MOCallEventType:
+	if eventType == models.EventTypeIncomingCall {
 		urn := contacts[0].URNForID(event.URNID())
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
 			WithCall(urn).
 			Build()
-
-	default:
-		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	} else {
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
+			WithParams(params).
+			Build()
 	}
 
 	// if we have a channel connection we set the connection on the session before our event hooks fire

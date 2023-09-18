@@ -21,6 +21,14 @@ func InsertNewConversationTrigger(rt *runtime.Runtime, org *Org, flow *Flow, cha
 	return insertTrigger(rt, org, models.NewConversationTriggerType, flow, "", "", nil, nil, nil, "", channel)
 }
 
+func InsertOptInTrigger(rt *runtime.Runtime, org *Org, flow *Flow, channel *Channel) models.TriggerID {
+	return insertTrigger(rt, org, models.OptInTriggerType, flow, "", "", nil, nil, nil, "", channel)
+}
+
+func InsertOptOutTrigger(rt *runtime.Runtime, org *Org, flow *Flow, channel *Channel) models.TriggerID {
+	return insertTrigger(rt, org, models.OptOutTriggerType, flow, "", "", nil, nil, nil, "", channel)
+}
+
 func InsertReferralTrigger(rt *runtime.Runtime, org *Org, flow *Flow, referrerID string, channel *Channel) models.TriggerID {
 	return insertTrigger(rt, org, models.ReferralTriggerType, flow, "", "", nil, nil, nil, referrerID, channel)
 }

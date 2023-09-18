@@ -417,6 +417,8 @@ func TestChannelEvents(t *testing.T) {
 	// add some channel event triggers
 	testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
 	testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
+	testdata.InsertOptInTrigger(rt, testdata.Org1, testdata.Favorites, testdata.VonageChannel)
+	testdata.InsertOptOutTrigger(rt, testdata.Org1, testdata.PickANumber, testdata.VonageChannel)
 
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
@@ -427,15 +429,17 @@ func TestChannelEvents(t *testing.T) {
 		URNID          models.URNID
 		OrgID          models.OrgID
 		ChannelID      models.ChannelID
-		Extra          map[string]string
+		Extra          map[string]any
 		Response       string
 		UpdateLastSeen bool
 	}{
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
-		{handler.WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
+		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
+		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
+		{models.EventTypeWelcomeMessage, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
+		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
+		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
+		{models.EventTypeOptIn, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, map[string]any{"optin_name": "Updates"}, "What is your favorite color?", true},
+		{models.EventTypeOptOut, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, map[string]any{"optin_name": "Updates"}, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -523,7 +527,7 @@ func TestStopEvent(t *testing.T) {
 	eventJSON, err := json.Marshal(event)
 	require.NoError(t, err)
 	task := &queue.Task{
-		Type:  handler.StopEventType,
+		Type:  string(models.EventTypeStopContact),
 		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}
