@@ -242,6 +242,10 @@ func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, f
 	start := time.Now()
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
+		if ctx.Err() != nil {
+			return sessions, ctx.Err()
+		}
+
 		ss, skipped, err := tryToStartWithLock(ctx, rt, oa, flow, remaining, options)
 		if err != nil {
 			return nil, err
@@ -249,6 +253,10 @@ func StartFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, f
 
 		sessions = append(sessions, ss...)
 		remaining = skipped // skipped are now our remaining
+	}
+
+	if len(remaining) > 0 {
+		logrus.WithField("contacts", remaining).Warn("failed to acquire locks for contacts")
 	}
 
 	return sessions, nil
