@@ -1,3 +1,11 @@
+v8.3.20 (2023-09-19)
+-------------------------
+ * Add NOOP handler for optin_created events and queue messages to courier with type
+ * Cleanup functions use to load org assets
+ * Tweak waiting for locks for contacts
+ * Create optin flow triggers for optin channel events
+ * Implement loading optin assets
+
 v8.3.19 (2023-09-14)
 -------------------------
  * Fix stop contact task name
