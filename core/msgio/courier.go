@@ -33,6 +33,12 @@ const (
 	highPriority = 1
 )
 
+type MsgType string
+
+const (
+	MsgTypeText MsgType = "text"
+)
+
 type MsgOrigin string
 
 const (
@@ -47,6 +53,7 @@ type Msg struct {
 	ID                   flows.MsgID           `json:"id"`
 	UUID                 flows.MsgUUID         `json:"uuid"`
 	OrgID                models.OrgID          `json:"org_id"`
+	Type                 MsgType               `json:"type"`
 	Origin               MsgOrigin             `json:"origin"`
 	Text                 string                `json:"text"`
 	Attachments          []utils.Attachment    `json:"attachments,omitempty"`
@@ -78,6 +85,7 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 		ID:           m.ID(),
 		UUID:         m.UUID(),
 		OrgID:        m.OrgID(),
+		Type:         MsgTypeText,
 		Text:         m.Text(),
 		Attachments:  m.Attachments(),
 		QuickReplies: m.QuickReplies(),
