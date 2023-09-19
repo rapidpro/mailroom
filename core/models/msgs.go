@@ -262,6 +262,12 @@ func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session
 	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilUserID)
 }
 
+// NewOutgoingOptInMsg creates an outgoing optin message for the passed in flow message
+func NewOutgoingOptInMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, optIn *OptIn, urn urns.URN, createdOn time.Time) (*Msg, error) {
+	// TODO
+	return nil, errors.New("not yet implemented")
+}
+
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, bb *BroadcastBatch) (*Msg, error) {
 	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, NilTicketID, bb.CreatedByID)

@@ -85,6 +85,8 @@ type OrgAssets struct {
 	labels       []assets.Label
 	labelsByUUID map[assets.LabelUUID]*Label
 
+	optInsByUUID map[assets.OptInUUID]*OptIn
+
 	ticketers       []assets.Ticketer
 	ticketersByID   map[TicketerID]*Ticketer
 	ticketersByUUID map[assets.TicketerUUID]*Ticketer
@@ -267,8 +269,10 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading optins for org %d", orgID)
 		}
+		oa.optInsByUUID = make(map[assets.OptInUUID]*OptIn)
 	} else {
 		oa.optIns = prev.optIns
+		oa.optInsByUUID = prev.optInsByUUID
 	}
 
 	if prev == nil || refresh&RefreshResthooks > 0 {
@@ -646,6 +650,10 @@ func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 
 func (a *OrgAssets) OptIns() ([]assets.OptIn, error) {
 	return a.optIns, nil
+}
+
+func (a *OrgAssets) OptInByUUID(uuid assets.OptInUUID) *OptIn {
+	return a.optInsByUUID[uuid]
 }
 
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
