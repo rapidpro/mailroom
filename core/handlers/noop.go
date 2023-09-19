@@ -3,12 +3,11 @@ package handlers
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 )
 
 func init() {
@@ -22,6 +21,7 @@ func init() {
 	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHandler(events.TypeDialWait, NoopHandler)
 	models.RegisterEventHandler(events.TypeDialEnded, NoopHandler)
+	models.RegisterEventHandler(events.TypeOptInCreated, NoopHandler)
 }
 
 // NoopHandler is our hook for events we ignore in a run

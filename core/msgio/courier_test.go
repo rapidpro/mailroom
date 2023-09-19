@@ -88,6 +88,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"session_status": "W",
 		"text": "Hi there",
 		"tps_cost": 2,
+		"type": "text",
 		"urn": "tel:+16055741111",
 		"uuid": "%s"
 	}`, session.ID(), msg1.UUID()))
@@ -124,6 +125,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"session_status": "W",
 		"text": "Hi there",
 		"tps_cost": 1,
+		"type": "text",
 		"urn": "tel:+16055741111",
 		"uuid": "%s"
 	}`, session.ID(), msg2.UUID()))
@@ -146,6 +148,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"origin": "broadcast",
 		"text": "Blast",
 		"tps_cost": 1,
+		"type": "text",
 		"urn": "tel:+16055741111",
 		"uuid": "%s"
 	}`, msg3.UUID()))
