@@ -65,6 +65,7 @@ type OrgAssets struct {
 	topicsByID   map[TopicID]*Topic
 	topicsByUUID map[assets.TopicUUID]*Topic
 
+	optIns    []assets.OptIn
 	resthooks []assets.Resthook
 	templates []assets.Template
 	triggers  []*Trigger
@@ -233,6 +234,15 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.labelsByUUID = prev.labelsByUUID
 	}
 
+	if prev == nil || refresh&RefreshOptIns > 0 {
+		oa.optIns, err = loadOptIns(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading optins for org %d", orgID)
+		}
+	} else {
+		oa.optIns = prev.optIns
+	}
+
 	if prev == nil || refresh&RefreshResthooks > 0 {
 		oa.resthooks, err = loadResthooks(ctx, db, orgID)
 		if err != nil {
@@ -393,6 +403,7 @@ const (
 	RefreshTicketers   = Refresh(1 << 14)
 	RefreshTopics      = Refresh(1 << 15)
 	RefreshUsers       = Refresh(1 << 16)
+	RefreshOptIns      = Refresh(1 << 17)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -629,6 +640,10 @@ func (a *OrgAssets) Triggers() []*Trigger {
 
 func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 	return a.locations, nil
+}
+
+func (a *OrgAssets) OptIns() ([]assets.OptIn, error) {
+	return a.optIns, nil
 }
 
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {

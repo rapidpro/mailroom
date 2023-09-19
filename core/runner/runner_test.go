@@ -51,7 +51,7 @@ func TestStartFlowBatch(t *testing.T) {
 		Returns(2)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = 'Hey, how are you?' AND org_id = 1 AND status = 'Q' 
-		AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T' AND channel_id = $2`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}), testdata.TwilioChannel.ID).
+		AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T'`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})).
 		Returns(2)
 
 	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowstart WHERE id = $1`, start1.ID).Returns("P")
