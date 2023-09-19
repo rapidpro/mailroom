@@ -29,7 +29,7 @@ func (o *OptIn) Name() string           { return o.o.Name }
 
 const sqlSelectOptInsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (
-	SELECT id, uuid, name
+    SELECT id, uuid, name
       FROM msgs_optin o
      WHERE o.org_id = $1 AND o.is_active
   ORDER BY o.id ASC
@@ -41,7 +41,7 @@ func loadOptIns(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.OptIn, e
 
 	rows, err := db.QueryContext(ctx, sqlSelectOptInsByOrg, orgID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying resthooks for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying optins for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -50,13 +50,13 @@ func loadOptIns(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.OptIn, e
 		optIn := &OptIn{}
 		err = dbutil.ScanJSON(rows, &optIn.o)
 		if err != nil {
-			return nil, errors.Wrap(err, "error scanning resthook row")
+			return nil, errors.Wrap(err, "error scanning optin row")
 		}
 
 		optIns = append(optIns, optIn)
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(optIns)).Debug("loaded resthooks")
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(optIns)).Debug("loaded optins")
 
 	return optIns, nil
 }
