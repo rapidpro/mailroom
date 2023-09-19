@@ -188,5 +188,5 @@ func TestCloseTicket(t *testing.T) {
 	require.NoError(t, err)
 
 	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,
-		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:34Z"},"queued_on":"2021-06-08T16:40:37Z"}`})
+		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:33Z"},"queued_on":"2021-06-08T16:40:36Z"}`})
 }
