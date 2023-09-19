@@ -3,14 +3,12 @@ package models
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type LabelID int
@@ -35,8 +33,6 @@ func (l *Label) Name() string { return l.l.Name }
 
 // loads the labels for the passed in org
 func loadLabels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Label, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectLabels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
@@ -52,8 +48,6 @@ func loadLabels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Label, e
 		}
 		labels = append(labels, label)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(labels)).Debug("loaded labels")
 
 	return labels, nil
 }

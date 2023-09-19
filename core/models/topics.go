@@ -4,14 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"time"
 
-	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type TopicID int
@@ -62,8 +59,6 @@ ORDER BY
 
 // loadTopics loads all the topics for the passed in org
 func loadTopics(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Topic, error) {
-	start := dates.Now()
-
 	rows, err := db.QueryContext(ctx, selectOrgTopicsSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying topics for org: %d", orgID)
@@ -79,8 +74,6 @@ func loadTopics(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Topic, e
 		}
 		topics = append(topics, topic)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(topics)).Debug("loaded topics")
 
 	return topics, nil
 }

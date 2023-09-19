@@ -3,12 +3,10 @@ package models
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // OptInID is our type for the database id of an optin
@@ -37,8 +35,6 @@ SELECT ROW_TO_JSON(r) FROM (
 
 // loads the optins for the passed in org
 func loadOptIns(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.OptIn, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectOptInsByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying optins for org: %d", orgID)
@@ -55,8 +51,6 @@ func loadOptIns(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.OptIn, e
 
 		optIns = append(optIns, optIn)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(optIns)).Debug("loaded optins")
 
 	return optIns, nil
 }

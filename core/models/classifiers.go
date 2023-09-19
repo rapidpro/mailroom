@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
@@ -17,7 +16,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ClassifierID is our type for classifier IDs
@@ -128,8 +126,6 @@ func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier
 
 // loadClassifiers loads all the classifiers for the passed in org
 func loadClassifiers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Classifier, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectClassifiers, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying classifiers for org: %d", orgID)
@@ -152,8 +148,6 @@ func loadClassifiers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Cla
 
 		classifiers = append(classifiers, classifier)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(classifiers)).Debug("loaded classifiers")
 
 	return classifiers, nil
 }

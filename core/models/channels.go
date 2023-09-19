@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
@@ -14,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ChannelID is the type for channel IDs
@@ -168,8 +166,6 @@ WHERE
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channel, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectChannels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
@@ -186,8 +182,6 @@ func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channe
 
 		channels = append(channels, channel)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(channels)).Debug("loaded channels")
 
 	return channels, nil
 }
