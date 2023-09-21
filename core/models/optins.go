@@ -12,6 +12,8 @@ import (
 // OptInID is our type for the database id of an optin
 type OptInID int
 
+const NilOptInID = OptInID(0)
+
 // OptIn is the mailroom type for optins
 type OptIn struct {
 	o struct {
@@ -24,6 +26,10 @@ type OptIn struct {
 func (o *OptIn) ID() OptInID            { return o.o.ID }
 func (o *OptIn) UUID() assets.OptInUUID { return o.o.UUID }
 func (o *OptIn) Name() string           { return o.o.Name }
+
+func (o *OptIn) Reference() *assets.OptInReference {
+	return assets.NewOptInReference(o.o.UUID, o.o.Name)
+}
 
 const sqlSelectOptInsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (

@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -104,6 +105,7 @@ type Msg struct {
 		Text         string         `db:"text"`
 		Attachments  pq.StringArray `db:"attachments"`
 		QuickReplies pq.StringArray `db:"quick_replies"`
+		OptInID      OptInID        `db:"optin_id"`
 		Locale       i18n.Locale    `db:"locale"`
 
 		HighPriority bool          `db:"high_priority"`
@@ -158,6 +160,7 @@ func (m *Msg) MsgCount() int                 { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID          { return m.m.ChannelID }
 func (m *Msg) OrgID() OrgID                  { return m.m.OrgID }
 func (m *Msg) FlowID() FlowID                { return m.m.FlowID }
+func (m *Msg) OptInID() OptInID              { return m.m.OptInID }
 func (m *Msg) TicketID() TicketID            { return m.m.TicketID }
 func (m *Msg) ContactID() ContactID          { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID          { return m.m.ContactURNID }
@@ -257,15 +260,37 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	return msg
 }
 
+// NewOutgoingOptInMsg creates an outgoing optin message
+func NewOutgoingOptInMsg(rt *runtime.Runtime, session *Session, flow *Flow, optIn *OptIn, channel *Channel, urn urns.URN, createdOn time.Time) *Msg {
+	msg := &Msg{}
+	m := &msg.m
+	m.UUID = flows.MsgUUID(uuids.New())
+	m.OrgID = session.OrgID()
+	m.ContactID = session.ContactID()
+	m.HighPriority = session.IncomingMsgID() != NilMsgID
+	m.Direction = DirectionOut
+	m.Status = MsgStatusQueued
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeText
+	m.MsgCount = 1
+	m.CreatedOn = createdOn
+
+	msg.SetChannel(channel)
+	msg.SetURN(urn)
+
+	if flow != nil {
+		m.FlowID = flow.ID()
+	}
+
+	// set transient fields which we'll use when queuing to courier
+	msg.Session = session
+
+	return msg
+}
+
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilUserID)
-}
-
-// NewOutgoingOptInMsg creates an outgoing optin message for the passed in flow message
-func NewOutgoingOptInMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, optIn *OptIn, urn urns.URN, createdOn time.Time) (*Msg, error) {
-	// TODO
-	return nil, errors.New("not yet implemented")
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast

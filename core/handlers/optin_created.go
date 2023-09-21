@@ -48,10 +48,15 @@ func handleOptInCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		return errors.Errorf("unable to load channel with uuid: %s", event.Channel.UUID)
 	}
 
-	msg, err := models.NewOutgoingOptInMsg(rt, oa.Org(), channel, scene.Session(), optIn, urn, event.CreatedOn())
-	if err != nil {
-		return errors.Wrap(err, "error creating outgoing message")
+	// and the flow
+	var flow *models.Flow
+	run, _ := scene.Session().FindStep(e.StepUUID())
+	flowAsset, _ := oa.FlowByUUID(run.FlowReference().UUID)
+	if flowAsset != nil {
+		flow = flowAsset.(*models.Flow)
 	}
+
+	msg := models.NewOutgoingOptInMsg(rt, scene.Session(), flow, optIn, channel, urn, event.CreatedOn())
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
