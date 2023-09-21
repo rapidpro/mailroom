@@ -281,6 +281,9 @@ func NewOutgoingOptInMsg(rt *runtime.Runtime, session *Session, flow *Flow, optI
 	if flow != nil {
 		m.FlowID = flow.ID()
 	}
+	if optIn != nil {
+		m.OptInID = optIn.ID()
+	}
 
 	// set transient fields which we'll use when queuing to courier
 	msg.Session = session
