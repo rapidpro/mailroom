@@ -69,6 +69,13 @@ func (e *ChannelEvent) ExtraString(key string) string {
 	}
 	return ""
 }
+func (e *ChannelEvent) ExtraInt(key string) int {
+	asFloat, ok := e.e.Extra[key].(float64)
+	if ok {
+		return int(asFloat)
+	}
+	return 0
+}
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (e *ChannelEvent) MarshalJSON() ([]byte, error) {

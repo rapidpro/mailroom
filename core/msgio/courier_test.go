@@ -164,7 +164,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"high_priority": true,
 		"id": 5,
 		"optin": {
-			"uuid": "%s",
+			"id": %d,
 			"name": "Joke Of The Day"
 		},
 		"org_id": 1,
@@ -176,7 +176,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"tps_cost": 1,
 		"urn": "tel:+16055741111",
 		"uuid": "%s"
-	}`, optIn.UUID(), session.ID(), msg4.UUID()))
+	}`, optIn.ID(), session.ID(), msg4.UUID()))
 }
 
 func createAndAssertCourierMsg(t *testing.T, ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, expectedJSON string) {
