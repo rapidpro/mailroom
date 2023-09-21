@@ -8,7 +8,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -243,9 +242,13 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
-	var optIn *flows.OptIn
+	var flowOptIn *flows.OptIn
 	if eventType == models.EventTypeOptIn || eventType == models.EventTypeOptOut {
-		optIn = oa.SessionAssets().OptIns().Get(assets.OptInUUID(event.ExtraString("optin_uuid")))
+		optInID := models.OptInID(event.ExtraInt("optin_id"))
+		optIn := oa.OptInByID(optInID)
+		if optIn != nil {
+			flowOptIn = oa.SessionAssets().OptIns().Get(optIn.UUID())
+		}
 	}
 
 	// build our flow trigger
@@ -255,10 +258,10 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	if eventType == models.EventTypeIncomingCall {
 		urn := contacts[0].URNForID(event.URNID())
 		trig = tb.Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).WithCall(urn).Build()
-	} else if eventType == models.EventTypeOptIn && optIn != nil {
-		trig = tb.OptIn(optIn, triggers.OptInEventTypeStarted).Build()
-	} else if eventType == models.EventTypeOptOut && optIn != nil {
-		trig = tb.OptIn(optIn, triggers.OptInEventTypeStopped).Build()
+	} else if eventType == models.EventTypeOptIn && flowOptIn != nil {
+		trig = tb.OptIn(flowOptIn, triggers.OptInEventTypeStarted).Build()
+	} else if eventType == models.EventTypeOptOut && flowOptIn != nil {
+		trig = tb.OptIn(flowOptIn, triggers.OptInEventTypeStopped).Build()
 	} else {
 		trig = tb.Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).WithParams(params).Build()
 	}
