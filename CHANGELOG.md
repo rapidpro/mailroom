@@ -1,3 +1,9 @@
+v8.3.21 (2023-09-21)
+-------------------------
+ * Switch to using optin ids instead of UUIDs
+ * Update to latest goflow
+ * Handle optin_requested events
+
 v8.3.20 (2023-09-19)
 -------------------------
  * Add NOOP handler for optin_created events and queue messages to courier with type
