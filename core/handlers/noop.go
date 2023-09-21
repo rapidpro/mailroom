@@ -21,7 +21,6 @@ func init() {
 	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHandler(events.TypeDialWait, NoopHandler)
 	models.RegisterEventHandler(events.TypeDialEnded, NoopHandler)
-	models.RegisterEventHandler(events.TypeOptInCreated, NoopHandler)
 }
 
 // NoopHandler is our hook for events we ignore in a run
