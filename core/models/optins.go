@@ -3,9 +3,11 @@ package models
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 )
 
@@ -13,6 +15,11 @@ import (
 type OptInID int
 
 const NilOptInID = OptInID(0)
+
+func (i *OptInID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i OptInID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *OptInID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i OptInID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // OptIn is the mailroom type for optins
 type OptIn struct {

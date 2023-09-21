@@ -293,25 +293,25 @@ func NewOutgoingOptInMsg(rt *runtime.Runtime, session *Session, flow *Flow, optI
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilUserID)
+	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilOptInID, NilUserID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, bb *BroadcastBatch) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, NilTicketID, bb.CreatedByID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, NilTicketID, bb.OptInID, bb.CreatedByID)
 }
 
 // NewOutgoingTicketMsg creates an outgoing message from a ticket
 func NewOutgoingTicketMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, ticketID TicketID, userID UserID) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, ticketID, userID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, ticketID, NilOptInID, userID)
 }
 
 // NewOutgoingChatMsg creates an outgoing message from chat
 func NewOutgoingChatMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, userID UserID) (*Msg, error) {
-	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, NilTicketID, userID)
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, NilTicketID, NilOptInID, userID)
 }
 
-func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID, ticketID TicketID, userID UserID) (*Msg, error) {
+func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID, ticketID TicketID, optInID OptInID, userID UserID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
@@ -322,6 +322,7 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	m.Text = out.Text()
 	m.QuickReplies = out.QuickReplies()
 	m.Locale = out.Locale()
+	m.OptInID = optInID
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
@@ -457,6 +458,7 @@ SELECT
 	broadcast_id,
 	flow_id,
 	ticket_id,
+	optin_id,
 	text,
 	attachments,
 	quick_replies,
@@ -497,6 +499,7 @@ SELECT
 	m.broadcast_id,
 	m.flow_id,
 	m.ticket_id,
+	m.optin_id,
 	m.text,
 	m.attachments,
 	m.quick_replies,
@@ -586,10 +589,10 @@ const sqlInsertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, ticket_id, created_by_id)
+		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, ticket_id, optin_id, created_by_id)
   VALUES(:uuid, :text, :attachments, :quick_replies, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :ticket_id, :created_by_id)
+		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :ticket_id, :optin_id, :created_by_id)
 RETURNING 
 	id AS id, 
 	modified_on AS modified_on,

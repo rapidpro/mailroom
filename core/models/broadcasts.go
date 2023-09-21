@@ -36,6 +36,7 @@ type Broadcast struct {
 	Translations  flows.BroadcastTranslations `json:"translations"            db:"translations"`
 	TemplateState TemplateState               `json:"template_state"`
 	BaseLanguage  i18n.Language               `json:"base_language"           db:"base_language"`
+	OptInID       OptInID                     `json:"optin_id"                db:"optin_id"`
 	URNs          []urns.URN                  `json:"urns,omitempty"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
 	GroupIDs      []GroupID                   `json:"group_ids,omitempty"`
@@ -87,6 +88,7 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID, isLast bool) *BroadcastB
 		BaseLanguage:  b.BaseLanguage,
 		Translations:  b.Translations,
 		TemplateState: b.TemplateState,
+		OptInID:       b.OptInID,
 		CreatedByID:   b.CreatedByID,
 		ContactIDs:    contactIDs,
 		IsLast:        isLast,
@@ -179,6 +181,7 @@ type BroadcastBatch struct {
 	Translations  flows.BroadcastTranslations `json:"translations"`
 	BaseLanguage  i18n.Language               `json:"base_language"`
 	TemplateState TemplateState               `json:"template_state"`
+	OptInID       OptInID                     `json:"optin_id"`
 	ContactIDs    []ContactID                 `json:"contact_ids,omitempty"`
 	CreatedByID   UserID                      `json:"created_by_id"`
 	IsLast        bool                        `json:"is_last"`

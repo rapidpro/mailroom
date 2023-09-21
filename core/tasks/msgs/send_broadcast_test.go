@@ -46,7 +46,7 @@ func TestSendBroadcastTask(t *testing.T) {
 	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001, nil)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdata.George.URNID)
@@ -197,7 +197,7 @@ func TestBroadcastTask(t *testing.T) {
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001, nil)
 
 	tcs := []struct {
 		Translations  flows.BroadcastTranslations
