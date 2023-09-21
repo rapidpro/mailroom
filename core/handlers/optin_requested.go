@@ -15,13 +15,13 @@ import (
 )
 
 func init() {
-	models.RegisterEventHandler(events.TypeOptInCreated, handleOptInCreated)
+	models.RegisterEventHandler(events.TypeOptInRequested, handleOptInRequested)
 }
 
-func handleOptInCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
-	event := e.(*events.OptInCreatedEvent)
+func handleOptInRequested(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+	event := e.(*events.OptInRequestedEvent)
 
-	logrus.WithFields(logrus.Fields{"contact_uuid": scene.ContactUUID(), "session_id": scene.SessionID(), "optin": event.OptIn.Name, "urn": event.URN}).Debug("optin created event")
+	logrus.WithFields(logrus.Fields{"contact_uuid": scene.ContactUUID(), "session_id": scene.SessionID(), "optin": event.OptIn.Name, "urn": event.URN}).Debug("optin requested event")
 
 	urn := event.URN
 	var err error
