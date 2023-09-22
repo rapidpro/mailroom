@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type TicketID int
@@ -878,8 +877,6 @@ ORDER BY
 
 // loadTicketers loads all the ticketers for the passed in org
 func loadTicketers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Ticketer, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectOrgTicketers, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying ticketers for org: %d", orgID)
@@ -895,8 +892,6 @@ func loadTicketers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Ticke
 		}
 		ticketers = append(ticketers, ticketer)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(ticketers)).Debug("loaded ticketers")
 
 	return ticketers, nil
 }

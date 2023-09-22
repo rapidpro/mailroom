@@ -4,14 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type Template struct {
@@ -65,8 +63,6 @@ func (t *TemplateTranslation) VariableCount() int { return t.t.VariableCount }
 
 // loads the templates for the passed in org
 func loadTemplates(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Template, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectTemplates, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying templates for org: %d", orgID)
@@ -83,8 +79,6 @@ func loadTemplates(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Templ
 
 		templates = append(templates, template)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(templates)).Debug("loaded templates")
 
 	return templates, nil
 }

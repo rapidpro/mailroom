@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
@@ -12,7 +11,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // GroupID is our type for group ids
@@ -65,10 +63,8 @@ func (g *Group) Status() GroupStatus { return g.g.Status }
 // Type returns the type of this group
 func (g *Group) Type() GroupType { return g.g.Type }
 
-// LoadGroups loads the groups for the passed in org
-func LoadGroups(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Group, error) {
-	start := time.Now()
-
+// loads the groups for the passed in org
+func loadGroups(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Group, error) {
 	rows, err := db.QueryContext(ctx, selectGroupsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying groups for org: %d", orgID)
@@ -85,8 +81,6 @@ func LoadGroups(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Group, e
 
 		groups = append(groups, group)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(groups)).Debug("loaded groups")
 
 	return groups, nil
 }

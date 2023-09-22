@@ -4,12 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type Global struct {
@@ -32,8 +30,6 @@ func (g *Global) MarshalJSON() ([]byte, error) { return json.Marshal(g.g) }
 
 // loads the globals for the passed in org
 func loadGlobals(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Global, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, selectGlobalsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying globals for org: %d", orgID)
@@ -50,8 +46,6 @@ func loadGlobals(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Global,
 
 		globals = append(globals, global)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(globals)).Debug("loaded globals")
 
 	return globals, nil
 }

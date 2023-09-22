@@ -42,6 +42,11 @@ const (
 	MsgOriginChat      MsgOrigin = "chat"
 )
 
+type OptIn struct {
+	ID   models.OptInID `json:"id"`
+	Name string         `json:"name"`
+}
+
 // Msg is the format of a message queued to courier
 type Msg struct {
 	ID                   flows.MsgID           `json:"id"`
@@ -62,6 +67,7 @@ type Msg struct {
 	URNAuth              string                `json:"urn_auth,omitempty"`
 	Metadata             map[string]any        `json:"metadata,omitempty"`
 	Flow                 *assets.FlowReference `json:"flow,omitempty"`
+	OptIn                *OptIn                `json:"optin,omitempty"`
 	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
 	IsResend             bool                  `json:"is_resend,omitempty"`
 
@@ -96,8 +102,8 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 
 	if m.FlowID() != models.NilFlowID {
 		msg.Origin = MsgOriginFlow
-		flow, _ := oa.FlowByID(m.FlowID()) // always a chance flow no longer exists
-		if flow != nil {
+		flow, _ := oa.FlowByID(m.FlowID())
+		if flow != nil { // always a chance flow no longer exists
 			msg.Flow = flow.Reference()
 		}
 	} else if m.BroadcastID() != models.NilBroadcastID {
@@ -106,6 +112,13 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 		msg.Origin = MsgOriginTicket
 	} else {
 		msg.Origin = MsgOriginChat
+	}
+
+	if m.OptInID() != models.NilOptInID {
+		optIn := oa.OptInByID(m.OptInID())
+		if optIn != nil { // always a chance optin no longer exists
+			msg.OptIn = &OptIn{ID: optIn.ID(), Name: optIn.Name()}
+		}
 	}
 
 	if m.Contact != nil {

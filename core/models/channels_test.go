@@ -19,6 +19,8 @@ func TestChannels(t *testing.T) {
 	// add some tel specific config to channel 2
 	rt.DB.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, testdata.VonageChannel.ID)
 
+	facebook := testdata.InsertChannel(rt, testdata.Org1, "FBA", "Facebook", "5678", []string{"facebook"}, "SR", nil)
+
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, 1, models.RefreshChannels)
 	require.NoError(t, err)
 
@@ -32,6 +34,7 @@ func TestChannels(t *testing.T) {
 		Address            string
 		Schemes            []string
 		Roles              []assets.ChannelRole
+		Features           []assets.ChannelFeature
 		Prefixes           []string
 		AllowInternational bool
 	}{
@@ -42,6 +45,7 @@ func TestChannels(t *testing.T) {
 			"+13605551212",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive", "call", "answer"},
+			[]assets.ChannelFeature{},
 			nil,
 			false,
 		},
@@ -52,6 +56,7 @@ func TestChannels(t *testing.T) {
 			"5789",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive"},
+			[]assets.ChannelFeature{},
 			[]string{"250", "251"},
 			true,
 		},
@@ -62,6 +67,18 @@ func TestChannels(t *testing.T) {
 			"ureport",
 			[]string{"twitter"},
 			[]assets.ChannelRole{"send", "receive"},
+			[]assets.ChannelFeature{},
+			nil,
+			false,
+		},
+		{
+			facebook.ID,
+			facebook.UUID,
+			"Facebook",
+			"5678",
+			[]string{"facebook"},
+			[]assets.ChannelRole{"send", "receive"},
+			[]assets.ChannelFeature{assets.ChannelFeatureOptIns},
 			nil,
 			false,
 		},

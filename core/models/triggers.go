@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
@@ -14,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // TriggerType is the type of a trigger
@@ -97,8 +95,6 @@ func (t *Trigger) Match() *triggers.KeywordMatch {
 
 // loadTriggers loads all non-schedule triggers for the passed in org
 func loadTriggers(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Trigger, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, selectTriggersSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
@@ -115,8 +111,6 @@ func loadTriggers(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Trigger, err
 
 		triggers = append(triggers, trigger)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(triggers)).Debug("loaded triggers")
 
 	return triggers, nil
 }

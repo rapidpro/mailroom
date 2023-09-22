@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
@@ -14,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ChannelID is the type for channel IDs
@@ -42,20 +40,21 @@ const (
 type Channel struct {
 	// inner struct for privacy and so we don't collide with method names
 	c struct {
-		ID                 ChannelID            `json:"id"`
-		UUID               assets.ChannelUUID   `json:"uuid"`
-		OrgID              OrgID                `json:"org_id"`
-		Name               string               `json:"name"`
-		Address            string               `json:"address"`
-		ChannelType        ChannelType          `json:"channel_type"`
-		TPS                int                  `json:"tps"`
-		Country            null.String          `json:"country"`
-		Schemes            []string             `json:"schemes"`
-		Roles              []assets.ChannelRole `json:"roles"`
-		MatchPrefixes      []string             `json:"match_prefixes"`
-		AllowInternational bool                 `json:"allow_international"`
-		MachineDetection   bool                 `json:"machine_detection"`
-		Config             map[string]any       `json:"config"`
+		ID                 ChannelID               `json:"id"`
+		UUID               assets.ChannelUUID      `json:"uuid"`
+		OrgID              OrgID                   `json:"org_id"`
+		Name               string                  `json:"name"`
+		Address            string                  `json:"address"`
+		ChannelType        ChannelType             `json:"channel_type"`
+		TPS                int                     `json:"tps"`
+		Country            null.String             `json:"country"`
+		Schemes            []string                `json:"schemes"`
+		Roles              []assets.ChannelRole    `json:"roles"`
+		Features           []assets.ChannelFeature `json:"features"`
+		MatchPrefixes      []string                `json:"match_prefixes"`
+		AllowInternational bool                    `json:"allow_international"`
+		MachineDetection   bool                    `json:"machine_detection"`
+		Config             map[string]any          `json:"config"`
 	}
 }
 
@@ -88,6 +87,9 @@ func (c *Channel) Schemes() []string { return c.c.Schemes }
 
 // Roles returns the roles this channel supports
 func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
+
+// Features returns the features this channel supports
+func (c *Channel) Features() []assets.ChannelFeature { return c.c.Features }
 
 // MatchPrefixes returns the prefixes we should also match when determining channel affinity
 func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
@@ -164,8 +166,6 @@ WHERE
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channel, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, sqlSelectChannels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
@@ -182,8 +182,6 @@ func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channe
 
 		channels = append(channels, channel)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(channels)).Debug("loaded channels")
 
 	return channels, nil
 }
@@ -210,6 +208,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		END 
 		FROM unnest(regexp_split_to_array(c.role,'')) AS r)
 	) as roles,
+	CASE WHEN channel_type IN ('FBA') THEN '{"optins"}'::text[] ELSE '{}'::text[] END,
 	jsonb_extract_path(c.config, 'matching_prefixes') AS match_prefixes,
 	jsonb_extract_path(c.config, 'allow_international') AS allow_international,
 	jsonb_extract_path(c.config, 'machine_detection') AS machine_detection

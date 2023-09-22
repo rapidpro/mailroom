@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -420,26 +421,90 @@ func TestChannelEvents(t *testing.T) {
 	testdata.InsertOptInTrigger(rt, testdata.Org1, testdata.Favorites, testdata.VonageChannel)
 	testdata.InsertOptOutTrigger(rt, testdata.Org1, testdata.PickANumber, testdata.VonageChannel)
 
+	polls := testdata.InsertOptIn(rt, testdata.Org1, "Polls")
+
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
-		EventType      models.ChannelEventType
-		ContactID      models.ContactID
-		URNID          models.URNID
-		OrgID          models.OrgID
-		ChannelID      models.ChannelID
-		Extra          map[string]any
-		Response       string
-		UpdateLastSeen bool
+		EventType           models.ChannelEventType
+		ContactID           models.ContactID
+		URNID               models.URNID
+		ChannelID           models.ChannelID
+		Extra               map[string]any
+		expectedTriggerType string
+		expectedResponse    string
+		updatesLastSeen     bool
 	}{
-		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
-		{models.EventTypeNewConversation, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
-		{models.EventTypeWelcomeMessage, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
-		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
-		{models.EventTypeReferral, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
-		{models.EventTypeOptIn, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, map[string]any{"optin_name": "Updates"}, "What is your favorite color?", true},
-		{models.EventTypeOptOut, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, map[string]any{"optin_name": "Updates"}, "Pick a number between 1-10.", true},
+		{
+			models.EventTypeNewConversation,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.TwitterChannel.ID,
+			nil,
+			"channel",
+			"What is your favorite color?",
+			true,
+		},
+		{
+			models.EventTypeNewConversation,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			nil,
+			"",
+			"",
+			true,
+		},
+		{
+			models.EventTypeWelcomeMessage,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			nil,
+			"",
+			"",
+			false,
+		},
+		{
+			models.EventTypeReferral,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.TwitterChannel.ID,
+			nil,
+			"",
+			"",
+			true,
+		},
+		{
+			models.EventTypeReferral,
+			testdata.Cathy.ID, testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			nil,
+			"channel",
+			"Pick a number between 1-10.",
+			true,
+		},
+		{
+			models.EventTypeOptIn,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			map[string]any{"optin_id": polls.ID, "optin_name": "Polls"},
+			"optin",
+			"What is your favorite color?",
+			true,
+		},
+		{
+			models.EventTypeOptOut,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			map[string]any{"optin_id": polls.ID, "optin_name": "Polls"},
+			"optin",
+			"Pick a number between 1-10.",
+			true,
+		},
 	}
 
 	models.FlushCache()
@@ -448,13 +513,13 @@ func TestChannelEvents(t *testing.T) {
 		start := time.Now()
 		time.Sleep(time.Millisecond * 5)
 
-		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
+		event := models.NewChannelEvent(tc.EventType, testdata.Org1.ID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
 		assert.NoError(t, err)
 
 		task := &queue.Task{
 			Type:  string(tc.EventType),
-			OrgID: int(tc.OrgID),
+			OrgID: int(testdata.Org1.ID),
 			Task:  eventJSON,
 		}
 
@@ -467,13 +532,23 @@ func TestChannelEvents(t *testing.T) {
 		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
-		// if we are meant to have a response
-		if tc.Response != "" {
+		// if we are meant to trigger a new session...
+		if tc.expectedTriggerType != "" {
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND created_on > $2`, tc.ContactID, start).Returns(1)
+
+			var output []byte
+			err = rt.DB.Get(&output, `SELECT output FROM flows_flowsession WHERE contact_id = $1 AND created_on > $2`, tc.ContactID, start)
+			require.NoError(t, err)
+
+			trigType, err := jsonparser.GetString(output, "trigger", "type")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedTriggerType, trigType)
+
 			assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
-				Returns(tc.Response, "%d: response mismatch", i)
+				Returns(tc.expectedResponse, "%d: response mismatch", i)
 		}
 
-		if tc.UpdateLastSeen {
+		if tc.updatesLastSeen {
 			var lastSeen time.Time
 			err = rt.DB.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
 			assert.NoError(t, err)

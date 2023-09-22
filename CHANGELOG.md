@@ -1,3 +1,17 @@
+v8.3.21 (2023-09-21)
+-------------------------
+ * Switch to using optin ids instead of UUIDs
+ * Update to latest goflow
+ * Handle optin_requested events
+
+v8.3.20 (2023-09-19)
+-------------------------
+ * Add NOOP handler for optin_created events and queue messages to courier with type
+ * Cleanup functions use to load org assets
+ * Tweak waiting for locks for contacts
+ * Create optin flow triggers for optin channel events
+ * Implement loading optin assets
+
 v8.3.19 (2023-09-14)
 -------------------------
  * Fix stop contact task name

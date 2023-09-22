@@ -29,7 +29,9 @@ func TestNewCourierMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	optInID := testdata.InsertOptIn(rt, testdata.Org1, "Joke Of The Day").ID
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOptIns)
 	require.NoError(t, err)
 	require.False(t, oa.Org().Suspended())
 
@@ -149,6 +151,32 @@ func TestNewCourierMsg(t *testing.T) {
 		"urn": "tel:+16055741111",
 		"uuid": "%s"
 	}`, msg3.UUID()))
+
+	optIn := oa.OptInByID(optInID)
+	msg4 := models.NewOutgoingOptInMsg(rt, session, flow, optIn, channel, "tel:+16055741111?id=10000", time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+
+	createAndAssertCourierMsg(t, ctx, rt, oa, msg4, cathyURNs[0], fmt.Sprintf(`{
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
+		"high_priority": true,
+		"id": 5,
+		"optin": {
+			"id": %d,
+			"name": "Joke Of The Day"
+		},
+		"org_id": 1,
+		"origin": "flow",
+		"response_to_external_id": "EX123",
+		"session_id": %d,
+		"session_status": "W",
+		"text": "",
+		"tps_cost": 1,
+		"urn": "tel:+16055741111",
+		"uuid": "%s"
+	}`, optIn.ID(), session.ID(), msg4.UUID()))
 }
 
 func createAndAssertCourierMsg(t *testing.T, ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, expectedJSON string) {

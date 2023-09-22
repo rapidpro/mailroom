@@ -39,6 +39,11 @@ type Label struct {
 	UUID assets.LabelUUID
 }
 
+type OptIn struct {
+	ID   models.OptInID
+	UUID assets.OptInUUID
+}
+
 // InsertIncomingMsg inserts an incoming text message
 func InsertIncomingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, text string, status models.MsgStatus) *MsgIn {
 	msgUUID := flows.MsgUUID(uuids.New())
@@ -110,4 +115,15 @@ func InsertBroadcast(rt *runtime.Runtime, org *Org, baseLanguage i18n.Language, 
 	}
 
 	return id
+}
+
+// InsertOptIn inserts an opt in
+func InsertOptIn(rt *runtime.Runtime, org *Org, name string) *OptIn {
+	uuid := assets.OptInUUID(uuids.New())
+	var id models.OptInID
+	must(rt.DB.Get(&id,
+		`INSERT INTO msgs_optin(uuid, org_id, name, created_on, modified_on, created_by_id, modified_by_id, is_active, is_system) 
+		VALUES($1, $2, $3, NOW(), NOW(), 1, 1, TRUE, FALSE) RETURNING id`, uuid, org.ID, name,
+	))
+	return &OptIn{ID: id, UUID: uuid}
 }

@@ -258,8 +258,6 @@ func (e *CampaignEvent) StartMode() StartMode { return e.e.StartMode }
 
 // loadCampaigns loads all the campaigns for the passed in org
 func loadCampaigns(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Campaign, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, selectCampaignsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying campaigns for org: %d", orgID)
@@ -283,8 +281,6 @@ func loadCampaigns(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Campaign, e
 			e.campaign = c
 		}
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(campaigns)).Debug("loaded campaigns")
 
 	return campaigns, nil
 }

@@ -5,13 +5,11 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"strings"
-	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -90,8 +88,6 @@ LEFT JOIN LATERAL (SELECT id, uuid, name FROM tickets_team WHERE tickets_team.id
 
 // loadUsers loads all the users for the passed in org
 func loadUsers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.User, error) {
-	start := time.Now()
-
 	rows, err := db.QueryContext(ctx, selectOrgUsersSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying users for org: %d", orgID)
@@ -107,8 +103,6 @@ func loadUsers(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.User, err
 		}
 		users = append(users, user)
 	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(users)).Debug("loaded users")
 
 	return users, nil
 }
