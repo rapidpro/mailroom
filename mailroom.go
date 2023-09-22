@@ -3,6 +3,7 @@ package mailroom
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
@@ -20,7 +21,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/olivere/elastic/v7"
-	"github.com/sirupsen/logrus"
 )
 
 // InitFunction is a function that will be called when mailroom starts
@@ -83,12 +83,12 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 func (mr *Mailroom) Start() error {
 	c := mr.rt.Config
 
-	log := logrus.WithFields(logrus.Fields{"state": "starting"})
+	log := slog.With("comp", "mailroom")
 
 	var err error
 	_, mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
 	if err != nil {
-		log.WithError(err).Error("db not reachable")
+		log.Error("db not reachable", "error", err)
 	} else {
 		log.Info("db ok")
 	}
@@ -96,7 +96,7 @@ func (mr *Mailroom) Start() error {
 	if c.ReadonlyDB != "" {
 		mr.rt.ReadonlyDB, _, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
 		if err != nil {
-			log.WithError(err).Error("readonly db not reachable")
+			log.Error("readonly db not reachable", "error", err)
 		} else {
 			log.Info("readonly db ok")
 		}
@@ -108,7 +108,7 @@ func (mr *Mailroom) Start() error {
 
 	mr.rt.RP, err = openAndCheckRedisPool(c.Redis)
 	if err != nil {
-		log.WithError(err).Error("redis not reachable")
+		log.Error("redis not reachable", "error", err)
 	} else {
 		log.Info("redis ok")
 	}
@@ -141,17 +141,17 @@ func (mr *Mailroom) Start() error {
 
 	// check our storages
 	if err := checkStorage(mr.rt.AttachmentStorage); err != nil {
-		log.WithError(err).Error(mr.rt.AttachmentStorage.Name() + " attachment storage not available")
+		log.Error(mr.rt.AttachmentStorage.Name()+" attachment storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.AttachmentStorage.Name() + " attachment storage ok")
 	}
 	if err := checkStorage(mr.rt.SessionStorage); err != nil {
-		log.WithError(err).Error(mr.rt.SessionStorage.Name() + " session storage not available")
+		log.Error(mr.rt.SessionStorage.Name()+" session storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
 	}
 	if err := checkStorage(mr.rt.LogStorage); err != nil {
-		log.WithError(err).Error(mr.rt.LogStorage.Name() + " log storage not available")
+		log.Error(mr.rt.LogStorage.Name()+" log storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.LogStorage.Name() + " log storage ok")
 	}
@@ -159,14 +159,14 @@ func (mr *Mailroom) Start() error {
 	// initialize our elastic client
 	mr.rt.ES, err = newElasticClient(c.Elastic, c.ElasticUsername, c.ElasticPassword)
 	if err != nil {
-		log.WithError(err).Error("elastic search not available")
+		log.Error("elastic search not available", "error", err)
 	} else {
 		log.Info("elastic ok")
 	}
 
 	// warn if we won't be doing FCM syncing
 	if c.FCMKey == "" {
-		logrus.Warn("fcm not configured, no syncing of android channels")
+		log.Warn("fcm not configured, no android syncing")
 	}
 
 	for _, initFunc := range initFunctions {
@@ -188,14 +188,16 @@ func (mr *Mailroom) Start() error {
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
 	mr.webserver.Start()
 
-	logrus.WithField("domain", c.Domain).Info("mailroom started")
+	log.Info("mailroom started", "domain", c.Domain)
 
 	return nil
 }
 
 // Stop stops the mailroom service
 func (mr *Mailroom) Stop() error {
-	logrus.Info("mailroom stopping")
+	log := slog.With("comp", "mailroom")
+	log.Info("mailroom stopping")
+
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
 	analytics.Stop()
@@ -212,7 +214,7 @@ func (mr *Mailroom) Stop() error {
 		mr.rt.ES.Stop()
 	}
 
-	logrus.Info("mailroom stopped")
+	log.Info("mailroom stopped")
 	return nil
 }
 
