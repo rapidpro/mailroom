@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/utils/cron"
-
 	"github.com/stretchr/testify/assert"
 )
 

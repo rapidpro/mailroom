@@ -2,17 +2,16 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -64,12 +63,7 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		return errors.Errorf("cannot handle msg created event without session")
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"text":         event.Msg.Text(),
-		"urn":          event.Msg.URN(),
-	}).Debug("msg created event")
+	slog.Debug("msg created", "contact", scene.ContactUUID(), "session", scene.SessionID(), "text", event.Msg.Text(), "urn", event.Msg.URN())
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
 	if scene.Session().SessionType() == models.FlowTypeMessaging && event.Msg.URN() != urns.NilURN {

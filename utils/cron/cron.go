@@ -3,12 +3,12 @@ package cron
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
-	"github.com/sirupsen/logrus"
 )
 
 // Function is the function that will be called on our schedule
@@ -33,7 +33,7 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 	wait := time.Duration(0)
 	lastFire := time.Now()
 
-	log := logrus.WithField("cron", name).WithField("lockName", lockName)
+	log := slog.With("cron", name)
 
 	go func() {
 		defer func() {
@@ -55,7 +55,6 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 				if err != nil {
 					break
 				}
-				log := log.WithField("lock", lock)
 
 				if lock == "" {
 					log.Debug("lock already present, sleeping")
@@ -64,21 +63,21 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 
 				// ok, got the lock, run our cron function
 				start := time.Now()
-				err = fireCron(rt, cronFunc, lockName, lock)
+				err = fireCron(rt, name, cronFunc)
 				if err != nil {
-					log.WithError(err).Error("error while running cron")
+					log.Error("error while running cron", "error", err)
 				}
 				elapsed := time.Since(start)
 
 				// release our lock
 				err = locker.Release(rt.RP, lock)
 				if err != nil {
-					log.WithError(err).Error("error releasing lock")
+					log.Error("error releasing lock", "error", err)
 				}
 
 				// if cron too longer than a minute, log
 				if elapsed > time.Minute {
-					logrus.WithField("cron", name).WithField("elapsed", elapsed).Error("cron took too long")
+					log.With("elapsed", elapsed).Error("cron took too long")
 				}
 			}
 
@@ -94,9 +93,7 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 
 // fireCron is just a wrapper around the cron function we will call for the purposes of
 // catching and logging panics
-func fireCron(rt *runtime.Runtime, cronFunc Function, lockName string, lockValue string) error {
-	log := logrus.WithField("lockValue", lockValue).WithField("func", cronFunc)
-
+func fireCron(rt *runtime.Runtime, name string, cronFunc Function) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 
@@ -104,7 +101,7 @@ func fireCron(rt *runtime.Runtime, cronFunc Function, lockName string, lockValue
 		// catch any panics and recover
 		panicLog := recover()
 		if panicLog != nil {
-			log.Errorf("panic running cron: %s", panicLog)
+			slog.Error(fmt.Sprintf("panic running cron: %s", panicLog), "cron", name)
 		}
 	}()
 

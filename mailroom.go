@@ -10,17 +10,16 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/pkg/errors"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/olivere/elastic/v7"
+	"github.com/pkg/errors"
 )
 
 // InitFunction is a function that will be called when mailroom starts

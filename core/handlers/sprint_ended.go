@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 )
 
 func init() {
@@ -17,6 +17,8 @@ func init() {
 
 func handleSprintEnded(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*models.SprintEndedEvent)
+
+	slog.Debug("sprint ended", "contact", scene.ContactUUID(), "session", scene.SessionID())
 
 	// if we're in a flow type that can wait then contact current flow has potentially changed
 	currentFlowChanged := scene.Session().SessionType().Interrupts() && event.Contact.CurrentFlowID() != scene.Session().CurrentFlowID()

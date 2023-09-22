@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -20,22 +19,15 @@ func init() {
 // handleContactGroupsChanged is called when a group is added or removed from our contact
 func handleContactGroupsChanged(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactGroupsChangedEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid":   scene.ContactUUID(),
-		"session_id":     scene.SessionID(),
-		"groups_removed": len(event.GroupsRemoved),
-		"groups_added":   len(event.GroupsAdded),
-	}).Debug("changing contact groups")
+
+	slog.Debug("contact groups changed", "contact", scene.ContactUUID(), "session", scene.SessionID(), "groups_removed", len(event.GroupsRemoved), "groups_added", len(event.GroupsAdded))
 
 	// remove each of our groups
 	for _, g := range event.GroupsRemoved {
 		// look up our group id
 		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
-			logrus.WithFields(logrus.Fields{
-				"contact_uuid": scene.ContactUUID(),
-				"group_uuid":   g.UUID,
-			}).Warn("unable to find group to remove, skipping")
+			slog.Warn("unable to find group to remove, skipping", "contact", scene.ContactUUID(), "group", g.UUID)
 			continue
 		}
 
@@ -55,10 +47,7 @@ func handleContactGroupsChanged(ctx context.Context, rt *runtime.Runtime, tx *sq
 		// look up our group id
 		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
-			logrus.WithFields(logrus.Fields{
-				"contact_uuid": scene.ContactUUID(),
-				"group_uuid":   g.UUID,
-			}).Warn("unable to find group to add, skipping")
+			slog.Warn("unable to find group to add, skipping", "contact", scene.ContactUUID(), "group", g.UUID)
 			continue
 		}
 

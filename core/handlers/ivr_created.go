@@ -2,16 +2,15 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -21,11 +20,8 @@ func init() {
 // handleIVRCreated creates the db msg for the passed in event
 func handleIVRCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"text":         event.Msg.Text(),
-	}).Debug("ivr say")
+
+	slog.Debug("ivr created", "contact", scene.ContactUUID(), "session", scene.SessionID(), "text", event.Msg.Text())
 
 	// get our call
 	call := scene.Session().Call()

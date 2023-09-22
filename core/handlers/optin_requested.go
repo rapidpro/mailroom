@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -11,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -21,7 +21,7 @@ func init() {
 func handleOptInRequested(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.OptInRequestedEvent)
 
-	logrus.WithFields(logrus.Fields{"contact_uuid": scene.ContactUUID(), "session_id": scene.SessionID(), "optin": event.OptIn.Name, "urn": event.URN}).Debug("optin requested event")
+	slog.Debug("optin requested", "contact", scene.ContactUUID(), "session", scene.SessionID(), slog.Group("optin", "uuid", event.OptIn.UUID, "name", event.OptIn.Name))
 
 	urn := event.URN
 	var err error

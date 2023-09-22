@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -10,7 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -20,15 +20,8 @@ func init() {
 // handleWebhookCalled is called for each webhook call in a scene
 func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.WebhookCalledEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"url":          event.URL,
-		"status":       event.Status,
-		"elapsed_ms":   event.ElapsedMS,
-		"resthook":     event.Resthook,
-		"extraction":   event.Extraction,
-	}).Debug("webhook called")
+
+	slog.Debug("webhook called", "contact", scene.ContactUUID(), "session", scene.SessionID(), "url", event.URL, "status", event.Status, "elapsed_ms", event.ElapsedMS)
 
 	// if this was a resthook and the status was 410, that means we should remove it
 	if event.Status == flows.CallStatusSubscriberGone {
