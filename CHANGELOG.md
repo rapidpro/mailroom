@@ -1,3 +1,7 @@
+v8.3.22 (2023-09-22)
+-------------------------
+ * Switch to go 1.21 and start switching to slog
+
 v8.3.21 (2023-09-21)
 -------------------------
  * Switch to using optin ids instead of UUIDs
