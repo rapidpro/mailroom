@@ -3,6 +3,7 @@ package campaigns
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -16,11 +17,9 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 )
 
 // TypeFireCampaignEvent is the type of the fire event task

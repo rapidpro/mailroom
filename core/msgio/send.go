@@ -2,13 +2,13 @@ package msgio
 
 import (
 	"context"
+	"slices"
 
 	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 type Send struct {

@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/shopspring/decimal"
 )
 

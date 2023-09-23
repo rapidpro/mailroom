@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/shopspring/decimal"
 )
 

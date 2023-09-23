@@ -2,17 +2,16 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -22,6 +21,8 @@ func init() {
 // handleTicketOpened is called for each ticket opened event
 func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.TicketOpenedEvent)
+
+	slog.Debug("ticket opened", "contact", scene.ContactUUID(), "session", scene.SessionID(), "ticket", event.Ticket.UUID)
 
 	ticketer := oa.TicketerByUUID(event.Ticket.Ticketer.UUID)
 	if ticketer == nil {
@@ -73,14 +74,6 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 	)
 
 	scene.AppendToEventPreCommitHook(hooks.InsertTicketsHook, ticket)
-
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid":  scene.ContactUUID(),
-		"session_id":    scene.SessionID(),
-		"ticket_uuid":   event.Ticket.UUID,
-		"ticketer_uuid": ticketer.UUID(),
-		"ticketer_name": ticketer.Name(),
-	}).Debug("ticket opened")
 
 	return nil
 }
