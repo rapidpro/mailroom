@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
 )
@@ -15,68 +14,39 @@ type ResthookID int
 
 // Resthook is the mailroom type for resthooks
 type Resthook struct {
-	r struct {
-		ID          ResthookID `json:"id"`
-		Slug        string     `json:"slug"`
-		Subscribers []string   `json:"subscribers"`
-	}
+	ID_          ResthookID `json:"id"`
+	Slug_        string     `json:"slug"`
+	Subscribers_ []string   `json:"subscribers"`
 }
 
 // ID returns the ID of this resthook
-func (r *Resthook) ID() ResthookID { return r.r.ID }
+func (r *Resthook) ID() ResthookID { return r.ID_ }
 
 // Slug returns the slug for this resthook
-func (r *Resthook) Slug() string { return r.r.Slug }
+func (r *Resthook) Slug() string { return r.Slug_ }
 
 // Subscribers returns the subscribers for this resthook
-func (r *Resthook) Subscribers() []string { return r.r.Subscribers }
+func (r *Resthook) Subscribers() []string { return r.Subscribers_ }
 
 // loads the resthooks for the passed in org
 func loadResthooks(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Resthook, error) {
-	rows, err := db.QueryContext(ctx, selectResthooksSQL, orgID)
+	rows, err := db.QueryContext(ctx, sqlSelectResthooksByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying resthooks for org: %d", orgID)
 	}
-	defer rows.Close()
 
-	resthooks := make([]assets.Resthook, 0, 10)
-	for rows.Next() {
-		resthook := &Resthook{}
-		err = dbutil.ScanJSON(rows, &resthook.r)
-		if err != nil {
-			return nil, errors.Wrap(err, "error scanning resthook row")
-		}
-
-		resthooks = append(resthooks, resthook)
-	}
-
-	return resthooks, nil
+	return ScanJSONRows(rows, func() assets.Resthook { return &Resthook{} })
 }
 
-const selectResthooksSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id,
-	slug,
-	(SELECT ARRAY_AGG(u.target_url) FROM (
-		SELECT
-			rs.target_url
-		FROM
-			api_resthooksubscriber rs 
-		WHERE
-			r.id = rs.resthook_id AND 
-			rs.is_active = TRUE
-		ORDER BY
-			rs.target_url ASC
-	) u) subscribers
-FROM 
-	api_resthook r
-WHERE 
-	r.org_id = $1 AND 
-	r.is_active = TRUE
-ORDER BY
-	r.slug ASC
-) r;
-`
+const sqlSelectResthooksByOrg = `
+SELECT ROW_TO_JSON(r) FROM (
+    SELECT id, slug, (
+        SELECT ARRAY_AGG(u.target_url) FROM (SELECT rs.target_url FROM api_resthooksubscriber rs WHERE r.id = rs.resthook_id AND rs.is_active = TRUE ORDER BY rs.target_url ASC) u
+	  ) subscribers
+      FROM api_resthook r
+     WHERE r.org_id = $1 AND r.is_active = TRUE
+  ORDER BY r.slug ASC
+) r;`
 
 // UnsubscribeResthooks unsubscribles all the resthooks passed in
 func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUnsubscribe) error {

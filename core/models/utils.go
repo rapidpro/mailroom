@@ -86,6 +86,22 @@ func ChunkSlice[T any](slice []T, size int) [][]T {
 	return chunks
 }
 
+func ScanJSONRows[T any](rows *sql.Rows, f func() T) ([]T, error) {
+	defer rows.Close()
+
+	as := make([]T, 0, 10)
+	for rows.Next() {
+		a := f()
+		err := dbutil.ScanJSON(rows, &a)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning into %T", a)
+		}
+		as = append(as, a)
+	}
+
+	return as, nil
+}
+
 // Map is a generic map which is written to the database as JSON. For nullable fields use null.Map.
 type JSONMap map[string]any
 
