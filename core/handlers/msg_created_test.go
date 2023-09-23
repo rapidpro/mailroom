@@ -26,7 +26,7 @@ func TestMsgCreated(t *testing.T) {
 	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10, nil)
 
 	// delete all URNs for bob
 	rt.DB.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
@@ -123,7 +123,7 @@ func TestNewURN(t *testing.T) {
 	)
 
 	// give George a URN that Bob will steal
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1, nil)
 
 	tcs := []handlers.TestCase{
 		{

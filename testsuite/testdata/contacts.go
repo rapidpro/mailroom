@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nyaruka/gocommon/i18n"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -86,7 +87,7 @@ func InsertContactGroup(rt *runtime.Runtime, org *Org, uuid assets.GroupUUID, na
 }
 
 // InsertContactURN inserts a contact URN
-func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.URN, priority int) models.URNID {
+func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.URN, priority int, authTokens map[string]string) models.URNID {
 	scheme, path, _, display := urn.ToParts()
 
 	contactID := models.NilContactID
@@ -96,8 +97,8 @@ func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.
 
 	var id models.URNID
 	must(rt.DB.Get(&id,
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, display, identity, priority) 
-		 VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id`, org.ID, contactID, scheme, path, display, urn.Identity(), priority,
+		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, display, identity, priority, auth_tokens) 
+		 VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`, org.ID, contactID, scheme, path, display, urn.Identity(), priority, jsonx.MustMarshal(authTokens),
 	))
 	return id
 }

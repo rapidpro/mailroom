@@ -424,7 +424,7 @@ func TestChannelEvents(t *testing.T) {
 	polls := testdata.InsertOptIn(rt, testdata.Org1, "Polls")
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10, nil)
 
 	tcs := []struct {
 		EventType           models.ChannelEventType

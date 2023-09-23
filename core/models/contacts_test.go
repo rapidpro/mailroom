@@ -32,7 +32,7 @@ func TestContacts(t *testing.T) {
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", time.Now(), testdata.Agent)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", time.Now(), nil)
 
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999, nil)
 	testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", time.Now(), testdata.Editor)
 
 	// delete mailgun ticketer
@@ -101,7 +101,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=30000", bob.URNs()[1].String())
 
 	// add another tel urn to bob
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10, nil)
 
 	// reload the contact
 	modelContacts, err = models.LoadContacts(ctx, rt.DB, org, []models.ContactID{testdata.Bob.ID})
@@ -146,7 +146,7 @@ func TestCreateContact(t *testing.T) {
 	testdata.InsertContactGroup(rt, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
 
 	// add an orphaned URN
-	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200002"), 100, nil)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -205,8 +205,8 @@ func TestGetOrCreateContact(t *testing.T) {
 	testdata.InsertContactGroup(rt, testdata.Org1, "dcc16d85-8274-4d19-a3c2-152d4ee99380", "Telegrammer", `telegram = 100001`)
 
 	// add some orphaned URNs
-	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
-	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100, nil)
+	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200002"), 100, nil)
 
 	contactIDSeq := models.ContactID(30000)
 	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
@@ -362,7 +362,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// add an orphaned URN
-	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(rt, testdata.Org1, nil, urns.URN("telegram:200001"), 100, nil)
 
 	cathy, _, _ := testdata.Cathy.Load(rt, oa)
 

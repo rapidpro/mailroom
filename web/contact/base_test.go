@@ -54,7 +54,7 @@ func TestInspect(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	// give cathy an unsendable twitterid URN with a display value
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("twitterid:23145325#cathy"), 20000)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("twitterid:23145325#cathy"), 20000, nil)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/inspect.json", nil)
 }

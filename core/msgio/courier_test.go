@@ -29,19 +29,26 @@ func TestNewCourierMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
+	// create an opt-in and a new contact with an auth token for it
 	optInID := testdata.InsertOptIn(rt, testdata.Org1, "Joke Of The Day").ID
+	testFred := testdata.InsertContact(rt, testdata.Org1, "", "Fred", "eng", models.ContactStatusActive)
+	testdata.InsertContactURN(rt, testdata.Org1, testFred, "tel:+593979123456", 1000, map[string]string{fmt.Sprintf("optin:%d", optInID): "sesame"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOptIns)
 	require.NoError(t, err)
 	require.False(t, oa.Org().Suspended())
 
 	_, cathy, cathyURNs := testdata.Cathy.Load(rt, oa)
+	_, fred, fredURNs := testFred.Load(rt, oa)
 
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 	flow, _ := oa.FlowByID(testdata.Favorites.ID)
-	urn, _ := cathyURNs[0].AsURN(oa)
+	optIn := oa.OptInByID(optInID)
+	cathyURN, _ := cathyURNs[0].AsURN(oa)
+	fredURN, _ := fredURNs[0].AsURN(oa)
+
 	flowMsg1 := flows.NewMsgOut(
-		urn,
+		cathyURN,
 		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
 		"Hi there",
 		[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
@@ -97,7 +104,7 @@ func TestNewCourierMsg(t *testing.T) {
 	// create a priority flow message.. i.e. the session is responding to an incoming message
 	cathy.SetLastSeenOn(time.Date(2023, 4, 20, 10, 15, 0, 0, time.UTC))
 	flowMsg2 := flows.NewMsgOut(
-		urn,
+		cathyURN,
 		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
 		"Hi there",
 		nil, nil, nil,
@@ -131,16 +138,15 @@ func TestNewCourierMsg(t *testing.T) {
 	}`, session.ID(), msg2.UUID()))
 
 	// try a broadcast message which won't have session and flow fields set and won't be high priority
-	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[i18n.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
-	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
-	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), &models.BroadcastBatch{BroadcastID: bcastID, CreatedByID: testdata.Admin.ID})
+	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[i18n.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testFred}, nil)
+	bcastMsg1 := flows.NewMsgOut(fredURN, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
+	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, fred, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), &models.BroadcastBatch{BroadcastID: bcastID, OptInID: optInID, CreatedByID: testdata.Admin.ID})
 	require.NoError(t, err)
 
-	createAndAssertCourierMsg(t, ctx, rt, oa, msg3, cathyURNs[0], fmt.Sprintf(`{
+	createAndAssertCourierMsg(t, ctx, rt, oa, msg3, fredURNs[0], fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact_id": 10000,
-		"contact_last_seen_on": "2023-04-20T10:15:00Z",
-		"contact_urn_id": 10000,
+		"contact_id": 30000,
+		"contact_urn_id": 30000,
 		"created_on": "2021-11-09T14:03:30Z",
 		"high_priority": false,
 		"id": 4,
@@ -148,11 +154,11 @@ func TestNewCourierMsg(t *testing.T) {
 		"origin": "broadcast",
 		"text": "Blast",
 		"tps_cost": 1,
-		"urn": "tel:+16055741111",
+		"urn": "tel:+593979123456",
+		"urn_auth": "sesame",
 		"uuid": "%s"
 	}`, msg3.UUID()))
 
-	optIn := oa.OptInByID(optInID)
 	msg4 := models.NewOutgoingOptInMsg(rt, session, flow, optIn, channel, "tel:+16055741111?id=10000", time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 
 	createAndAssertCourierMsg(t, ctx, rt, oa, msg4, cathyURNs[0], fmt.Sprintf(`{

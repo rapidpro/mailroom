@@ -29,7 +29,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	blake := testdata.InsertContact(rt, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", i18n.NilLanguage, models.ContactStatusBlocked)
-	blakeURNID := testdata.InsertContactURN(rt, testdata.Org1, blake, "tel:++250700000007", 1)
+	blakeURNID := testdata.InsertContactURN(rt, testdata.Org1, blake, "tel:++250700000007", 1, nil)
 
 	tcs := []struct {
 		Channel      *testdata.Channel
