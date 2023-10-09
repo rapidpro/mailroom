@@ -3,6 +3,10 @@ package twiml
 // BaseURL is our default base URL for TWIML channels (public for testing overriding)
 var BaseURL = `https://api.twilio.com`
 
+type Reject struct {
+	XMLName string `xml:"Reject"`
+}
+
 type Say struct {
 	XMLName  string `xml:"Say"`
 	Text     string `xml:",chardata"`
@@ -24,10 +28,11 @@ type Redirect struct {
 }
 
 type Dial struct {
-	XMLName string `xml:"Dial"`
-	Number  string `xml:",chardata"`
-	Action  string `xml:"action,attr"`
-	Timeout int    `xml:"timeout,attr,omitempty"`
+	XMLName   string `xml:"Dial"`
+	Number    string `xml:",chardata"`
+	Action    string `xml:"action,attr"`
+	Timeout   int    `xml:"timeout,attr,omitempty"`
+	TimeLimit int    `xml:"timeLimit,attr,omitempty"`
 }
 
 type Gather struct {

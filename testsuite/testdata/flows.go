@@ -1,6 +1,7 @@
 package testdata
 
 import (
+	"os"
 	"time"
 
 	"github.com/buger/jsonparser"
@@ -43,6 +44,30 @@ func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
 	return &Flow{ID: id, UUID: assets.FlowUUID(uuid)}
 }
 
+func ImportFlows(db *sqlx.DB, org *Org, path string) []*Flow {
+	assetsJSON, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+
+	flowsJSON, _, _, err := jsonparser.Get(assetsJSON, "flows")
+	if err != nil {
+		panic(err)
+	}
+
+	flows := []*Flow{}
+
+	_, err = jsonparser.ArrayEach(flowsJSON, func(flowJSON []byte, dataType jsonparser.ValueType, offset int, err error) {
+		flow := InsertFlow(db, org, flowJSON)
+		flows = append(flows, flow)
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return flows
+}
+
 // InsertFlowStart inserts a flow start
 func InsertFlowStart(db *sqlx.DB, org *Org, flow *Flow, contacts []*Contact) models.StartID {
 	var id models.StartID
@@ -59,40 +84,49 @@ func InsertFlowStart(db *sqlx.DB, org *Org, flow *Flow, contacts []*Contact) mod
 }
 
 // InsertFlowSession inserts a flow session
-func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, connectionID models.ConnectionID) models.SessionID {
+func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, callID models.CallID) models.SessionID {
 	now := time.Now()
 	tomorrow := now.Add(time.Hour * 24)
 
-	var waitStartedOn, waitExpiresOn *time.Time
+	var waitStartedOn, waitExpiresOn, endedOn *time.Time
 	if status == models.SessionStatusWaiting {
 		waitStartedOn = &now
 		waitExpiresOn = &tomorrow
+	} else {
+		endedOn = &now
 	}
 
 	var id models.SessionID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire) 
-		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, call_id, wait_started_on, wait_expires_on, wait_resume_on_expire, ended_on) 
+		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, endedOn,
 	))
 	return id
 }
 
 // InsertWaitingSession inserts a waiting flow session
-func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, connectionID models.ConnectionID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
+func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, callID models.CallID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
 	var id models.SessionID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
-		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, call_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
+		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
 	))
 	return id
 }
 
 // InsertFlowRun inserts a flow run
 func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus) models.FlowRunID {
+	now := time.Now()
+
+	var exitedOn *time.Time
+	if status != models.RunStatusActive && status != models.RunStatusWaiting {
+		exitedOn = &now
+	}
+
 	var id models.FlowRunID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, responded, created_on, modified_on) 
-		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW()) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status,
+		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, responded, created_on, modified_on, exited_on) 
+		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), $7) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, exitedOn,
 	))
 	return id
 }

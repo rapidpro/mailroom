@@ -18,6 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/stringsx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -62,7 +64,7 @@ type service struct {
 	rtConfig   *runtime.Config
 	restClient *Client
 	ticketer   *flows.Ticketer
-	redactor   utils.Redactor
+	redactor   stringsx.Redactor
 }
 
 // newService creates a new twilio flex ticket service
@@ -82,7 +84,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			rtConfig:   rtCfg,
 			ticketer:   ticketer,
 			restClient: NewClient(httpClient, httpRetries, authToken, accountSid, chatServiceSid, workspaceSid, flexFlowSid),
-			redactor:   utils.NewRedactor(flows.RedactionMask, authToken, accountSid, chatServiceSid, workspaceSid),
+			redactor:   stringsx.NewRedactor(flows.RedactionMask, authToken, accountSid, chatServiceSid, workspaceSid),
 		}, nil
 	}
 
@@ -90,9 +92,8 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 }
 
 // Open opens a ticket wich for Twilioflex means create a Chat Channel associated to a Chat User
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contact := session.Contact()
 	chatUser := &CreateChatUserParams{
 		Identity:     fmt.Sprint(contact.ID()),
 		FriendlyName: contact.Name(),
@@ -274,7 +275,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return errors.New("Twilio Flex ticket type doesn't support reopening")
 }
 
-func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor utils.Redactor) {
+func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor stringsx.Redactor) {
 	after := session.Runs()[0].CreatedOn()
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

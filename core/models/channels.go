@@ -123,9 +123,10 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 	return assets.NewChannelReference(c.UUID(), c.Name())
 }
 
-// GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending
+// GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending, and
+// that this function will return deleted channels.
 func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Channel, error) {
-	rows, err := db.QueryxContext(ctx, selectChannelsByIDSQL, pq.Array(ids))
+	rows, err := db.QueryxContext(ctx, sqlSelectChannelsByID, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels by id")
 	}
@@ -145,7 +146,7 @@ func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Chann
 	return channels, nil
 }
 
-const selectChannelsByIDSQL = `
+const sqlSelectChannelsByID = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
@@ -157,14 +158,13 @@ FROM
 	channels_channel c
 WHERE 
 	c.id = ANY($1)
-) r;
-`
+) r;`
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channel, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, selectChannelsSQL, orgID)
+	rows, err := db.QueryxContext(ctx, sqlSelectChannels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}
@@ -186,7 +186,7 @@ func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channe
 	return channels, nil
 }
 
-const selectChannelsSQL = `
+const sqlSelectChannels = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
@@ -218,8 +218,7 @@ WHERE
 	c.is_active = TRUE
 ORDER BY
 	c.created_on ASC
-) r;
-`
+) r;`
 
 // OrgIDForChannelUUID returns the org id for the passed in channel UUID if any
 func OrgIDForChannelUUID(ctx context.Context, db Queryer, channelUUID assets.ChannelUUID) (OrgID, error) {

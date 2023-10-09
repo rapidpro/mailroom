@@ -53,7 +53,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	request := &eventCallbackRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
@@ -88,11 +88,6 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			if err != nil {
 				return errors.Wrapf(err, "error fetching ticket file '%s'", attachment), http.StatusBadRequest, nil
 			}
-		}
-
-		var attachments []string
-		for _, attachment := range data.Attachments {
-			attachments = append(attachments, attachment.URL)
 		}
 
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/schema"
+	"github.com/nyaruka/goflow/utils"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -49,4 +50,8 @@ func DecodeAndValidateForm(form interface{}, r *http.Request) error {
 
 	// check our input is valid
 	return validate.Struct(form)
+}
+
+func ReadAndValidateJSON(r *http.Request, v interface{}) error {
+	return utils.UnmarshalAndValidateWithLimit(r.Body, v, maxRequestBytes)
 }

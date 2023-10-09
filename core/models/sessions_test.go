@@ -2,11 +2,9 @@ package models_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/buger/jsonparser"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
@@ -24,19 +22,15 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[0]")
-	require.NoError(t, err)
-	flow := testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
+	flow := testFlows[0]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Bob.Load(db, oa)
 
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("c49daa28-cf70-407a-a767-a4c1360f4b01").
+	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
@@ -80,7 +74,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint2, err := test.ResumeSession(flowSession, assetsJSON, "no")
+	flowSession, sprint2, err := test.ResumeSession(flowSession, sa, "no")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -102,7 +96,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint3, err := test.ResumeSession(flowSession, assetsJSON, "yes")
+	flowSession, sprint3, err := test.ResumeSession(flowSession, sa, "yes")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -139,19 +133,15 @@ func TestSingleSprintSession(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[1]")
-	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
+	flow := testFlows[1]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Bob.Load(db, oa)
 
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("8b1b02a0-e217-4d59-8ecb-3b20bec69cf4").
+	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
@@ -191,24 +181,16 @@ func TestSessionWithSubflows(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	parentJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[2]")
-	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, parentJSON)
-
-	childJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[3]")
-	require.NoError(t, err)
-	childFlow := testdata.InsertFlow(db, testdata.Org1, childJSON)
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
+	parent, child := testFlows[2], testFlows[3]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Cathy.Load(db, oa)
 
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("f128803a-9027-42b1-a707-f1dbe4cf88bd").
-		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
+	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(parent.UUID).
+		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
 
@@ -229,7 +211,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Cathy.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
-	assert.Equal(t, childFlow.ID, session.CurrentFlowID())
+	assert.Equal(t, child.ID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.EndedOn())
 	assert.False(t, session.Responded())
@@ -241,13 +223,13 @@ func TestSessionWithSubflows(t *testing.T) {
 	// check that matches what is in the db
 	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on, wait_resume_on_expire FROM flows_flowsession`).
 		Columns(map[string]interface{}{
-			"status": "W", "session_type": "M", "current_flow_id": int64(childFlow.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": true,
+			"status": "W", "session_type": "M", "current_flow_id": int64(child.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": true,
 		})
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint2, err := test.ResumeSession(flowSession, assetsJSON, "yes")
+	flowSession, sprint2, err := test.ResumeSession(flowSession, sa, "yes")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -267,27 +249,79 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.Nil(t, session.Timeout())
 }
 
+func TestSessionFailedStart(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/ping_pong.json")
+	ping, pong := testFlows[0], testFlows[1]
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
+	require.NoError(t, err)
+
+	modelContact, _ := testdata.Cathy.Load(db, oa)
+
+	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(ping.UUID).
+		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
+
+	tx := db.MustBegin()
+
+	hookCalls := 0
+	hook := func(context.Context, *sqlx.Tx, *redis.Pool, *models.OrgAssets, []*models.Session) error {
+		hookCalls++
+		return nil
+	}
+
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, []*models.Contact{modelContact}, hook)
+	require.NoError(t, err)
+	assert.Equal(t, 1, hookCalls)
+
+	require.NoError(t, tx.Commit())
+
+	session := modelSessions[0]
+
+	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
+	assert.Equal(t, testdata.Cathy.ID, session.ContactID())
+	assert.Equal(t, models.SessionStatusFailed, session.Status())
+	assert.Equal(t, models.NilFlowID, session.CurrentFlowID())
+	assert.Nil(t, session.WaitExpiresOn())
+	assert.NotNil(t, session.EndedOn())
+
+	// check that matches what is in the db
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false})
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL`).Returns(1)
+
+	// check the state of all the created runs
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun`).Returns(101)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1`, ping.ID).Returns(51)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1`, pong.ID).Returns(50)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'F' AND exited_on IS NOT NULL`).Returns(101)
+}
+
 func TestInterruptSessionsForContacts(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
 
 	// noop if no contacts
-	err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{})
-	require.NoError(t, err)
+	_, err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{})
+	assert.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted)
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusWaiting)
 	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusWaiting)
 	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting)
 
-	err = models.InterruptSessionsForContacts(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
-	require.NoError(t, err)
+	count, err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID})
+	assert.Equal(t, 2, count)
+	assert.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusInterrupted)
@@ -305,10 +339,10 @@ func TestInterruptSessionsForContactsTx(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
 
 	tx := db.MustBegin()
 
@@ -346,26 +380,17 @@ func TestInterruptSessionsForChannels(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	bobConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
-	georgeConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.VonageChannel, testdata.George)
+	cathy1CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	cathy2CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	bobCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	georgeCallID := testdata.InsertCall(db, testdata.Org1, testdata.VonageChannel, testdata.George)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1ConnectionID)
-	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2ConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, georgeConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1CallID)
+	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2CallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, georgeCallID)
 
-	// noop if no channels
-	err := models.InterruptSessionsForChannels(ctx, db, []models.ChannelID{})
-	require.NoError(t, err)
-
-	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted)
-	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusWaiting)
-	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusWaiting)
-	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting)
-
-	err = models.InterruptSessionsForChannels(ctx, db, []models.ChannelID{testdata.TwilioChannel.ID})
+	err := models.InterruptSessionsForChannel(ctx, db, testdata.TwilioChannel.ID)
 	require.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
@@ -383,15 +408,15 @@ func TestInterruptSessionsForFlows(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	bobConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
-	georgeConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.VonageChannel, testdata.George)
+	cathy1CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	cathy2CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	bobCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	georgeCallID := testdata.InsertCall(db, testdata.Org1, testdata.VonageChannel, testdata.George)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1ConnectionID)
-	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2ConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.PickANumber, georgeConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1CallID)
+	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2CallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.PickANumber, georgeCallID)
 
 	// noop if no flows
 	err := models.InterruptSessionsForFlows(ctx, db, []models.FlowID{})
@@ -421,14 +446,14 @@ func TestGetSessionWaitExpiresOn(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	s1Expires := time.Date(2022, 1, 26, 13, 28, 30, 0, time.UTC)
-	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), s1Expires, true, nil)
+	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), s1Expires, true, nil)
 
 	s1Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s1ID)
 	assert.NoError(t, err)
 	assert.Equal(t, s1Expires, *s1Actual)
 
 	// for a non-waiting session, should return nil
-	s2ID := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
+	s2ID := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
 
 	s2Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s2ID)
 	assert.NoError(t, err)
@@ -446,7 +471,7 @@ func TestClearWaitTimeout(t *testing.T) {
 
 	expiresOn := time.Now().Add(time.Hour)
 	timeoutOn := time.Now().Add(time.Minute)
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), expiresOn, true, &timeoutOn)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), expiresOn, true, &timeoutOn)
 
 	session, err := models.FindWaitingSessionForContact(ctx, db, nil, oa, models.FlowTypeMessaging, cathy)
 	require.NoError(t, err)
@@ -463,7 +488,7 @@ func TestClearWaitTimeout(t *testing.T) {
 	assertdb.Query(t, db, `SELECT timeout_on FROM flows_flowsession WHERE id = $1`, session.ID()).Returns(nil)
 }
 
-func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.ConnectionID) (models.SessionID, models.FlowRunID) {
+func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.CallID) (models.SessionID, models.FlowRunID) {
 	// create session and add a run with same status
 	sessionID := testdata.InsertFlowSession(db, testdata.Org1, contact, sessionType, status, flow, connID)
 	runID := testdata.InsertFlowRun(db, testdata.Org1, sessionID, contact, flow, models.RunStatus(status))

@@ -12,8 +12,10 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -39,6 +41,7 @@ type TestCase struct {
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
 	Modifiers     ContactModifierMap
+	ModifierUser  *testdata.User
 	Assertions    []Assertion
 	SQLAssertions []SQLAssertion
 }
@@ -158,6 +161,8 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
+	svcs := goflow.Engine(rt.Config).Services()
+
 	// reuse id from one of our real flows
 	flowUUID := testdata.Favorites.UUID
 
@@ -183,7 +188,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 			for _, s := range session {
 				msg := msgsByContactID[s.ContactID()]
 				if msg != nil {
-					s.SetIncomingMsg(msg.ID(), "")
+					s.SetIncomingMsg(models.MsgID(msg.ID()), "")
 				}
 			}
 			return nil
@@ -191,9 +196,9 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := msgsByContactID[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Manual().Build()
+				return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Manual().Build()
 			}
-			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
+			return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Msg(msg).Build()
 		}
 
 		for _, c := range []*testdata.Contact{testdata.Cathy, testdata.Bob, testdata.George, testdata.Alexandria} {
@@ -218,11 +223,11 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 				Events:  make([]flows.Event, 0, len(mods)),
 			}
 
-			scene := models.NewSceneForContact(flowContact)
+			scene := models.NewSceneForContact(flowContact, tc.ModifierUser.SafeID())
 
 			// apply our modifiers
 			for _, mod := range mods {
-				mod.Apply(oa.Env(), oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+				modifiers.Apply(oa.Env(), svcs, oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
 			}
 
 			results[contact.ID()] = result

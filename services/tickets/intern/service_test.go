@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	intern "github.com/nyaruka/mailroom/services/tickets/intern"
@@ -21,10 +20,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
-
-	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
-	require.NoError(t, err)
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
@@ -46,7 +42,10 @@ func TestOpenAndForward(t *testing.T) {
 	require.NoError(t, err)
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	env := envs.NewBuilder().Build()
+	_, contact := testdata.Cathy.Load(db, oa)
+
+	ticket, err := svc.Open(env, contact, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
@@ -54,7 +53,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "", ticket.ExternalID())
 	assert.Equal(t, 0, len(logger.Logs))
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, nil)
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Internal.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, nil)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(
@@ -81,8 +80,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "12", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Internal.ID, "14", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Internal.ID, "12", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Bob.ID, testdata.Internal.ID, "14", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

@@ -80,27 +80,15 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 }
 
 const timedoutSessionsSQL = `
-	SELECT 
-		s.id as session_id,
-		s.timeout_on as timeout_on,
-		s.contact_id as contact_id,
-		s.org_id as org_id
-	FROM 
-		flows_flowsession s
-		JOIN orgs_org o ON s.org_id = o.id
-	WHERE 
-		status = 'W' AND 
-		timeout_on < NOW() AND
-		connection_id IS NULL
-	ORDER BY 
-		timeout_on ASC
-	LIMIT 25000
-`
+  SELECT id as session_id, org_id, contact_id, timeout_on
+    FROM flows_flowsession
+   WHERE status = 'W' AND timeout_on < NOW() AND call_id IS NULL
+ORDER BY timeout_on ASC
+   LIMIT 25000`
 
 type Timeout struct {
-	OrgID     models.OrgID     `db:"org_id"`
-	FlowID    models.FlowID    `db:"flow_id"`
-	ContactID models.ContactID `db:"contact_id"`
 	SessionID models.SessionID `db:"session_id"`
+	OrgID     models.OrgID     `db:"org_id"`
+	ContactID models.ContactID `db:"contact_id"`
 	TimeoutOn time.Time        `db:"timeout_on"`
 }

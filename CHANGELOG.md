@@ -1,3 +1,178 @@
+v7.5.35 (2022-12-05)
+-------------------------
+ * Retry messages which fail to queue to courier
+
+v7.5.34 (2022-11-30)
+-------------------------
+ * Update deps including new goflow which adds legacy_vars issues
+ * Fix test and cleanup msg status constants
+ * Add basic auth for Elastic
+
+v7.5.33
+----------
+ * Test with only redis 6.2
+ * Don't filter labels by label_type which is being removed
+
+v7.5.32
+----------
+ * Send msg id to fetch-attachments endpoint and clean up flows.MsgID vs models.MsgID
+ * Revert "Remove rocketchat as ticketer"
+ * Don't include unavailable attachments in flows but do save them
+
+v7.5.31
+----------
+ * Set server idle timeout to 90 seconds
+ * Test against redis 6.2 and postgres 14
+
+v7.5.30
+----------
+ * Add workaround to contact resolve endpoint to deal with invalid phone numbers
+
+v7.5.29
+----------
+ * Update to latest gocommon and goflow
+ * Remove rocketchat as ticketer
+
+v7.5.28
+----------
+ * Update deps
+
+v7.5.27
+----------
+ * Remove legacy functionality to look for missed call trigger if there's no incoming call trigger
+
+v7.5.26
+----------
+ * Update to latest goflow
+
+v7.5.25
+----------
+ * Update to latest goflow
+
+v7.5.24
+----------
+ * Update to latest goflow
+ * Remove some leftover references to topups
+
+v7.5.23
+----------
+ * Remove topups
+
+v7.5.22
+----------
+ * Set is_active=TRUE on new broadcasts
+
+v7.5.21
+----------
+ * Update to latest goflow
+
+v7.5.20
+----------
+ * Remove unused created_on field from msg events
+ * Rename media config vars
+ * Update to latest gocommon
+
+v7.5.19
+----------
+ * Add channel removed failed reason for msgs
+ * Call courier endpoint to fetch attachments if they're raw URLs
+
+v7.5.18
+----------
+ * Move interrupt_channel task into tasks/interrupts
+ * Tweak msg retries to ignore deleted channels
+ * Remove no longer used channels option from interrupt_sessions task
+
+v7.5.17
+----------
+ * Update to latest goflow
+ * Add interrupt channel task
+
+v7.5.16
+----------
+ * If starting a message flow from an ivr trigger, send reject response
+
+v7.5.15
+----------
+ * Update to latest goflow which changes expirations for dial waits
+ * Add support for time limits on dial waits
+ * Rework message events to use channel UUID and include channel type
+ * Simplify getting active call count
+ * Allow incoming call triggers to take message flows
+
+v7.5.14
+----------
+ * Switch to new ivr_call table
+
+v7.5.13
+----------
+ * Update test database
+ * Rename channelconnection to call
+ * Don't read or write connection_type
+ * Attach channel logs to channel connections
+
+v7.5.12
+----------
+ * Add redaction to IVR channel logging
+
+v7.5.11
+----------
+ * Use MsgOut.UnsendableReason instead of checking contact status
+ * Restructure channel logs like how they are in courier
+ * Update to latest goflow and gocommon
+
+v7.5.10
+----------
+ * Bump default steps per sprint limit to 200
+ * Use go 1.19
+
+v7.5.9
+----------
+ * Add channel log UUID field
+ * Add codecov token to ci.yml
+
+v7.5.8
+----------
+ * Update to latest goflow and gocommon
+
+v7.5.7
+----------
+ * Update to latest gocommon
+
+v7.5.6
+----------
+ * Update to latest gocommon and goflow
+ * Save IVR channel logs in new format
+ * Upgrade dependencies
+
+v7.5.5
+----------
+ * Update to latest goflow and gocommon
+ * Add support for AWS Cred Chains
+
+v7.5.4
+----------
+ * Add test utility to make it easier to test with imported flows
+ * Failed sessions should be saved with ended_on set
+
+v7.5.3
+----------
+ * Add endpoint to do synchronous interrupt of a single contact
+
+v7.5.2
+----------
+ * Update to latest goflow
+ * Set opened_by_id on the open ticket event as well as the ticket itself
+
+v7.5.1
+----------
+ * Add Ticket.opened_by and opened_in and set when opening tickets
+
+v7.5.0
+----------
+ * Update to latest goflow with support for ticket modifier
+ * Update to latest goflow which removes sessions from engine services
+
 v7.4.1
 ----------
  * Update to latest goflow

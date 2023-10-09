@@ -143,6 +143,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	defer rows.Close()
 
 	expiredSessions := make([]models.SessionID, 0, 100)
+	clogs := make([]*models.ChannelLog, 0, 100)
 
 	for rows.Next() {
 		expiredWait := &ExpiredVoiceWait{}
@@ -154,17 +155,22 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		// add the session to those we need to expire
 		expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
-		// load our connection
-		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.ConnectionID)
+		// load our call
+		conn, err := models.GetCallByID(ctx, rt.DB, expiredWait.OrgID, expiredWait.CallID)
 		if err != nil {
-			log.WithError(err).WithField("connection_id", expiredWait.ConnectionID).Error("unable to load connection")
+			log.WithError(err).WithField("call_id", expiredWait.CallID).Error("unable to load call")
 			continue
 		}
 
 		// hang up our call
-		err = ivr.HangupCall(ctx, rt, conn)
+		clog, err := ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
-			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
+			// log error but carry on with other calls
+			log.WithError(err).WithField("call_id", conn.ID()).Error("error hanging up call")
+		}
+
+		if clog != nil {
+			clogs = append(clogs, clog)
 		}
 	}
 
@@ -174,21 +180,26 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		if err != nil {
 			log.WithError(err).Error("error expiring sessions for expired calls")
 		}
-		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
+		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on call")
+	}
+
+	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
+		return errors.Wrap(err, "error inserting channel logs")
 	}
 
 	return nil
 }
 
 const sqlSelectExpiredVoiceWaits = `
-  SELECT id, connection_id, wait_expires_on
+  SELECT id, org_id, call_id, wait_expires_on
     FROM flows_flowsession
    WHERE session_type = 'V' AND status = 'W' AND wait_expires_on <= NOW()
 ORDER BY wait_expires_on ASC
    LIMIT 100`
 
 type ExpiredVoiceWait struct {
-	SessionID    models.SessionID    `db:"id"`
-	ConnectionID models.ConnectionID `db:"connection_id"`
-	ExpiresOn    time.Time           `db:"wait_expires_on"`
+	SessionID models.SessionID `db:"id"`
+	OrgID     models.OrgID     `db:"org_id"`
+	CallID    models.CallID    `db:"call_id"`
+	ExpiresOn time.Time        `db:"wait_expires_on"`
 }

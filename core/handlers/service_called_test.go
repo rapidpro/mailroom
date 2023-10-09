@@ -18,9 +18,9 @@ func TestServiceCalled(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.wit.ai/message?v=20200513&q=book+me+a+flight": {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"text": "I want to book a flight to Quito",
 				"intents": [
 				  {
@@ -29,7 +29,7 @@ func TestServiceCalled(t *testing.T) {
 					"confidence": 0.9024
 				  }
 				]
-			}`),
+			}`)),
 		},
 	}))
 

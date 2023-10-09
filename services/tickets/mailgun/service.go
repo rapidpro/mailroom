@@ -8,6 +8,8 @@ import (
 	"text/template"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/stringsx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -79,7 +81,7 @@ type service struct {
 	toAddress string
 	brandName string
 	urlBase   string
-	redactor  utils.Redactor
+	redactor  stringsx.Redactor
 }
 
 // NewService creates a new mailgun email-based ticket service
@@ -100,19 +102,19 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			toAddress: toAddress,
 			brandName: brandName,
 			urlBase:   urlBase,
-			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
+			redactor:  stringsx.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
 		}, nil
 	}
 	return nil, errors.New("missing domain or api_key or to_address or url_base in mailgun config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
+	contactDisplay := tickets.GetContactDisplay(env, contact)
 
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
-	context := s.templateContext(body, "", string(session.Contact().UUID()), contactDisplay)
+	context := s.templateContext(body, "", string(contact.UUID()), contactDisplay)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
 	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subjectFromBody(body), fullBody, nil, nil)
@@ -230,5 +232,5 @@ func evaluateTemplate(t *template.Template, c map[string]string) string {
 }
 
 func subjectFromBody(body string) string {
-	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
+	return stringsx.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
 }

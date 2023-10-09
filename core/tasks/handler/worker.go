@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -290,7 +291,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
+func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, call *models.Call) (*models.Session, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
@@ -382,8 +383,8 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		return nil, errors.Wrapf(err, "error loading flow for trigger")
 	}
 
-	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-	if flow.FlowType() == models.FlowTypeVoice && conn == nil {
+	// if this is an IVR flow and we don't have a call, trigger that asynchronously
+	if flow.FlowType() == models.FlowTypeVoice && call == nil {
 		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
@@ -418,7 +419,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		urn := contacts[0].URNForID(event.URNID())
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
-			WithConnection(urn).
+			WithCall(urn).
 			Build()
 
 	default:
@@ -428,10 +429,10 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	// if we have a channel connection we set the connection on the session before our event hooks fire
 	// so that IVR messages can be created with the right connection reference
 	var hook models.SessionCommitHook
-	if conn != nil {
+	if flow.FlowType() == models.FlowTypeVoice && call != nil {
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 			for _, session := range sessions {
-				session.SetChannelConnection(conn)
+				session.SetCall(call)
 			}
 			return nil
 		}
@@ -477,34 +478,48 @@ func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent)
 func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) error {
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
-		return errors.Wrapf(err, "error loading org")
+		return errors.Wrap(err, "error loading org")
 	}
 
-	// allocate a topup for this message if org uses topups
-	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
-	if err != nil {
-		return errors.Wrapf(err, "error allocating topup for incoming message")
+	// load the channel for this message
+	channel := oa.ChannelByID(event.ChannelID)
+
+	// fetch the attachments on the message (i.e. ask courier to fetch them)
+	attachments := make([]utils.Attachment, 0, len(event.Attachments))
+	logUUIDs := make([]models.ChannelLogUUID, 0, len(event.Attachments))
+
+	// no channel, no attachments
+	if channel != nil {
+		for _, attURL := range event.Attachments {
+			// if courier has already fetched this attachment, use it as is
+			if utils.Attachment(attURL).ContentType() != "" {
+				attachments = append(attachments, utils.Attachment(attURL))
+			} else {
+				attachment, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL, event.MsgID)
+				if err != nil {
+					return errors.Wrapf(err, "error fetching attachment '%s'", attURL)
+				}
+
+				attachments = append(attachments, attachment)
+				logUUIDs = append(logUUIDs, logUUID)
+			}
+		}
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
+	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, event.ContactID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
 
-	// contact has been deleted, ignore this message but mark it as handled
-	if len(contacts) == 0 {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
+	// contact has been deleted, or is blocked, or channel no longer exists, ignore this message but mark it as handled
+	if modelContact == nil || modelContact.Status() == models.ContactStatusBlocked || channel == nil {
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, attachments, logUUIDs)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
 		return nil
 	}
-
-	modelContact := contacts[0]
-
-	// load the channel for this message
-	channel := oa.ChannelByID(event.ChannelID)
 
 	// if we have URNs make sure the message URN is our highest priority (this is usually a noop)
 	if len(modelContact.URNs()) > 0 {
@@ -512,15 +527,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		if err != nil {
 			return errors.Wrapf(err, "error changing primary URN")
 		}
-	}
-
-	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
-	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
-		if err != nil {
-			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
-		}
-		return nil
 	}
 
 	// stopped contact? they are unstopped if they send us an incoming message
@@ -554,7 +560,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
 	for _, ticket := range tickets {
-		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, attachments)
 	}
 
 	// find any matching triggers
@@ -582,9 +588,17 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 	}
 
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
+	// flow will only see the attachments we were able to fetch
+	availableAttachments := make([]utils.Attachment, 0, len(attachments))
+	for _, att := range attachments {
+		if att.ContentType() != utils.UnavailableType {
+			availableAttachments = append(availableAttachments, att)
+		}
+	}
+
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, availableAttachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
-	msgIn.SetID(event.MsgID)
+	msgIn.SetID(flows.MsgID(event.MsgID))
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -594,7 +608,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
 
-		return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
+		return markMsgHandled(ctx, tx, contact, msgIn, flow, attachments, tickets, logUUIDs)
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
@@ -611,7 +625,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
+					return markMsgHandled(ctx, tx, contact, msgIn, flow, attachments, tickets, logUUIDs)
 				}
 				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
@@ -641,7 +655,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, attachments, logUUIDs, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
@@ -745,23 +759,23 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 }
 
 // handles a message as an inbox message
-func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
+func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, attachments []utils.Attachment, logUUIDs []models.ChannelLogUUID, tickets []*models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
 	// message we manually create that event and handle it
 	msgEvent := events.NewMsgReceived(msg)
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, rt, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, rt, oa, models.NilUserID, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, rt.DB, contact, msg, nil, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, nil, attachments, tickets, logUUIDs)
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, topupID models.TopupID, tickets []*models.Ticket) error {
+func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, attachments []utils.Attachment, tickets []*models.Ticket, logUUIDs []models.ChannelLogUUID) error {
 	msgType := models.MsgTypeInbox
 	flowID := models.NilFlowID
 	if flow != nil {
@@ -769,7 +783,7 @@ func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Conta
 		flowID = flow.ID()
 	}
 
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, topupID)
+	err := models.UpdateMessage(ctx, db, models.MsgID(msg.ID()), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, attachments, logUUIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
@@ -796,18 +810,17 @@ type TimedEvent struct {
 }
 
 type MsgEvent struct {
-	ContactID     models.ContactID   `json:"contact_id"`
-	OrgID         models.OrgID       `json:"org_id"`
-	ChannelID     models.ChannelID   `json:"channel_id"`
-	MsgID         flows.MsgID        `json:"msg_id"`
-	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
-	MsgExternalID null.String        `json:"msg_external_id"`
-	URN           urns.URN           `json:"urn"`
-	URNID         models.URNID       `json:"urn_id"`
-	Text          string             `json:"text"`
-	Attachments   []utils.Attachment `json:"attachments"`
-	NewContact    bool               `json:"new_contact"`
-	CreatedOn     time.Time          `json:"created_on"`
+	ContactID     models.ContactID `json:"contact_id"`
+	OrgID         models.OrgID     `json:"org_id"`
+	ChannelID     models.ChannelID `json:"channel_id"`
+	MsgID         models.MsgID     `json:"msg_id"`
+	MsgUUID       flows.MsgUUID    `json:"msg_uuid"`
+	MsgExternalID null.String      `json:"msg_external_id"`
+	URN           urns.URN         `json:"urn"`
+	URNID         models.URNID     `json:"urn_id"`
+	Text          string           `json:"text"`
+	Attachments   []string         `json:"attachments"`
+	NewContact    bool             `json:"new_contact"`
 }
 
 type StopEvent struct {

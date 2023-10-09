@@ -34,10 +34,13 @@ func TestRetryErroredMessages(t *testing.T) {
 	// errored messages with a next-attempt in the past
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour), false)
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
-	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
+	msg5 := testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(5)
+	db.MustExec(`UPDATE msgs_msg SET status = 'P' WHERE id = $1`, msg5.ID())
+
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(4)
 
 	// try again...
 	err = msgs.RetryErroredMessages(ctx, rt)

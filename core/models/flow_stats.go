@@ -7,8 +7,8 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
@@ -78,7 +78,7 @@ func RecordFlowStatistics(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx,
 
 		for _, recent := range recentContacts {
 			// set members need to be unique, so we include a random string
-			value := fmt.Sprintf("%s|%d|%s", redisx.RandomBase64(10), recent.contact.ID(), utils.TruncateEllipsis(recent.operand, 100))
+			value := fmt.Sprintf("%s|%d|%s", redisx.RandomBase64(10), recent.contact.ID(), stringsx.TruncateEllipsis(recent.operand, 100))
 			score := float64(recent.time.UnixNano()) / float64(1e9) // score is UNIX time as floating point
 
 			err := recentSet.Add(rc, value, score)

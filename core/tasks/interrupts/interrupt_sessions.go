@@ -7,7 +7,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 )
 
@@ -22,7 +21,6 @@ func init() {
 type InterruptSessionsTask struct {
 	SessionIDs []models.SessionID `json:"session_ids,omitempty"`
 	ContactIDs []models.ContactID `json:"contact_ids,omitempty"`
-	ChannelIDs []models.ChannelID `json:"channel_ids,omitempty"`
 	FlowIDs    []models.FlowID    `json:"flow_ids,omitempty"`
 }
 
@@ -35,12 +33,7 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 	db := rt.DB
 
 	if len(t.ContactIDs) > 0 {
-		if err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
-			return err
-		}
-	}
-	if len(t.ChannelIDs) > 0 {
-		if err := models.InterruptSessionsForChannels(ctx, db, t.ChannelIDs); err != nil {
+		if _, err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
 			return err
 		}
 	}

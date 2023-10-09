@@ -8,11 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -24,8 +23,8 @@ const (
 	// UserIDKey is our context key for user id
 	UserIDKey = "user_id"
 
-	// MaxRequestBytes is the max body size our web server will accept
-	MaxRequestBytes int64 = 1048576 * 32 // 32MB
+	// max body bytes we'll read from a incoming request
+	maxRequestBytes int64 = 1048576 * 50 // 50MB
 )
 
 type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error)
@@ -91,6 +90,7 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 		Handler:      router,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  90 * time.Second,
 	}
 
 	return s
@@ -151,18 +151,15 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 // Start starts our web server, listening for new requests
 func (s *Server) Start() {
+	s.wg.Add(1)
+
 	// start serving HTTP
 	go func() {
-		s.wg.Add(1)
 		defer s.wg.Done()
 
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			logrus.WithFields(logrus.Fields{
-				"comp":  "server",
-				"state": "stopping",
-				"err":   err,
-			}).Error()
+			logrus.WithFields(logrus.Fields{"comp": "server", "state": "stopping", "err": err}).Error()
 		}
 	}()
 
@@ -179,7 +176,7 @@ func (s *Server) Stop() {
 
 func handleIndex(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	response := map[string]string{
-		"url":       fmt.Sprintf("%s", r.URL),
+		"url":       r.URL.String(),
 		"component": "mailroom",
 		"version":   rt.Config.Version,
 	}

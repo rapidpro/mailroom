@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -13,16 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestChannelLogs(t *testing.T) {
+func TestChannelLogsOutgoing(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	defer db.MustExec(`DELETE FROM channels_channellog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io":     {httpx.NewMockResponse(200, nil, "OK")},
-		"http://rapidpro.io/bad": {httpx.NewMockResponse(400, nil, "Oops")},
-		"http://rapidpro.io/new": {httpx.NewMockResponse(200, nil, "OK")},
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+		"http://ivr.com/start":  {httpx.NewMockResponse(200, nil, []byte("OK"))},
+		"http://ivr.com/hangup": {httpx.NewMockResponse(400, nil, []byte("Oops"))},
 	}))
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
@@ -31,26 +31,29 @@ func TestChannelLogs(t *testing.T) {
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
 	require.NotNil(t, channel)
 
-	req1, _ := httpx.NewRequest("GET", "http://rapidpro.io", nil, nil)
+	clog1 := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, []string{"sesame"})
+	clog2 := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, []string{"sesame"})
+
+	req1, _ := httpx.NewRequest("GET", "http://ivr.com/start", nil, map[string]string{"Authorization": "Token sesame"})
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
 	require.NoError(t, err)
-	log1 := models.NewChannelLog(trace1, false, "test request", channel, nil)
 
-	req2, _ := httpx.NewRequest("GET", "http://rapidpro.io/bad", nil, nil)
+	clog1.HTTP(trace1)
+	clog1.End()
+
+	req2, _ := httpx.NewRequest("GET", "http://ivr.com/hangup", nil, nil)
 	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
 	require.NoError(t, err)
-	log2 := models.NewChannelLog(trace2, true, "test request", channel, nil)
 
-	req3, _ := httpx.NewRequest("GET", "http://rapidpro.io/new", nil, map[string]string{"X-Forwarded-Path": "/old"})
-	trace3, err := httpx.DoTrace(http.DefaultClient, req3, nil, nil, -1)
-	require.NoError(t, err)
-	log3 := models.NewChannelLog(trace3, false, "test request", channel, nil)
+	clog2.HTTP(trace2)
+	clog2.Error(errors.New("oops"))
+	clog2.End()
 
-	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2, log3})
+	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{clog1, clog2})
 	require.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(3)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE log_type = 'ivr_start' AND http_logs -> 0 ->> 'url' = 'http://ivr.com/start' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE log_type = 'ivr_hangup' AND http_logs -> 0 ->> 'url' = 'http://ivr.com/hangup' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%sesame%'`).Returns(0)
 }

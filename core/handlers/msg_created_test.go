@@ -110,34 +110,6 @@ func TestMsgCreated(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
-func TestNoTopup(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
-
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	// no more credits
-	db.MustExec(`UPDATE orgs_topup SET credits = 0 WHERE org_id = $1`, testdata.Org1.ID)
-
-	tcs := []handlers.TestCase{
-		{
-			Actions: handlers.ContactActionMap{
-				testdata.Cathy: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "No Topup", nil, nil, false),
-				},
-			},
-			SQLAssertions: []handlers.SQLAssertion{
-				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'Q'",
-					Args:  []interface{}{testdata.Cathy.ID},
-					Count: 1,
-				},
-			},
-		},
-	}
-
-	handlers.RunTestCases(t, ctx, rt, tcs)
-}
-
 func TestNewURN(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 

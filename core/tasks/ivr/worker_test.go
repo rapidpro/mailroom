@@ -50,88 +50,96 @@ func TestIVR(t *testing.T) {
 	err = json.Unmarshal(task.Task, batch)
 	assert.NoError(t, err)
 
-	client.callError = errors.Errorf("unable to create call")
+	service.callError = errors.Errorf("unable to create call")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.ConnectionStatusFailed).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
 
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.ConnectionStatusWired, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.ConnectionStatusQueued).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 }
 
-var client = &MockProvider{}
+var service = &MockService{}
 
 func NewMockProvider(httpClient *http.Client, channel *models.Channel) (ivr.Service, error) {
-	return client, nil
+	return service, nil
 }
 
-type MockProvider struct {
+type MockService struct {
 	callID    ivr.CallID
 	callError error
 }
 
-func (c *MockProvider) RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
-	return c.callID, nil, c.callError
+func (s *MockService) RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
+	return s.callID, nil, s.callError
 }
 
-func (c *MockProvider) HangupCall(externalID string) (*httpx.Trace, error) {
+func (s *MockService) HangupCall(externalID string) (*httpx.Trace, error) {
 	return nil, nil
 }
 
-func (c *MockProvider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
-func (c *MockProvider) WriteErrorResponse(w http.ResponseWriter, err error) error {
+func (s *MockService) WriteRejectResponse(w http.ResponseWriter) error {
 	return nil
 }
 
-func (c *MockProvider) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+func (s *MockService) WriteErrorResponse(w http.ResponseWriter, err error) error {
 	return nil
 }
 
-func (c *MockProvider) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
+func (s *MockService) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+	return nil
+}
+
+func (s *MockService) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	return nil, nil
 }
 
-func (c *MockProvider) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
-	return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 10
+func (s *MockService) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
+	return models.CallStatusFailed, models.CallErrorProvider, 10
 }
 
-func (c *MockProvider) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *MockService) CheckStartRequest(r *http.Request) models.CallError {
 	return ""
 }
 
-func (c *MockProvider) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *MockService) PreprocessResume(ctx context.Context, rt *runtime.Runtime, call *models.Call, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
-func (c *MockProvider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
+func (s *MockService) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
-func (c *MockProvider) ValidateRequestSignature(r *http.Request) error {
+func (s *MockService) ValidateRequestSignature(r *http.Request) error {
 	return nil
 }
 
-func (c *MockProvider) DownloadMedia(url string) (*http.Response, error) {
+func (s *MockService) DownloadMedia(url string) (*http.Response, error) {
 	return nil, nil
 }
 
-func (c *MockProvider) URNForRequest(r *http.Request) (urns.URN, error) {
+func (s *MockService) URNForRequest(r *http.Request) (urns.URN, error) {
 	return urns.NilURN, nil
 }
 
-func (c *MockProvider) CallIDForRequest(r *http.Request) (string, error) {
+func (s *MockService) CallIDForRequest(r *http.Request) (string, error) {
 	return "", nil
+}
+
+func (s *MockService) RedactValues(*models.Channel) []string {
+	return []string{"sesame"}
 }

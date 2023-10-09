@@ -14,7 +14,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -83,16 +82,15 @@ func newSimulationResponse(session flows.Session, sprint flows.Sprint) *simulati
 
 // Starts a new engine session
 //
-//   {
-//     "org_id": 1,
-//     "flows": [{
-//        "uuid": uuidv4,
-//        "definition": {...},
-//     },.. ],
-//     "trigger": {...},
-//     "assets": {...}
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "flows": [{
+//	     "uuid": uuidv4,
+//	     "definition": {...},
+//	  },.. ],
+//	  "trigger": {...},
+//	  "assets": {...}
+//	}
 type startRequest struct {
 	sessionRequest
 	Trigger json.RawMessage `json:"trigger" validate:"required"`
@@ -121,7 +119,7 @@ func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.O
 // handles a request to /start
 func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
@@ -164,17 +162,16 @@ func triggerFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 // Resumes an existing engine session
 //
-//   {
-//     "org_id": 1,
-//     "flows": [{
-//        "uuid": uuidv4,
-//        "definition": {...},
-//     },.. ],
-//     "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
-//     "resume": {...},
-//     "assets": {...}
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "flows": [{
+//	     "uuid": uuidv4,
+//	     "definition": {...},
+//	  },.. ],
+//	  "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
+//	  "resume": {...},
+//	  "assets": {...}
+//	}
 type resumeRequest struct {
 	sessionRequest
 
@@ -184,7 +181,7 @@ type resumeRequest struct {
 
 func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &resumeRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
@@ -239,9 +236,9 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 					var sessionTrigger flows.Trigger
 					if triggeredFlow.FlowType() == models.FlowTypeVoice {
-						// TODO this should trigger a msg trigger with a connection but first we need to rework
+						// TODO this should trigger a msg trigger with a call but first we need to rework
 						// non-simulation IVR triggers to use that so that this is consistent.
-						sessionTrigger = tb.Manual().WithConnection(testChannel, testURN).Build()
+						sessionTrigger = tb.Manual().WithCall(testChannel, testURN).Build()
 					} else {
 						sessionTrigger = tb.Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
 					}

@@ -22,7 +22,6 @@ type Config struct {
 	ReadonlyDB string `validate:"omitempty,url,startswith=postgres:" help:"URL of optional connection to readonly database instance"`
 	DBPoolSize int    `                                              help:"the size of our db pool"`
 	Redis      string `validate:"url,startswith=redis:"              help:"URL for your Redis instance"`
-	Elastic    string `validate:"url"                                help:"URL for your ElasticSearch service"`
 	SentryDSN  string `                                              help:"the DSN used for logging errors to Sentry"`
 
 	Address          string `help:"the address to bind our web server to"`
@@ -49,22 +48,27 @@ type Config struct {
 	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
 	SessionStorage       string `validate:"omitempty,session_storage"         help:"where to store session output (s3|db)"`
 
+	Elastic         string `validate:"url" help:"the URL of your ElasticSearch instance"`
+	ElasticUsername string `help:"the username for ElasticSearch if using basic auth"`
+	ElasticPassword string `help:"the password for ElasticSearch if using basic auth"`
+
 	S3Endpoint           string `help:"the S3 endpoint we will write attachments to"`
 	S3Region             string `help:"the S3 region we will write attachments to"`
-	S3MediaBucket        string `help:"the S3 bucket we will write attachments to"`
-	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
-	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
+	S3AttachmentsBucket  string `help:"the S3 bucket we will write attachments to"`
+	S3AttachmentsPrefix  string `help:"the prefix that will be added to attachment filenames"`
 	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
 	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
+	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
 	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
 	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
+	AWSUseCredChain    bool   `help:"whether to use the AWS credentials chain. Defaults to false."`
 
-	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
-	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
-
+	CourierAuthToken  string `help:"the authentication token used for requests to Courier"`
+	LibratoUsername   string `help:"the username that will be used to authenticate to Librato"`
+	LibratoToken      string `help:"the token that will be used to authenticate to Librato"`
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
@@ -87,7 +91,6 @@ func NewDefaultConfig() *Config {
 		ReadonlyDB: "",
 		DBPoolSize: 36,
 		Redis:      "redis://localhost:6379/15",
-		Elastic:    "http://localhost:9200",
 
 		Address: "localhost",
 		Port:    8090,
@@ -105,22 +108,27 @@ func NewDefaultConfig() *Config {
 
 		SMTPServer:           "",
 		DisallowedNetworks:   `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
-		MaxStepsPerSprint:    100,
+		MaxStepsPerSprint:    200,
 		MaxResumesPerSession: 250,
 		MaxValueLength:       640,
 		SessionStorage:       "db",
 
-		S3Endpoint:       "https://s3.amazonaws.com",
-		S3Region:         "us-east-1",
-		S3MediaBucket:    "mailroom-media",
-		S3MediaPrefix:    "/media/",
-		S3SessionBucket:  "mailroom-sessions",
-		S3SessionPrefix:  "/",
-		S3DisableSSL:     false,
-		S3ForcePathStyle: false,
+		Elastic:         "http://localhost:9200",
+		ElasticUsername: "",
+		ElasticPassword: "",
+
+		S3Endpoint:          "https://s3.amazonaws.com",
+		S3Region:            "us-east-1",
+		S3AttachmentsBucket: "mailroom-attachments",
+		S3AttachmentsPrefix: "/attachments/",
+		S3SessionBucket:     "mailroom-sessions",
+		S3SessionPrefix:     "/",
+		S3DisableSSL:        false,
+		S3ForcePathStyle:    false,
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
+		AWSUseCredChain:    false,
 
 		InstanceName:        hostname,
 		LogLevel:            "error",

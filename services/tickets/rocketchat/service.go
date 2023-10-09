@@ -3,11 +3,12 @@ package rocketchat
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -31,7 +32,7 @@ func init() {
 type service struct {
 	client   *Client
 	ticketer *flows.Ticketer
-	redactor utils.Redactor
+	redactor stringsx.Redactor
 }
 
 // NewService creates a new RocketChat ticket service
@@ -43,7 +44,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		return &service{
 			client:   NewClient(httpClient, httpRetries, baseURL, secret),
 			ticketer: ticketer,
-			redactor: utils.NewRedactor(flows.RedactionMask, secret),
+			redactor: stringsx.NewRedactor(flows.RedactionMask, secret),
 		}, nil
 	}
 	return nil, errors.New("missing base_url or secret config")
@@ -53,9 +54,8 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 type VisitorToken models.ContactID
 
 // Open opens a ticket which for RocketChat means open a room associated to a visitor user
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contact := session.Contact()
 	email := ""
 	phone := ""
 
@@ -82,7 +82,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		},
 		TicketID: string(ticket.UUID()),
 	}
-	room.SessionStart = session.Runs()[0].CreatedOn().Add(-time.Minute).Format(time.RFC3339)
 
 	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
 	extra := &struct {

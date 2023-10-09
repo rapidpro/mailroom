@@ -38,8 +38,8 @@ func init() {
 func emailServiceFactory(c *runtime.Config) engine.EmailServiceFactory {
 	var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
 
-	return func(session flows.Session) (flows.EmailService, error) {
-		return orgFromSession(session).EmailService(c, emailRetries)
+	return func(sa flows.SessionAssets) (flows.EmailService, error) {
+		return orgFromAssets(sa).EmailService(c, emailRetries)
 	}
 }
 
@@ -48,8 +48,8 @@ func airtimeServiceFactory(c *runtime.Config) engine.AirtimeServiceFactory {
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
-	return func(session flows.Session) (flows.AirtimeService, error) {
-		return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
+	return func(sa flows.SessionAssets) (flows.AirtimeService, error) {
+		return orgFromAssets(sa).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
 	}
 }
 
@@ -68,10 +68,9 @@ const (
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	o struct {
-		ID         OrgID    `json:"id"`
-		Suspended  bool     `json:"is_suspended"`
-		UsesTopups bool     `json:"uses_topups"`
-		Config     null.Map `json:"config"`
+		ID        OrgID    `json:"id"`
+		Suspended bool     `json:"is_suspended"`
+		Config    null.Map `json:"config"`
 	}
 	env envs.Environment
 }
@@ -81,9 +80,6 @@ func (o *Org) ID() OrgID { return o.o.ID }
 
 // Suspended returns whether the org has been suspended
 func (o *Org) Suspended() bool { return o.o.Suspended }
-
-// UsesTopups returns whether the org uses topups
-func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -171,7 +167,7 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 
 // StoreAttachment saves an attachment to storage
 func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
-	prefix := rt.Config.S3MediaPrefix
+	prefix := rt.Config.S3AttachmentsPrefix
 
 	// read the content
 	contentBytes, err := io.ReadAll(content)
@@ -181,13 +177,13 @@ func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename
 	content.Close()
 
 	if contentType == "" {
-		contentType = httpx.DetectContentType(contentBytes)
+		contentType, _ = httpx.DetectContentType(contentBytes)
 		contentType, _, _ = mime.ParseMediaType(contentType)
 	}
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := rt.MediaStorage.Put(ctx, path, contentType, contentBytes)
+	url, err := rt.AttachmentStorage.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}
@@ -219,9 +215,9 @@ func (o *Org) attachmentPath(prefix string, filename string) string {
 	return path
 }
 
-// gets the underlying org for the given engine session
-func orgFromSession(session flows.Session) *Org {
-	return session.Assets().Source().(*OrgAssets).Org()
+// gets the underlying org for the given session assets
+func orgFromAssets(sa flows.SessionAssets) *Org {
+	return sa.Source().(*OrgAssets).Org()
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
@@ -252,7 +248,6 @@ const selectOrgByID = `
 SELECT ROW_TO_JSON(o) FROM (SELECT
 	id,
 	is_suspended,
-	uses_topups,
 	COALESCE(o.config::json,'{}'::json) AS config,
 	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
 	'tt:mm' AS time_format,

@@ -36,14 +36,14 @@ func TestOpenAndForward(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "uiF7ybjsv7PSJGSw6" }`)),
 		},
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "tyLrD97j8TFZmT3Y6" }`)),
 		},
 	}))
 
@@ -75,11 +75,11 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	logger := &flows.HTTPLogger{}
-	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	_, err = svc.Open(session.Environment(), session.Contact(), defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(session.Environment(), session.Contact(), defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
@@ -88,7 +88,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.RocketChat.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -115,11 +115,11 @@ func TestCloseAndReopen(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(204, nil, ``),
-			httpx.NewMockResponse(204, nil, ``),
+			httpx.NewMockResponse(204, nil, nil),
+			httpx.NewMockResponse(204, nil, nil),
 		},
 	}))
 
@@ -136,8 +136,8 @@ func TestCloseAndReopen(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "X5gwXeaxbnGDaq8Q3", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.RocketChat.ID, "cq7AokJHKkGhAMoBK", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.RocketChat.ID, "X5gwXeaxbnGDaq8Q3", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Bob.ID, testdata.RocketChat.ID, "cq7AokJHKkGhAMoBK", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)

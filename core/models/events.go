@@ -6,6 +6,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
@@ -14,6 +16,7 @@ import (
 type Scene struct {
 	contact *flows.Contact
 	session *Session
+	userID  UserID
 
 	preCommits  map[EventCommitHook][]interface{}
 	postCommits map[EventCommitHook][]interface{}
@@ -21,25 +24,24 @@ type Scene struct {
 
 // NewSceneForSession creates a new scene for the passed in session
 func NewSceneForSession(session *Session) *Scene {
-	s := &Scene{
+	return &Scene{
 		contact: session.Contact(),
 		session: session,
 
 		preCommits:  make(map[EventCommitHook][]interface{}),
 		postCommits: make(map[EventCommitHook][]interface{}),
 	}
-	return s
 }
 
 // NewSceneForContact creates a new scene for the passed in contact, session will be nil
-func NewSceneForContact(contact *flows.Contact) *Scene {
-	s := &Scene{
+func NewSceneForContact(contact *flows.Contact, userID UserID) *Scene {
+	return &Scene{
 		contact: contact,
+		userID:  userID,
 
 		preCommits:  make(map[EventCommitHook][]interface{}),
 		postCommits: make(map[EventCommitHook][]interface{}),
 	}
-	return s
 }
 
 // SessionID returns the session id for this scene if any
@@ -55,9 +57,10 @@ func (s *Scene) ContactID() ContactID           { return ContactID(s.contact.ID(
 func (s *Scene) ContactUUID() flows.ContactUUID { return s.contact.UUID() }
 
 // Session returns the session for this scene if any
-func (s *Scene) Session() *Session {
-	return s.session
-}
+func (s *Scene) Session() *Session { return s.session }
+
+// User returns the user ID for this scene if any
+func (s *Scene) UserID() UserID { return s.userID }
 
 // AppendToEventPreCommitHook adds a new event to be handled by a pre commit hook
 func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event interface{}) {
@@ -184,11 +187,11 @@ func ApplyEventPostCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sql
 }
 
 // HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
-func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
+func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, contactEvents map[*flows.Contact][]flows.Event) error {
 	// create scenes for each contact
 	scenes := make([]*Scene, 0, len(contactEvents))
 	for contact := range contactEvents {
-		scene := NewSceneForContact(contact)
+		scene := NewSceneForContact(contact, userID)
 		scenes = append(scenes, scene)
 	}
 
@@ -237,9 +240,13 @@ func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAsse
 }
 
 // ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
-func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+// Note that we don't load the user object from org assets because it's possible that the user isn't part
+// of the org, e.g. customer support.
+func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
+
+	svcs := goflow.Engine(rt.Config).Services()
 
 	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
 
@@ -247,12 +254,12 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, mod
 	for contact, mods := range modifiersByContact {
 		events := make([]flows.Event, 0)
 		for _, mod := range mods {
-			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
+			modifiers.Apply(env, svcs, oa.SessionAssets(), contact, mod, func(e flows.Event) { events = append(events, e) })
 		}
 		eventsByContact[contact] = events
 	}
 
-	err := HandleAndCommitEvents(ctx, rt, oa, eventsByContact)
+	err := HandleAndCommitEvents(ctx, rt, oa, userID, eventsByContact)
 	if err != nil {
 		return nil, errors.Wrap(err, "error commiting events")
 	}

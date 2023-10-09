@@ -132,8 +132,8 @@ func TestSendReply(t *testing.T) {
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
 	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
-	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_media_storage/media/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg"}, msg.Attachments())
-	assert.FileExists(t, "_test_media_storage/media/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg")
+	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_attachments_storage/attachments/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg"}, msg.Attachments())
+	assert.FileExists(t, "_test_attachments_storage/attachments/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg")
 
 	// try with file that can't be read (i.e. same file again which is already closed)
 	_, err = tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
@@ -150,12 +150,12 @@ func TestCloseTicket(t *testing.T) {
 
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2021, 6, 8, 16, 40, 30, 0, time.UTC)))
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
+			}`)),
 		},
 	}))
 
@@ -165,6 +165,8 @@ func TestCloseTicket(t *testing.T) {
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
+		testdata.Admin.ID,
+		models.NilFlowID,
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",

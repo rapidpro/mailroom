@@ -18,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buger/jsonparser"
+	"github.com/golang-jwt/jwt"
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -29,10 +32,6 @@ import (
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/buger/jsonparser"
-	"github.com/golang-jwt/jwt"
-	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -167,7 +166,7 @@ func (s *service) DownloadMedia(url string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
-func (s *service) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *service) CheckStartRequest(r *http.Request) models.CallError {
 	return ""
 }
 
@@ -281,7 +280,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	return s.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
-func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, call *models.Call, r *http.Request) ([]byte, error) {
 	// if this is a recording_url resume, grab that
 	waitType := r.URL.Query().Get("wait_type")
 
@@ -508,54 +507,54 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (s *service) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	}
 
 	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
 	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
 	// transfer status callbacks have no status, safe to ignore them
 	if status.Status == "" {
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ConnectionStatusWired, "", 0
+		return models.CallStatusWired, "", 0
 
 	case "answered":
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ConnectionStatusCompleted, "", duration
+		return models.CallStatusCompleted, "", duration
 
 	case "busy":
-		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+		return models.CallStatusErrored, models.CallErrorBusy, 0
 	case "rejected", "unanswered", "timeout":
-		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+		return models.CallStatusErrored, models.CallErrorNoAnswer, 0
 	case "machine":
-		return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
+		return models.CallStatusErrored, models.CallErrorMachine, 0
 	case "failed":
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 
 	default:
 		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
-		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
+		return models.CallStatusFailed, models.CallErrorProvider, 0
 	}
 }
 
@@ -590,7 +589,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -603,7 +602,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := s.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, sprint.Events())
+	response, err := s.responseForSprint(ctx, rt.RP, channel, call, resumeURL, sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -617,20 +616,23 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
+func (s *service) WriteRejectResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	_, err := w.Write(jsonx.MustMarshal([]any{Talk{
+		Action: "talk",
+		Text:   "This number is not accepting calls",
+	}}))
+	return err
+}
+
 // WriteErrorResponse writes an error / unavailable response
 func (s *service) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	actions := []interface{}{Talk{
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(jsonx.MustMarshal([]any{Talk{
 		Action: "talk",
 		Text:   ivr.ErrorMessage,
 		Error:  err.Error(),
-	}}
-	body, err := json.Marshal(actions)
-	if err != nil {
-		return errors.Wrapf(err, "error marshalling ncco error")
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(body)
+	}}))
 	return err
 }
 
@@ -642,14 +644,9 @@ func (s *service) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 }
 
 func (s *service) MakeEmptyResponseBody(msg string) []byte {
-	msgBody := map[string]string{
+	return jsonx.MustMarshal(map[string]string{
 		"_message": msg,
-	}
-	body, err := json.Marshal(msgBody)
-	if err != nil {
-		panic(errors.Wrapf(err, "error marshalling message"))
-	}
-	return body
+	})
 }
 
 func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
@@ -727,7 +724,7 @@ func (s *service) generateToken() (string, error) {
 
 // NCCO building utilities
 
-func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
@@ -816,13 +813,16 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			}
 			waitActions = append(waitActions, connect)
 
-			// create our outbound call with the same conversation UUID
-			call := CallRequest{}
-			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
-			call.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
-			call.NCCO = append(call.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
+			// create our outbound cr with the same conversation UUID
+			cr := CallRequest{
+				From:         Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")},
+				To:           []Phone{{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")}},
+				NCCO:         []NCCO{{Action: "conversation", Name: conversationUUID}},
+				RingingTimer: wait.DialLimitSeconds,
+				LengthTimer:  wait.CallLimitSeconds,
+			}
 
-			trace, err := s.makeRequest(http.MethodPost, s.callURL, call)
+			trace, err := s.makeRequest(http.MethodPost, s.callURL, cr)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
 			if err != nil {
 				return "", errors.Wrapf(err, "error trying to start call")
@@ -844,12 +844,12 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 
 			eventURL := resumeURL + "&wait_type=dial"
 			redisKey := fmt.Sprintf("dial_%s", transferUUID)
-			redisValue := fmt.Sprintf("%s:%s", conn.ExternalID(), eventURL)
+			redisValue := fmt.Sprintf("%s:%s", call.ExternalID(), eventURL)
 			_, err = rc.Do("setex", redisKey, 3600, redisValue)
 			if err != nil {
 				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
 			}
-			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
+			logrus.WithField("transferUUID", transferUUID).WithField("callID", call.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
 		}
 	}
 
@@ -892,4 +892,8 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 	}
 
 	return string(body), nil
+}
+
+func (s *service) RedactValues(ch *models.Channel) []string {
+	return []string{ch.ConfigValue(privateKeyConfig, "")}
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -17,169 +18,148 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
-	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleFlow))
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", newIVRHandler(handleStatus))
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncomingCall))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleCallback, models.ChannelLogTypeIVRCallback))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", newIVRHandler(handleStatus, models.ChannelLogTypeIVRStatus))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncoming, models.ChannelLogTypeIVRIncoming))
 }
 
-type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error)
+type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.Call, error)
 
-func newIVRHandler(handler ivrHandlerFn) web.Handler {
+func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
-		recorder := httpx.NewRecorder(r, w)
+		channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
 
-		// immediately save our request body so we have a complete channel log
-		err := recorder.SaveRequest()
+		// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
+		orgID, err := models.OrgIDForChannelUUID(ctx, rt.DB, channelUUID)
+		if err != nil {
+			return writeGenericErrorResponse(w, err)
+		}
+
+		// load our org assets
+		oa, err := models.GetOrgAssets(ctx, rt, orgID)
+		if err != nil {
+			return writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
+		}
+
+		// and our channel
+		ch := oa.ChannelByUUID(channelUUID)
+		if ch == nil {
+			return writeGenericErrorResponse(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
+		}
+
+		// get the IVR service for this channel
+		svc, err := ivr.GetService(ch)
+		if svc == nil {
+			return writeGenericErrorResponse(w, errors.Wrapf(err, "unable to get service for channel: %s", ch.UUID()))
+		}
+
+		// validate this request's signature
+		err = svc.ValidateRequestSignature(r)
+		if err != nil {
+			return svc.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
+		}
+
+		recorder, err := httpx.NewRecorder(r, w, true)
 		if err != nil {
 			return errors.Wrapf(err, "error reading request body")
 		}
-		ww := recorder.ResponseWriter
 
-		channel, connection, rerr := handler(ctx, rt, r, ww)
+		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))
 
-		if channel != nil {
-			trace, err := recorder.End()
-			if err != nil {
-				logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
+		call, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
+		if call != nil {
+			clog.SetCall(call)
+			if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
+				logrus.WithError(err).WithField("http_request", r).Error("error attaching ivr channel log")
 			}
+		}
 
-			desc := "IVR event handled"
-			isError := false
-			if trace.Response == nil || trace.Response.StatusCode != http.StatusOK {
-				desc = "IVR Error"
-				isError = true
-			}
+		if err := recorder.End(); err != nil {
+			logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
+		}
 
-			log := models.NewChannelLog(trace, isError, desc, channel, connection)
-			err = models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
-			if err != nil {
-				logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
-			}
+		clog.End()
+
+		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 
 		return rerr
 	}
 }
 
-func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
-	channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
-
-	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
-	orgID, err := models.OrgIDForChannelUUID(ctx, rt.DB, channelUUID)
-	if err != nil {
-		return nil, nil, writeGenericErrorResponse(w, err)
-	}
-
-	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, orgID)
-	if err != nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
-	}
-
-	// and our channel
-	channel := oa.ChannelByUUID(channelUUID)
-	if channel == nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
-	}
-
-	// get the right kind of provider
-	provider, err := ivr.GetService(channel)
-	if provider == nil {
-		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
-	}
-
-	// validate this request's signature
-	err = provider.ValidateRequestSignature(r)
-	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
-	}
-
+func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.Call, error) {
 	// lookup the URN of the caller
-	urn, err := provider.URNForRequest(r)
+	urn, err := svc.URNForRequest(r)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to find URN in request"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to find URN in request"))
 	}
 
 	// get the contact for this URN
-	contact, _, _, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, channel.ID())
+	contact, _, _, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, ch.ID())
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
 	}
 
 	urn, err = models.URNForURN(ctx, rt.DB, oa, urn)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to load urn"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to load urn"))
 	}
 
 	// urn ID
 	urnID := models.GetURNID(urn)
 	if urnID == models.NilURNID {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to get id for URN"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to get id for URN"))
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
+	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), ch.ID(), contact.ID(), urnID, nil, false)
 
-	externalID, err := provider.CallIDForRequest(r)
+	externalID, err := svc.CallIDForRequest(r)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to get external id from request"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to get external id from request"))
 	}
 
-	// create our connection
-	conn, err := models.InsertIVRConnection(
-		ctx, rt.DB, oa.OrgID(), channel.ID(), models.NilStartID, contact.ID(), urnID,
-		models.ConnectionDirectionIn, models.ConnectionStatusInProgress, externalID,
-	)
+	// create our call
+	call, err := models.InsertCall(ctx, rt.DB, oa.OrgID(), ch.ID(), models.NilStartID, contact.ID(), urnID, models.CallDirectionIn, models.CallStatusInProgress, externalID)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "error creating ivr connection"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "error creating call"))
 	}
 
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, rt, models.MOCallEventType, event, conn)
+	session, err := handler.HandleChannelEvent(ctx, rt, models.MOCallEventType, event, call)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 
-		return channel, conn, provider.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
+		return call, svc.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
 	}
 
-	// we got a session back so we have an active call trigger
+	// if we matched with an incoming-call trigger, we'll have a session
 	if session != nil {
-		// build our resume URL
-		resumeURL := buildResumeURL(rt.Config, channel, conn, urn)
-
-		// have our client output our session status
-		err = provider.WriteSessionResponse(ctx, rt, channel, conn, session, urn, resumeURL, r, w)
-		if err != nil {
-			return channel, conn, errors.Wrapf(err, "error writing ivr response for start")
+		// that might have started a non-voice flow, in which case we need to reject this call
+		if session.SessionType() != models.FlowTypeVoice {
+			return call, svc.WriteRejectResponse(w)
 		}
 
-		return channel, conn, nil
-	}
+		// build our resume URL
+		resumeURL := buildResumeURL(rt.Config, ch, call, urn)
 
-	// no session means no trigger, create a missed call event instead
-	// we first create an incoming call channel event and see if that matches
-	event = models.NewChannelEvent(models.MOMissEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
-	err = event.Insert(ctx, rt.DB)
-	if err != nil {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
-	}
+		// have our client output our session status
+		err = svc.WriteSessionResponse(ctx, rt, ch, call, session, urn, resumeURL, r, w)
+		if err != nil {
+			return call, errors.Wrapf(err, "error writing ivr response for start")
+		}
 
-	// try to handle it, this time looking for a missed call event
-	_, err = handler.HandleChannelEvent(ctx, rt, models.MOMissEventType, event, nil)
-	if err != nil {
-		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
-		return channel, conn, provider.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
+		return call, nil
 	}
 
 	// write our empty response
-	return channel, conn, provider.WriteEmptyResponse(w, "missed call handled")
+	return call, svc.WriteEmptyResponse(w, "missed call handled")
 }
 
 const (
@@ -190,8 +170,8 @@ const (
 
 // IVRRequest is our form for what fields we expect in IVR callbacks
 type IVRRequest struct {
-	ConnectionID models.ConnectionID `form:"connection" validate:"required"`
-	Action       string              `form:"action"     validate:"required"`
+	ConnectionID models.CallID `form:"connection" validate:"required"`
+	Action       string        `form:"action"     validate:"required"`
 }
 
 // writeGenericErrorResponse is just a small utility method to write out a simple JSON error when we don't have a client yet
@@ -202,73 +182,49 @@ func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
 	return err
 }
 
-func buildResumeURL(cfg *runtime.Config, channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
+func buildResumeURL(cfg *runtime.Config, channel *models.Channel, call *models.Call, urn urns.URN) string {
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, cfg.Domain)
 	form := url.Values{
 		"action":     []string{actionResume},
-		"connection": []string{fmt.Sprintf("%d", conn.ID())},
+		"connection": []string{fmt.Sprintf("%d", call.ID())},
 		"urn":        []string{urn.String()},
 	}
 
 	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
 }
 
-// handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere)
-func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
+// handles all incoming IVR requests related to a flow (status is handled elsewhere)
+func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.Call, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
 
 	request := &IVRRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
-		return nil, nil, errors.Wrapf(err, "request failed validation")
+		return nil, errors.Wrapf(err, "request failed validation")
 	}
 
-	// load our connection
-	conn, err := models.SelectChannelConnection(ctx, rt.DB, request.ConnectionID)
+	// load our call
+	conn, err := models.GetCallByID(ctx, rt.DB, oa.OrgID(), request.ConnectionID)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unable to load channel connection with id: %d", request.ConnectionID)
-	}
-
-	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
-	if err != nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
-	}
-
-	// and our channel
-	channel := oa.ChannelByID(conn.ChannelID())
-	if channel == nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
-	}
-
-	// get the right kind of provider
-	provider, err := ivr.GetService(channel)
-	if provider == nil {
-		return channel, conn, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %d", conn.ChannelID()))
-	}
-
-	// validate this request's signature if relevant
-	err = provider.ValidateRequestSignature(r)
-	if err != nil {
-		return channel, conn, writeGenericErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
+		return nil, errors.Wrapf(err, "unable to load call with id: %d", request.ConnectionID)
 	}
 
 	// load our contact
 	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{conn.ContactID()})
 	if err != nil {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
+		return conn, svc.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}
 	if len(contacts) == 0 {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
+		return conn, svc.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
 	}
 	if contacts[0].Status() != models.ContactStatusActive {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
+		return conn, svc.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
 	}
 
-	// load the URN for this connection
+	// load the URN for this call
 	urn, err := models.URNForID(ctx, rt.DB, oa, conn.ContactURNID())
 	if err != nil {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Errorf("unable to find connection urn: %d", conn.ContactURNID()))
+		return conn, svc.WriteErrorResponse(w, errors.Errorf("unable to find call urn: %d", conn.ContactURNID()))
 	}
 
 	// make sure our URN is indeed present on our contact, no funny business
@@ -279,117 +235,72 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 		}
 	}
 	if !found {
-		return channel, conn, provider.WriteErrorResponse(w, errors.Errorf("unable to find URN: %s on contact: %d", urn, conn.ContactID()))
+		return conn, svc.WriteErrorResponse(w, errors.Errorf("unable to find URN: %s on contact: %d", urn, conn.ContactID()))
 	}
 
-	resumeURL := buildResumeURL(rt.Config, channel, conn, urn)
+	resumeURL := buildResumeURL(rt.Config, ch, conn, urn)
 
 	// if this a start, start our contact
 	switch request.Action {
 	case actionStart:
-		err = ivr.StartIVRFlow(
-			ctx, rt, provider, resumeURL,
-			oa, channel, conn, contacts[0], urn, conn.StartID(),
-			r, w,
-		)
-
+		err = ivr.StartIVRFlow(ctx, rt, svc, resumeURL, oa, ch, conn, contacts[0], urn, conn.StartID(), r, w)
 	case actionResume:
-		err = ivr.ResumeIVRFlow(
-			ctx, rt, resumeURL, provider,
-			oa, channel, conn, contacts[0], urn,
-			r, w,
-		)
-
+		err = ivr.ResumeIVRFlow(ctx, rt, resumeURL, svc, oa, ch, conn, contacts[0], urn, r, w)
 	case actionStatus:
-		err = ivr.HandleIVRStatus(
-			ctx, rt, oa, provider, conn,
-			r, w,
-		)
+		err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w)
 
 	default:
-		err = provider.WriteErrorResponse(w, errors.Errorf("unknown action: %s", request.Action))
+		err = svc.WriteErrorResponse(w, errors.Errorf("unknown action: %s", request.Action))
 	}
 
-	// had an error? mark our connection as errored and log it
+	// had an error? mark our call as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling IVR")
-		return channel, conn, ivr.HandleAsFailure(ctx, rt.DB, provider, conn, w, err)
+		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
 	}
 
-	return channel, conn, nil
+	return conn, nil
 }
 
 // handleStatus handles all incoming IVR events / status updates
-func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
+func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.Call, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
 
-	channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
-
-	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
-	orgID, err := models.OrgIDForChannelUUID(ctx, rt.DB, channelUUID)
-	if err != nil {
-		return nil, nil, writeGenericErrorResponse(w, err)
-	}
-
-	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, orgID)
-	if err != nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
-	}
-
-	// and our channel
-	channel := oa.ChannelByUUID(channelUUID)
-	if channel == nil {
-		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
-	}
-
-	// get the right kind of provider
-	provider, err := ivr.GetService(channel)
-	if provider == nil {
-		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
-	}
-
-	// validate this request's signature if relevant
-	err = provider.ValidateRequestSignature(r)
-	if err != nil {
-		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
-	}
-
 	// preprocess this status
-	body, err := provider.PreprocessStatus(ctx, rt, r)
+	body, err := svc.PreprocessStatus(ctx, rt, r)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
 	}
 	if len(body) > 0 {
-		contentType := httpx.DetectContentType(body)
+		contentType, _ := httpx.DetectContentType(body)
 		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
-		return channel, nil, err
+		return nil, err
 	}
 
 	// get our external id
-	externalID, err := provider.CallIDForRequest(r)
+	externalID, err := svc.CallIDForRequest(r)
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to get call id for request"))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to get call id for request"))
 	}
 
-	// load our connection
-	conn, err := models.SelectChannelConnectionByExternalID(ctx, rt.DB, channel.ID(), models.ConnectionTypeIVR, externalID)
+	// load our call
+	conn, err := models.GetCallByExternalID(ctx, rt.DB, ch.ID(), externalID)
 	if errors.Cause(err) == sql.ErrNoRows {
-		return channel, nil, provider.WriteEmptyResponse(w, "unknown connection, ignoring")
+		return nil, svc.WriteEmptyResponse(w, "unknown call, ignoring")
 	}
 	if err != nil {
-		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "unable to load channel connection with id: %s", externalID))
+		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to load call with id: %s", externalID))
 	}
 
-	err = ivr.HandleIVRStatus(ctx, rt, oa, provider, conn, r, w)
+	err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w)
 
-	// had an error? mark our connection as errored and log it
+	// had an error? mark our call as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling status")
-		return channel, conn, ivr.HandleAsFailure(ctx, rt.DB, provider, conn, w, err)
+		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
 	}
 
-	return channel, conn, nil
+	return conn, nil
 }

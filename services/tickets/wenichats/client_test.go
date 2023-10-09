@@ -17,11 +17,11 @@ const (
 
 func TestCreateRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/", baseURL): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"detail":"Something went wrong"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"detail":"Something went wrong"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -52,7 +52,7 @@ func TestCreateRoom(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -80,11 +80,11 @@ func TestCreateRoom(t *testing.T) {
 func TestUpdateRoom(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/%s/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"detail":"Something went wrong"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"detail":"Something went wrong"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -115,7 +115,7 @@ func TestUpdateRoom(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -139,11 +139,11 @@ func TestUpdateRoom(t *testing.T) {
 func TestCloseRoom(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/%s/close/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"detail":"Something went wrong"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"detail":"Something went wrong"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -174,7 +174,7 @@ func TestCloseRoom(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -195,11 +195,11 @@ func TestCloseRoom(t *testing.T) {
 func TestSendMessage(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/msgs/", baseURL): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"detail": "Something went wrong"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"detail": "Something went wrong"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
 				"user": null,
 				"room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
@@ -221,7 +221,7 @@ func TestSendMessage(t *testing.T) {
 					}
 				],
 				"created_on": "2022-08-25T02:06:55.885000-03:00"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -253,11 +253,11 @@ func TestSendMessage(t *testing.T) {
 
 func TestGetQueues(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/queues/", baseURL): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"detail": "Something went wrong"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"detail": "Something went wrong"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"count": 1,
 				"next": "http://example.com",
 				"previous": "http://example.com",
@@ -267,7 +267,7 @@ func TestGetQueues(t *testing.T) {
 						"name": "Queue 1"
 					}
 				]
-			}`),
+			}`)),
 		},
 	}))
 

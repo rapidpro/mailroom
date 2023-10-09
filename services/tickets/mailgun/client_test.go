@@ -17,15 +17,15 @@ func TestSendMessage(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong"}`), // non-200 response
-			httpx.NewMockResponse(200, nil, `xx`),                                  // non-JSON response
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong"}`)), // non-200 response
+			httpx.NewMockResponse(200, nil, []byte(`xx`)),                                  // non-JSON response
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
+			}`)),
 		},
 	}))
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))

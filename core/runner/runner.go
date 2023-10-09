@@ -748,7 +748,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	// create our batch of all our contacts
 	task := start.CreateBatch(contactIDs, true, len(contactIDs))
 
-	// queue this to our ivr starter, it will take care of creating the connections then calling back in
+	// queue this to our ivr starter, it will take care of creating the calls then calling back in
 	rc := rt.RP.Get()
 	defer rc.Close()
 	err = queue.AddTask(rc, queue.BatchQueue, queue.StartIVRFlowBatch, int(orgID), task, queue.HighPriority)

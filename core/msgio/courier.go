@@ -1,17 +1,30 @@
 package msgio
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+var courierHttpClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
 
 const (
 	bulkPriority = 0
@@ -115,4 +128,65 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 
 	// any remaining in our batch, queue it up
 	return commitBatch()
+}
+
+var queueClearScript = redis.NewScript(3, `
+-- KEYS: [QueueType, QueueName, TPS]
+local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
+
+-- first construct the base key for this queue from the type + name + tps, e.g. "msgs:0a77a158-1dcb-4c06-9aee-e15bdf64653e|10"
+local queueKey = queueType .. ":" .. queueName .. "|" .. tps
+
+-- clear the sorted sets for the key
+redis.call("DEL", queueKey .. "/1")
+redis.call("DEL", queueKey .. "/0")
+
+-- reset queue to zero
+redis.call("ZADD", queueType .. ":active", 0, queueKey)
+`)
+
+// ClearCourierQueues clears the courier queues (priority and bulk) for the given channel
+func ClearCourierQueues(rc redis.Conn, ch *models.Channel) error {
+	_, err := queueClearScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
+	return err
+}
+
+// see https://github.com/nyaruka/courier/blob/main/attachments.go#L23
+type fetchAttachmentRequest struct {
+	ChannelType models.ChannelType `json:"channel_type"`
+	ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
+	URL         string             `json:"url"`
+	MsgID       models.MsgID       `json:"msg_id"`
+}
+
+type fetchAttachmentResponse struct {
+	Attachment struct {
+		ContentType string `json:"content_type"`
+		URL         string `json:"url"`
+		Size        int    `json:"size"`
+	} `json:"attachment"`
+	LogUUID string `json:"log_uuid"`
+}
+
+// FetchAttachment calls courier to fetch the given attachment
+func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgID models.MsgID) (utils.Attachment, models.ChannelLogUUID, error) {
+	payload := jsonx.MustMarshal(&fetchAttachmentRequest{
+		ChannelType: ch.Type(),
+		ChannelUUID: ch.UUID(),
+		URL:         attURL,
+		MsgID:       msgID,
+	})
+	req, _ := http.NewRequest("POST", fmt.Sprintf("https://%s/c/_fetch-attachment", rt.Config.Domain), bytes.NewReader(payload))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))
+
+	resp, err := httpx.DoTrace(courierHttpClient, req, nil, nil, -1)
+	if err != nil || resp.Response.StatusCode != 200 {
+		return "", "", errors.New("error calling courier endpoint")
+	}
+	fa := &fetchAttachmentResponse{}
+	if err := json.Unmarshal(resp.ResponseBody, fa); err != nil {
+		return "", "", errors.Wrap(err, "error unmarshaling courier response")
+	}
+
+	return utils.Attachment(fmt.Sprintf("%s:%s", fa.Attachment.ContentType, fa.Attachment.URL)), models.ChannelLogUUID(fa.LogUUID), nil
 }

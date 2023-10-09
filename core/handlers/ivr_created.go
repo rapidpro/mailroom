@@ -27,18 +27,18 @@ func handleIVRCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		"text":         event.Msg.Text(),
 	}).Debug("ivr say")
 
-	// get our channel connection
-	conn := scene.Session().ChannelConnection()
-	if conn == nil {
-		return errors.Errorf("ivr session must have a channel connection set")
+	// get our call
+	call := scene.Session().Call()
+	if call == nil {
+		return errors.Errorf("ivr session must have a call set")
 	}
 
 	// if our call is no longer in progress, return
-	if conn.Status() != models.ConnectionStatusInProgress {
+	if call.Status() != models.CallStatusInProgress {
 		return nil
 	}
 
-	msg := models.NewOutgoingIVR(rt.Config, oa.OrgID(), conn, event.Msg, event.CreatedOn())
+	msg := models.NewOutgoingIVR(rt.Config, oa.OrgID(), call, event.Msg, event.CreatedOn())
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitIVRHook, msg)

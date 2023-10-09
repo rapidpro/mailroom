@@ -20,11 +20,11 @@ const (
 
 func TestCreateUser(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users", serviceSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"is_notifiable": null,
 				"date_updated": "2022-03-08T22:18:23Z",
 				"is_online": null,
@@ -42,7 +42,7 @@ func TestCreateUser(t *testing.T) {
 						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
 						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
 				}
-			}`),
+			}`)),
 		},
 	}))
 
@@ -67,11 +67,11 @@ func TestCreateUser(t *testing.T) {
 func TestFetchUser(t *testing.T) {
 	userSid := "USf4015a97250d482889459f8e8819e09f"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", serviceSid, userSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"is_notifiable": null,
 				"date_updated": "2022-03-08T22:18:23Z",
 				"is_online": null,
@@ -89,7 +89,7 @@ func TestFetchUser(t *testing.T) {
 						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
 						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
 				}
-			}`),
+			}`)),
 		},
 	}))
 
@@ -108,11 +108,11 @@ func TestFetchUser(t *testing.T) {
 
 func TestCreateFlexChannel(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://flex-api.twilio.com/v1/Channels": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"task_sid": "WT1d187abc335f7f16ff050a66f9b6a6b2",
 				"flex_flow_sid": "FOedbb8c9e54f04afaef409246f728a44d",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
@@ -121,7 +121,7 @@ func TestCreateFlexChannel(t *testing.T) {
 				"date_updated": "2022-03-08T22:38:30Z",
 				"sid": "CH6442c09c93ba4d13966fa42e9b78f620",
 				"date_created": "2022-03-08T22:38:30Z"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -149,11 +149,11 @@ func TestCreateFlexChannel(t *testing.T) {
 func TestFetchFlexChannel(t *testing.T) {
 	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://flex-api.twilio.com/v1/Channels/%s", channelSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"task_sid": "WT1d187abc335f7f16ff050a66f9b6a6b2",
 				"flex_flow_sid": "FOedbb8c9e54f04afaef409246f728a44d",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
@@ -162,7 +162,7 @@ func TestFetchFlexChannel(t *testing.T) {
 				"date_updated": "2022-03-08T22:38:30Z",
 				"sid": "CH6442c09c93ba4d13966fa42e9b78f620",
 				"date_created": "2022-03-08T22:38:30Z"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -183,11 +183,11 @@ func TestFetchFlexChannel(t *testing.T) {
 func TestCreateFlexChannelWebhook(t *testing.T) {
 	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Webhooks", serviceSid, channelSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
@@ -204,7 +204,7 @@ func TestCreateFlexChannelWebhook(t *testing.T) {
 				"date_created": "2022-03-09T19:54:49Z",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"type": "webhook"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -240,11 +240,11 @@ func TestCreateFlexChannelWebhook(t *testing.T) {
 func TestCreateMessage(t *testing.T) {
 	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", serviceSid, channelSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"body": "hello",
 				"index": 0,
 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
@@ -261,7 +261,7 @@ func TestCreateMessage(t *testing.T) {
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
-				}`),
+				}`)),
 		},
 	}))
 
@@ -288,17 +288,17 @@ func TestCreateMessage(t *testing.T) {
 func TestCompleteTask(t *testing.T) {
 	taskSid := "WT1d187abc335f7f16ff050a66f9b6a6b2"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://taskrouter.twilio.com/v1/Workspaces/%s/Tasks/%s", workspaceSid, taskSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(400, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(400, nil, []byte(`{
 				"code": 20001,
 				"message": "Cannot complete task WT1d187abc335f7f16ff050a66f9b6a6b2 in workspace WS954611f5aebc7672d71de836c0179113 for account AC81d44315e19372138bdaffcc13cf3b94 because it is not currently assigned.",
 				"more_info": "https://www.twilio.com/docs/errors/20001",
 				"status": 400
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"workspace_sid": "WS954611f5aebc7672d71de836c0179113",
 				"assignment_status": "completed",
 				"date_updated": "2022-03-09T21:57:00Z",
@@ -325,7 +325,7 @@ func TestCompleteTask(t *testing.T) {
 						"workspace": "https://taskrouter.twilio.com/v1/Workspaces/WS954611f5aebc7672d71de836c0179113",
 						"workflow": "https://taskrouter.twilio.com/v1/Workspaces/WS954611f5aebc7672d71de836c0179113/Workflows/WWfaeaff148cfdefce03443a4980149558"
 				}
-			}`),
+			}`)),
 		},
 	}))
 
@@ -348,11 +348,11 @@ func TestCompleteTask(t *testing.T) {
 
 func TestCreateMediaResource(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", serviceSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 					"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
 					"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 					"date_created": "2022-03-14T13:10:38.897143-07:00",
@@ -370,7 +370,7 @@ func TestCreateMediaResource(t *testing.T) {
 					"channel_sid": null,
 					"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
 					"is_multipart_upstream": false
-			}`),
+			}`)),
 		},
 	}))
 
@@ -398,11 +398,11 @@ func TestCreateMediaResource(t *testing.T) {
 func TestFetchMedia(t *testing.T) {
 	mediaSid := "ME59b872f1e52fbd6fe6ad956bbb4fa9bd"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/%s", mediaSid): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"date_created": "2022-03-14T13:10:38.897143-07:00",
@@ -421,7 +421,7 @@ func TestFetchMedia(t *testing.T) {
 				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
 				"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
 				"is_multipart_upstream": false
-			}`),
+			}`)),
 		},
 	}))
 

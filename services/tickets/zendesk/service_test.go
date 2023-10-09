@@ -37,34 +37,34 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"results": [
 					{
 						"external_resource_id": "123",
 						"status": {"code": "success"}
 					}
 				]
-			}`),
-			httpx.NewMockResponse(201, nil, `{
+			}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"results": [
 					{
 						"external_resource_id": "124",
 						"status": {"code": "success"}
 					}
 				]
-			}`),
+			}`)),
 		},
 		"https://nyaruka.zendesk.com/api/v2/tickets?external_id=59d74b86-3e2f-4a93-aece-b05d2fdcde0c": {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"tickets": [
 				{
 					"id": 1234,
 					"subject": "Where are my cookie?"
 				}
-			]}`),
+			]}`)),
 		},
 	}))
 
@@ -101,12 +101,12 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	// try with connection failure
-	_, err = svc.Open(session, defaultTopic, fieldTicket, nil, logger.Log)
+	_, err = svc.Open(session.Environment(), session.Contact(), defaultTopic, fieldTicket, nil, logger.Log)
 	assert.EqualError(t, err, "error pushing message to zendesk: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, defaultTopic, fieldTicket, nil, logger.Log)
+	ticket, err := svc.Open(session.Environment(), session.Contact(), defaultTopic, fieldTicket, nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
@@ -115,7 +115,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -125,7 +125,7 @@ func TestOpenAndForward(t *testing.T) {
 		dbTicket,
 		flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"),
 		"It's urgent",
-		[]utils.Attachment{utils.Attachment("image/jpg:http://myfiles.com/media/0123/attachment1.jpg")},
+		[]utils.Attachment{utils.Attachment("image/jpg:http://myfiles.com/attachments/0123/attachment1.jpg")},
 		logger.Log,
 	)
 
@@ -140,24 +140,24 @@ func TestCloseAndReopen(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=12,14": {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {
 					"id": "1234-abcd",
 					"url": "http://zendesk.com",
 					"status": "queued"
 				}
-			}`),
+			}`)),
 		},
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=14": {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {
 					"id": "1234-abcd",
 					"url": "http://zendesk.com",
 					"status": "queued"
 				}
-			}`),
+			}`)),
 		},
 	}))
 
@@ -178,8 +178,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "12", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Zendesk.ID, "14", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Zendesk.ID, "12", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Bob.ID, testdata.Zendesk.ID, "14", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

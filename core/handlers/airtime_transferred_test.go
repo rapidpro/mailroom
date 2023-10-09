@@ -272,15 +272,15 @@ func TestAirtimeTransferred(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://dvs-api.dtone.com/v1/lookup/mobile-number/+16055741111": {
-			httpx.NewMockResponse(200, nil, lookupNumberResponse), // successful mobile number lookup
+			httpx.NewMockResponse(200, nil, []byte(lookupNumberResponse)), // successful mobile number lookup
 		},
 		"https://dvs-api.dtone.com/v1/products?type=FIXED_VALUE_RECHARGE&operator_id=1596&per_page=100": {
-			httpx.NewMockResponse(200, nil, productsResponse),
+			httpx.NewMockResponse(200, nil, []byte(productsResponse)),
 		},
 		"https://dvs-api.dtone.com/v1/sync/transactions": {
-			httpx.NewMockResponse(200, nil, transactionRejectedResponse),
+			httpx.NewMockResponse(200, nil, []byte(transactionRejectedResponse)),
 		},
 		"https://dvs-api.dtone.com/v1/lookup/mobile-number/+16055743333": {
 			httpx.MockConnectionError, // timeout x 3 retries

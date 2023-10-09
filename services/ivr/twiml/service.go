@@ -24,7 +24,6 @@ import (
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -63,34 +62,35 @@ const (
 	baseURLConfig = "base_url"
 )
 
-var validLanguageCodes = map[string]bool{
-	"da-DK": true,
-	"de-DE": true,
-	"en-AU": true,
-	"en-CA": true,
-	"en-GB": true,
-	"en-IN": true,
-	"en-US": true,
-	"ca-ES": true,
-	"es-ES": true,
-	"es-MX": true,
-	"fi-FI": true,
-	"fr-CA": true,
-	"fr-FR": true,
-	"it-IT": true,
-	"ja-JP": true,
-	"ko-KR": true,
-	"nb-NO": true,
-	"nl-NL": true,
-	"pl-PL": true,
-	"pt-BR": true,
-	"pt-PT": true,
-	"ru-RU": true,
-	"sv-SE": true,
-	"zh-CN": true,
-	"zh-HK": true,
-	"zh-TW": true,
-}
+// https://www.twilio.com/docs/voice/twiml/say
+var supportedSayLanguages = utils.StringSet([]string{
+	"da-DK",
+	"de-DE",
+	"en-AU",
+	"en-CA",
+	"en-GB",
+	"en-IN",
+	"en-US",
+	"ca-ES",
+	"es-ES",
+	"es-MX",
+	"fi-FI",
+	"fr-CA",
+	"fr-FR",
+	"it-IT",
+	"ja-JP",
+	"ko-KR",
+	"nb-NO",
+	"nl-NL",
+	"pl-PL",
+	"pt-BR",
+	"pt-PT",
+	"ru-RU",
+	"sv-SE",
+	"zh-CN",
+	"zh-HK",
+	"zh-TW",
+})
 
 type service struct {
 	httpClient   *http.Client
@@ -140,11 +140,11 @@ func (s *service) DownloadMedia(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func (s *service) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *service) CheckStartRequest(r *http.Request) models.CallError {
 	r.ParseForm()
 	answeredBy := r.Form.Get("AnsweredBy")
 	if answeredBy == "machine_start" || answeredBy == "fax" {
-		return models.ConnectionErrorMachine
+		return models.CallErrorMachine
 	}
 	return ""
 }
@@ -153,7 +153,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	return nil, nil
 }
 
-func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, call *models.Call, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
@@ -291,28 +291,28 @@ func (s *service) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 
 // StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
 // and if available, the current call duration
-func (s *service) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
-		return models.ConnectionStatusWired, "", 0
+		return models.CallStatusWired, "", 0
 	case "in-progress", "initiated":
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ConnectionStatusCompleted, "", duration
+		return models.CallStatusCompleted, "", duration
 
 	case "busy":
-		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+		return models.CallStatusErrored, models.CallErrorBusy, 0
 	case "no-answer":
-		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+		return models.CallStatusErrored, models.CallErrorNoAnswer, 0
 	case "canceled", "failed":
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in status callback")
-		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
+		return models.CallStatusFailed, models.CallErrorProvider, 0
 	}
 }
 
@@ -351,7 +351,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -377,29 +377,37 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
+func (s *service) WriteRejectResponse(w http.ResponseWriter) error {
+	return s.writeResponse(w, &Response{
+		Commands: []any{Reject{}},
+	})
+}
+
 // WriteErrorResponse writes an error / unavailable response
 func (s *service) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	r := &Response{Message: strings.Replace(err.Error(), "--", "__", -1)}
-	r.Commands = append(r.Commands, Say{Text: ivr.ErrorMessage})
-	r.Commands = append(r.Commands, Hangup{})
-
-	body, err := xml.Marshal(r)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write([]byte(xml.Header + string(body)))
-	return err
+	return s.writeResponse(w, &Response{
+		Message: strings.Replace(err.Error(), "--", "__", -1),
+		Commands: []any{
+			Say{Text: ivr.ErrorMessage},
+			Hangup{},
+		},
+	})
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (s *service) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
-	r := &Response{Message: strings.Replace(msg, "--", "__", -1)}
+	return s.writeResponse(w, &Response{
+		Message: strings.Replace(msg, "--", "__", -1),
+	})
+}
 
-	body, err := xml.Marshal(r)
+func (s *service) writeResponse(w http.ResponseWriter, resp *Response) error {
+	marshalled, err := xml.Marshal(resp)
 	if err != nil {
 		return err
 	}
-	_, err = w.Write([]byte(xml.Header + string(body)))
+	w.Write([]byte(xml.Header))
+	_, err = w.Write(marshalled)
 	return err
 }
 
@@ -444,7 +452,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
+func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 	hasWait := false
@@ -453,14 +461,16 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				country := envs.DeriveCountryFromTel(number.Path())
-				locale := envs.NewLocale(event.Msg.TextLanguage, country)
-				languageCode := locale.ToBCP47()
+				urnCountry := envs.DeriveCountryFromTel(urn.Path())
+				msgLocale := envs.NewLocale(event.Msg.TextLanguage, urnCountry)
 
-				if _, valid := validLanguageCodes[languageCode]; !valid {
-					languageCode = ""
+				// only send locale if it's a supported say language for Twilio
+				msgLocaleCode := msgLocale.ToBCP47()
+				if _, valid := supportedSayLanguages[msgLocaleCode]; !valid {
+					msgLocaleCode = ""
 				}
-				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
+
+				commands = append(commands, &Say{Text: event.Msg.Text(), Language: msgLocaleCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
 					a = models.NormalizeAttachment(cfg, a)
@@ -497,7 +507,7 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 
 		case *events.DialWaitEvent:
 			hasWait = true
-			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: event.URN.Path()}
+			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: event.URN.Path(), Timeout: event.DialLimitSeconds, TimeLimit: event.CallLimitSeconds}
 			commands = append(commands, dial)
 			r.Commands = commands
 		}
@@ -521,4 +531,8 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 	}
 
 	return xml.Header + string(body), nil
+}
+
+func (s *service) RedactValues(ch *models.Channel) []string {
+	return []string{ch.ConfigValue(authTokenConfig, "")}
 }

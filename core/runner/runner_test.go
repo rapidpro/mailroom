@@ -38,9 +38,9 @@ func TestFireCampaignEvents(t *testing.T) {
 	fire2ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent3, now)
 	fire3ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent3, now)
 
-	// create an waiting sessions for Cathy and Alexandria
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilConnectionID, time.Now(), time.Now(), false, nil)
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
+	// create waiting sessions for Cathy and Alexandria
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilCallID, time.Now(), time.Now(), false, nil)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
 
 	fires := []*models.EventFire{
 		{
@@ -62,9 +62,9 @@ func TestFireCampaignEvents(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
+	startedIDs, err := runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(sessions))
+	assert.ElementsMatch(t, []models.ContactID{testdata.Bob.ID}, startedIDs)
 
 	// cathy has her existing waiting session because event skipped her
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -111,9 +111,9 @@ func TestFireCampaignEvents(t *testing.T) {
 		},
 	}
 
-	sessions, err = runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
+	startedIDs, err = runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(sessions))
+	assert.ElementsMatch(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID}, startedIDs)
 
 	// cathy still has her existing waiting session and now a completed one
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(1)
@@ -157,9 +157,9 @@ func TestFireCampaignEvents(t *testing.T) {
 		},
 	}
 
-	sessions, err = runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.Favorites.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent1.UUID))
+	startedIDs, err = runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.Favorites.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent1.UUID))
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(sessions))
+	assert.ElementsMatch(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID}, startedIDs)
 
 	// cathy's existing waiting session should now be interrupted and now she has a waiting session in the Favorites flow
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'I'`, testdata.Cathy.ID).Returns(1)
@@ -231,7 +231,7 @@ func TestBatchStart(t *testing.T) {
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
 			Returns(tc.Count, "%d: unexpected number of sessions", i)
 
 		assertdb.Query(t, db,
@@ -273,7 +273,7 @@ func TestResume(t *testing.T) {
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
@@ -306,7 +306,7 @@ func TestResume(t *testing.T) {
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1
-			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
+			 AND status = $2 AND responded = TRUE AND org_id = 1 AND call_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2

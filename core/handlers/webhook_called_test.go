@@ -31,15 +31,15 @@ func TestWebhookCalled(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"http://rapidpro.io/": {
-			httpx.NewMockResponse(200, nil, "OK"),
-			httpx.NewMockResponse(200, nil, "OK"),
+			httpx.NewMockResponse(200, nil, []byte("OK")),
+			httpx.NewMockResponse(200, nil, []byte("OK")),
 		},
 		"http://rapidpro.io/?unsub=1": {
-			httpx.NewMockResponse(410, nil, "Gone"),
-			httpx.NewMockResponse(410, nil, "Gone"),
-			httpx.NewMockResponse(410, nil, "Gone"),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
 		},
 	}))
 
@@ -102,7 +102,7 @@ type failingWebhookService struct {
 	delay time.Duration
 }
 
-func (s *failingWebhookService) Call(session flows.Session, request *http.Request) (*flows.WebhookCall, error) {
+func (s *failingWebhookService) Call(request *http.Request) (*flows.WebhookCall, error) {
 	return &flows.WebhookCall{
 		Trace: &httpx.Trace{
 			Request:       request,
@@ -139,7 +139,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	// webhook service with a 2 second delay
 	svc := &failingWebhookService{delay: 2 * time.Second}
 
-	eng := engine.NewBuilder().WithWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) { return svc, nil }).Build()
+	eng := engine.NewBuilder().WithWebhookServiceFactory(func(flows.SessionAssets) (flows.WebhookService, error) { return svc, nil }).Build()
 	flowRef := assets.NewFlowReference("bc5d6b7b-3e18-4d7c-8279-50b460e74f7f", "Test")
 
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)

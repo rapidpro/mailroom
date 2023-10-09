@@ -11,6 +11,8 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/stringsx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -44,7 +46,7 @@ type service struct {
 	restClient     *RESTClient
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
-	redactor       utils.Redactor
+	redactor       stringsx.Redactor
 	secret         string
 	instancePushID string
 	webhookID      string
@@ -67,7 +69,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
-			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
+			redactor:       stringsx.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
 			instancePushID: instancePushID,
 			webhookID:      webhookID,
@@ -78,16 +80,16 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contactDisplay := session.Contact().Format(session.Environment())
+	contactDisplay := contact.Format(env)
 
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
-			ExternalID: string(session.Contact().UUID()),
+			ExternalID: string(contact.UUID()),
 			Name:       contactDisplay,
 		},
 		AllowChannelback: true,
@@ -313,7 +315,7 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
-	prefix := s.rtConfig.S3MediaPrefix
+	prefix := s.rtConfig.S3AttachmentsPrefix
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}

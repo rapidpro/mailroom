@@ -9,9 +9,9 @@ var Viewer = &User{5, "viewer1@nyaruka.com"}
 var Agent = &User{6, "agent1@nyaruka.com"}
 var Surveyor = &User{7, "surveyor1@nyaruka.com"}
 
-var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
-var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
-var TwitterChannel = &Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91"}
+var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "T"}
+var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49", "NX"}
+var TwitterChannel = &Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91", "TT"}
 
 var Cathy = &Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
 var Bob = &Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
@@ -49,7 +49,7 @@ var DefaultTopic = &Topic{1, "5cc1848a-357c-4de9-9720-45770ec18d11"}
 var SalesTopic = &Topic{2, "9ef2ff21-064a-41f1-8560-ccc990b4f937"}
 var SupportTopic = &Topic{3, "0a8f2e00-fef6-402c-bd79-d789446ec0e0"}
 
-var Internal = &Ticketer{1, "8bd48029-6ca1-46a8-aa14-68f7213b82b3"}
+var Internal = &Ticketer{1, "ffc903f7-8cbb-443f-9627-87106842d1aa"}
 var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
 var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
@@ -71,7 +71,7 @@ var RemindersEvent3 = &CampaignEvent{10002, "3e4f06c2-e04f-47ca-a047-f5252b3160e
 // secondary org.. only a few things
 var Org2 = &Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}
 var Org2Admin = &User{8, "admin2@nyaruka.com"}
-var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651"}
+var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651", "T"}
 var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}
 var Org2SingleMessage = &Flow{20001, "5277916d-6011-41ac-a4a4-f6ac6a4f1dd9"}
