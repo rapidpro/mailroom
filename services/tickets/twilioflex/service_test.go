@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -490,119 +488,120 @@ func TestCloseAndReopen(t *testing.T) {
 	assert.EqualError(t, err, "Twilio Flex ticket type doesn't support reopening")
 }
 
-func TestSendHistory(t *testing.T) {
-	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
+// do not use send message history, we do not have access to Run's CreatedOn()
+// func TestSendHistory(t *testing.T) {
+// 	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
-	defer dates.SetNowSource(dates.DefaultNowSource)
-	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+// 	defer dates.SetNowSource(dates.DefaultNowSource)
+// 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 
-	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
-	require.NoError(t, err)
+// 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+// 	require.NoError(t, err)
 
-	defer uuids.SetGenerator(uuids.DefaultGenerator)
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
+// 	defer uuids.SetGenerator(uuids.DefaultGenerator)
+// 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+// 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
-			httpx.NewMockResponse(201, nil, []byte(`{
-				"body": "Hi! I'll try to help you!",
-				"index": 0,
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"from": "10000",
-				"date_updated": "2022-03-09T20:27:47Z",
-				"type": "text",
-				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"last_updated_by": null,
-				"date_created": "2022-03-09T20:27:47Z",
-				"media": null,
-				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
-				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"was_edited": false
-			}`)),
-			httpx.NewMockResponse(201, nil, []byte(`{
-				"body": "Where are you from?",
-				"index": 0,
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"from": "10000",
-				"date_updated": "2022-03-09T20:27:47Z",
-				"type": "text",
-				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"last_updated_by": null,
-				"date_created": "2022-03-09T20:27:47Z",
-				"media": null,
-				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
-				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"was_edited": false
-			}`)),
-			httpx.NewMockResponse(201, nil, []byte(`{
-				"body": "I'm from Brazil",
-				"index": 0,
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"from": "10000",
-				"date_updated": "2022-03-09T20:27:47Z",
-				"type": "text",
-				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"last_updated_by": null,
-				"date_created": "2022-03-09T20:27:47Z",
-				"media": null,
-				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
-				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"was_edited": false
-			}`)),
-		},
-	}))
+// 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+// 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
+// 			httpx.NewMockResponse(201, nil, []byte(`{
+// 				"body": "Hi! I'll try to help you!",
+// 				"index": 0,
+// 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"from": "10000",
+// 				"date_updated": "2022-03-09T20:27:47Z",
+// 				"type": "text",
+// 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+// 				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"last_updated_by": null,
+// 				"date_created": "2022-03-09T20:27:47Z",
+// 				"media": null,
+// 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+// 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+// 				"attributes": "{}",
+// 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+// 				"was_edited": false
+// 			}`)),
+// 			httpx.NewMockResponse(201, nil, []byte(`{
+// 				"body": "Where are you from?",
+// 				"index": 0,
+// 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"from": "10000",
+// 				"date_updated": "2022-03-09T20:27:47Z",
+// 				"type": "text",
+// 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+// 				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"last_updated_by": null,
+// 				"date_created": "2022-03-09T20:27:47Z",
+// 				"media": null,
+// 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+// 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+// 				"attributes": "{}",
+// 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+// 				"was_edited": false
+// 			}`)),
+// 			httpx.NewMockResponse(201, nil, []byte(`{
+// 				"body": "I'm from Brazil",
+// 				"index": 0,
+// 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"from": "10000",
+// 				"date_updated": "2022-03-09T20:27:47Z",
+// 				"type": "text",
+// 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+// 				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+// 				"last_updated_by": null,
+// 				"date_created": "2022-03-09T20:27:47Z",
+// 				"media": null,
+// 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+// 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+// 				"attributes": "{}",
+// 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+// 				"was_edited": false
+// 			}`)),
+// 		},
+// 	}))
 
-	mockDB, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	defer mockDB.Close()
-	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+// 	mockDB, mock, err := sqlmock.New()
+// 	assert.NoError(t, err)
+// 	defer mockDB.Close()
+// 	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
-	dummyTime, _ := time.Parse(time.RFC1123, "2019-10-07T15:21:30")
+// 	dummyTime, _ := time.Parse(time.RFC1123, "2019-10-07T15:21:30")
 
-	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"}).
-		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "Hi! I'll try to help you!", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, 2, 2, 3, 3).
-		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, 2, 2, 3, 3).
-		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, 2, 2, 3, nil)
+// 	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"}).
+// 		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "Hi! I'll try to help you!", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, 2, 2, 3, 3).
+// 		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, 2, 2, 3, 3).
+// 		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, 2, 2, 3, nil)
 
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
-	assert.NoError(t, err)
+// 	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
+// 	assert.NoError(t, err)
 
-	mock.ExpectQuery("SELECT").
-		WithArgs(2, after).
-		WillReturnRows(rows)
+// 	mock.ExpectQuery("SELECT").
+// 		WithArgs(2, after).
+// 		WillReturnRows(rows)
 
-	twilioflex.SetDB(sqlxDB)
+// 	twilioflex.SetDB(sqlxDB)
 
-	restClient := twilioflex.NewClient(
-		http.DefaultClient,
-		nil,
-		authToken,
-		accountSid,
-		serviceSid,
-		workspaceSid,
-		flexFlowSid,
-	)
+// restClient := twilioflex.NewClient(
+// 	http.DefaultClient,
+// 	nil,
+// 	authToken,
+// 	accountSid,
+// 	serviceSid,
+// 	workspaceSid,
+// 	flexFlowSid,
+// )
 
-	logger := &flows.HTTPLogger{}
+// logger := &flows.HTTPLogger{}
 
-	twilioflex.SendHistory(
-		session,
-		2,
-		&twilioflex.FlexChannel{Sid: "CH6442c09c93ba4d13966fa42e9b78f620"},
-		logger.Log,
-		restClient,
-		nil,
-	)
-	assert.Equal(t, 3, len(logger.Logs))
-}
+// twilioflex.SendHistory(
+// 	session,
+// 	2,
+// 	&twilioflex.FlexChannel{Sid: "CH6442c09c93ba4d13966fa42e9b78f620"},
+// 	logger.Log,
+// 	restClient,
+// 	nil,
+// )
+// assert.Equal(t, 3, len(logger.Logs))
+// }

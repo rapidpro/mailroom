@@ -1,21 +1,17 @@
 package twilioflex
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/stringsx"
@@ -37,7 +33,8 @@ const (
 
 var db *sqlx.DB
 var lock = &sync.Mutex{}
-var historyDelay = 6
+
+//var historyDelay = 6
 
 func initDB(dbURL string) error {
 	if db == nil {
@@ -163,11 +160,11 @@ func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flow
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create channel webhook")
 	}
-
-	go func() {
-		time.Sleep(time.Second * time.Duration(historyDelay))
-		SendHistory(session, contact.ID(), newFlexChannel, logHTTP, s.restClient, s.redactor)
-	}()
+	// do not use send message history, we do not have access to Run's CreatedOn()
+	// go func() {
+	// 	time.Sleep(time.Second * time.Duration(historyDelay))
+	// 	SendHistory(session, contact.ID(), newFlexChannel, logHTTP, s.restClient, s.redactor)
+	// }()
 
 	ticket.SetExternalID(newFlexChannel.Sid)
 	return ticket, nil
@@ -275,44 +272,45 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return errors.New("Twilio Flex ticket type doesn't support reopening")
 }
 
-func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor stringsx.Redactor) {
-	after := session.Runs()[0].CreatedOn()
-	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	// get messages for history
-	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
-	if err != nil {
-		logrus.Error(errors.Wrap(err, "failed to get history messages"))
-		return
-	}
+// do not use send message history, we do not have access to Run's CreatedOn()
+// func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor stringsx.Redactor) {
+// 	after := session.Runs()[0].CreatedOn()
+// 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+// 	defer cancel()
+// 	// get messages for history
+// 	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
+// 	if err != nil {
+// 		logrus.Error(errors.Wrap(err, "failed to get history messages"))
+// 		return
+// 	}
 
-	// sort messages by CreatedOn()
-	sort.SliceStable(msgs, func(i, j int) bool {
-		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
-	})
+// 	// sort messages by CreatedOn()
+// 	sort.SliceStable(msgs, func(i, j int) bool {
+// 		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+// 	})
 
-	var trace *httpx.Trace
-	// send history
-	for _, msg := range msgs {
-		m := &CreateChatMessageParams{
-			Body:        msg.Text(),
-			ChannelSid:  newFlexChannel.Sid,
-			DateCreated: msg.CreatedOn().Format(time.RFC3339),
-		}
-		if msg.Direction() == "I" {
-			m.From = fmt.Sprint(contactID)
-			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
-			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
-		} else {
-			m.From = "Bot"
-			_, trace, err = restClient.CreateMessage(m, nil)
-		}
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
-		}
-		if err != nil {
-			logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
-			return
-		}
-	}
-}
+// 	var trace *httpx.Trace
+// 	// send history
+// 	for _, msg := range msgs {
+// 		m := &CreateChatMessageParams{
+// 			Body:        msg.Text(),
+// 			ChannelSid:  newFlexChannel.Sid,
+// 			DateCreated: msg.CreatedOn().Format(time.RFC3339),
+// 		}
+// 		if msg.Direction() == "I" {
+// 			m.From = fmt.Sprint(contactID)
+// 			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
+// 			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
+// 		} else {
+// 			m.From = "Bot"
+// 			_, trace, err = restClient.CreateMessage(m, nil)
+// 		}
+// 		if trace != nil {
+// 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+// 		}
+// 		if err != nil {
+// 			logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
+// 			return
+// 		}
+// 	}
+// }
