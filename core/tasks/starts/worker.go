@@ -208,7 +208,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 
 // HandleFlowStartBatch starts a batch of contacts in a flow
 func handleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*15)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*time.Duration(rt.Config.FlowStartBatchTimeout))
 	defer cancel()
 
 	// decode our task body

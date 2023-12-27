@@ -84,14 +84,17 @@ func (c *Client) post(endpoint string, payload interface{}, response interface{}
 type Visitor struct {
 	Token        string            `json:"token"`
 	ContactUUID  string            `json:"contactUUID,omitempty"`
+	Department   string            `json:"department,omitempty"`
 	Name         string            `json:"name,omitempty"`
 	Email        string            `json:"email,omitempty"`
 	Phone        string            `json:"phone,omitempty"`
+	CustomFields map[string]string `json:"customFields,omitempty"`
 }
 
 type Room struct {
-	Visitor  Visitor `json:"visitor"`
-	TicketID string  `json:"ticketID"`
+	Visitor      Visitor `json:"visitor"`
+	TicketID     string  `json:"ticketID"`
+	SessionStart string  `json:"sessionStart,omitempty"`
 }
 
 // CreateRoom creates a new room and returns the ID

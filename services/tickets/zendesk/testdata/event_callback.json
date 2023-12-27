@@ -102,12 +102,12 @@
         }
     },
     {
-        "label": "target and trigger created for create_integration_instance event",
+        "label": "webhook and trigger created for create_integration_instance event",
         "http_mocks": {
-            "https://nyaruka.zendesk.com/api/v2/targets.json": [
+            "https://nyaruka.zendesk.com/api/v2/webhooks": [
                 {
                     "status": 200,
-                    "body": "{\"target\":{\"id\":15}}"
+                    "body": "{\"webhook\":{\"id\":\"15\"}}"
                 }
             ],
             "https://nyaruka.zendesk.com/api/v2/triggers.json": [
@@ -139,7 +139,7 @@
         },
         "db_assertions": [
             {
-                "query": "select count(*) from tickets_ticketer where config @> '{\"target_id\": \"15\", \"trigger_id\": \"23\"}'",
+                "query": "select count(*) from tickets_ticketer where config @> '{\"webhook_id\": \"15\", \"trigger_id\": \"23\"}'",
                 "count": 1
             }
         ]
@@ -206,9 +206,9 @@
         ]
     },
     {
-        "label": "target and trigger deleted for destroy_integration_instance event",
+        "label": "webhook and trigger deleted for destroy_integration_instance event",
         "http_mocks": {
-            "https://nyaruka.zendesk.com/api/v2/targets/15.json": [
+            "https://nyaruka.zendesk.com/api/v2/webhooks/15": [
                 {
                     "status": 200,
                     "body": ""
@@ -243,7 +243,7 @@
         },
         "db_assertions": [
             {
-                "query": "select count(*) from tickets_ticketer where config @> '{\"target_id\": \"15\", \"trigger_id\": \"23\"}'",
+                "query": "select count(*) from tickets_ticketer where config @> '{\"webhook_id\": \"15\", \"trigger_id\": \"23\"}'",
                 "count": 0
             },
             {

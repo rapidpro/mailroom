@@ -31,7 +31,7 @@ func TestEventCallback(t *testing.T) {
 	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
 
-func TestTarget(t *testing.T) {
+func TestWebhook(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
@@ -39,5 +39,5 @@ func TestTarget(t *testing.T) {
 	// create a zendesk ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "1234", time.Now(), nil)
 
-	web.RunWebTests(t, ctx, rt, "testdata/target.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
+	web.RunWebTests(t, ctx, rt, "testdata/webhook.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }

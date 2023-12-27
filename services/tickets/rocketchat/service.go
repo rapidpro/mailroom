@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
@@ -80,6 +81,16 @@ func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flow
 			Phone:       phone,
 		},
 		TicketID: string(ticket.UUID()),
+	}
+
+	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
+	extra := &struct {
+		Department   string            `json:"department"`
+		CustomFields map[string]string `json:"customFields"`
+	}{}
+	if err := jsonx.Unmarshal([]byte(body), extra); err == nil {
+		room.Visitor.Department = extra.Department
+		room.Visitor.CustomFields = extra.CustomFields
 	}
 
 	roomID, trace, err := s.client.CreateRoom(room)

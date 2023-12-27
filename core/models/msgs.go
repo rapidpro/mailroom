@@ -423,6 +423,9 @@ func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
 	if m.Topic() != flows.NilMsgTopic {
 		metadata["topic"] = string(m.Topic())
 	}
+	if m.TextLanguage != "" {
+		metadata["text_language"] = m.TextLanguage
+	}
 	return metadata
 }
 
@@ -567,6 +570,57 @@ func loadMessages(ctx context.Context, db Queryer, sql string, params ...interfa
 
 	for _, msg := range msgs {
 		msg.SetChannel(channelsByID[msg.m.ChannelID])
+	}
+
+	return msgs, nil
+}
+
+var selectContactMessagesSQL = `
+SELECT 
+	id,
+	broadcast_id,
+	uuid,
+	text,
+	created_on,
+	direction,
+	status,
+	visibility,
+	msg_count,
+	error_count,
+	next_attempt,
+	external_id,
+	attachments,
+	metadata,
+	channel_id,
+	contact_id,
+	contact_urn_id,
+	org_id,
+	topup_id
+FROM
+	msgs_msg
+WHERE
+	contact_id = $1 AND
+	created_on >= $2
+ORDER BY
+	id ASC`
+
+// SelectContactMessages loads the given messages for the passed in contact, created after the passed in time
+func SelectContactMessages(ctx context.Context, db Queryer, contactID int, after time.Time) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, selectContactMessagesSQL, contactID, after)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying msgs for contact: %d", contactID)
+	}
+	defer rows.Close()
+
+	msgs := make([]*Msg, 0)
+	for rows.Next() {
+		msg := &Msg{}
+		err = rows.StructScan(&msg.m)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning msg row")
+		}
+
+		msgs = append(msgs, msg)
 	}
 
 	return msgs, nil
@@ -1118,7 +1172,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 }
 
 func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
+	firstReply, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
 	if err != nil {
 		return err
 	}
@@ -1140,8 +1194,8 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 		return err
 	}
 
-	if firstReplySeconds >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplySeconds); err != nil {
+	if firstReply >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReply); err != nil {
 			return err
 		}
 	}

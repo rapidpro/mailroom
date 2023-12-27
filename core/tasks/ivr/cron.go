@@ -22,10 +22,10 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	start := time.Now()
 
 	// find all calls that need restarting
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 100)
+	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 200)
 	if err != nil {
 		return errors.Wrapf(err, "error loading calls to retry")
 	}
@@ -38,11 +38,11 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 		log = log.WithField("call_id", call.ID())
 
 		// if the channel for this call is throttled, move on
-		if throttledChannels[call.ChannelID()] {
+		/*if throttledChannels[call.ChannelID()] {
 			call.MarkThrottled(ctx, rt.DB, time.Now())
 			log.WithField("channel_id", call.ChannelID()).Info("skipping call, throttled")
 			continue
-		}
+		}*/
 
 		// load the org for this call
 		oa, err := models.GetOrgAssets(ctx, rt, call.OrgID())

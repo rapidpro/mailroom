@@ -1,0 +1,7 @@
+GET /v1/Channels/CH6442c09c93ba4d13966fa42e9b78f620 HTTP/1.1
+Host: flex-api.twilio.com
+User-Agent: Go-http-client/1.1
+Authorization: Basic QUM4MWQ0NDMxNWUxOTM3MjEzOGJkYWZmY2MxM2NmM2I5NDp0b2tlbg==
+Content-Type: application/x-www-form-urlencoded
+Accept-Encoding: gzip
+

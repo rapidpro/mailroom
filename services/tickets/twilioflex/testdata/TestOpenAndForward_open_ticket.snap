@@ -1,0 +1,8 @@
+POST /v2/Services/****************/Users/1234567 HTTP/1.1
+Host: chat.twilio.com
+User-Agent: Go-http-client/1.1
+Content-Length: 0
+Authorization: Basic QUM4MWQ0NDMxNWUxOTM3MjEzOGJkYWZmY2MxM2NmM2I5NDp0b2tlbg==
+Content-Type: application/x-www-form-urlencoded
+Accept-Encoding: gzip
+
