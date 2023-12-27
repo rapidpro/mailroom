@@ -66,4 +66,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-//replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.22.4-weni
+replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.33.1-weni

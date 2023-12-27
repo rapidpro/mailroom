@@ -35,6 +35,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20OEh60=
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
+github.com/Ilhasoft/gocommon v1.33.1-weni h1:3so8jFApBQpy+DdtyZzGvxTyrV2wy40u8C83BzkZ/Rg=
+github.com/Ilhasoft/gocommon v1.33.1-weni/go.mod h1:gusIA2aNC8EPB3ozlP4O0PaBiHUNq5+f1peRNvcn0DI=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/Shopify/gomail v0.0.0-20220729171026-0784ece65e69 h1:gPoXdwo3sKq8qcfMu/Nc/wkJMLKwe7kaG9Uo8tOj3cU=
@@ -224,8 +226,6 @@ github.com/naoina/toml v0.1.1 h1:PT/lllxVVN0gzzSqSlHEmP8MJB4MY2U7STGxiouV4X8=
 github.com/naoina/toml v0.1.1/go.mod h1:NBIhNtsFMo3G2szEBne+bO4gS192HuIYRqfvOWb4i1E=
 github.com/nyaruka/ezconf v0.2.1 h1:TDXWoqjqYya1uhou1mAJZg7rgFYL98EB0Tb3+BWtUh0=
 github.com/nyaruka/ezconf v0.2.1/go.mod h1:ey182kYkw2MIi4XiWe1FR/mzI33WCmTWuceDYYxgnQw=
-github.com/nyaruka/gocommon v1.33.1 h1:RUy1O5Ly4tAaQDDpahds8z+4uewwsXg6SNCH0hYm7pE=
-github.com/nyaruka/gocommon v1.33.1/go.mod h1:gusIA2aNC8EPB3ozlP4O0PaBiHUNq5+f1peRNvcn0DI=
 github.com/nyaruka/goflow v0.175.0 h1:ofrTm5qlf19oR1mjg8wFCmvNS9faFyDIQiFNs039kss=
 github.com/nyaruka/goflow v0.175.0/go.mod h1:C3Hj+jvJ2RY6w/ANx4zjcbVjYzd8gzOcryyPW2OEa8E=
 github.com/nyaruka/librato v1.0.0 h1:Vznj9WCeC1yZXbBYyYp40KnbmXLbEkjKmHesV/v2SR0=
