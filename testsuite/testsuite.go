@@ -197,7 +197,7 @@ DELETE FROM msgs_msg;
 DELETE FROM flows_flowrun;
 DELETE FROM flows_flowpathcount;
 DELETE FROM flows_flownodecount;
-DELETE FROM flows_flowruncount;
+DELETE FROM flows_flowrunstatuscount;
 DELETE FROM flows_flowcategorycount;
 DELETE FROM flows_flowsession;
 DELETE FROM flows_flowrevision WHERE flow_id >= 30000;

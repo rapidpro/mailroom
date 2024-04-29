@@ -199,7 +199,7 @@ func TestTwilioIVR(t *testing.T) {
 				`<Say>You said</Say>`,
 				`<Say>I hope hearing that makes you feel better. Good day and good bye.</Say>`,
 				`<Dial action=`,
-				`>2065551212</Dial>`,
+				`>+12065551212</Dial>`,
 			},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
@@ -364,7 +364,7 @@ func mockVonageHandler(w http.ResponseWriter, r *http.Request) {
 		} else if form.To[0].Number == "16055743333" {
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
-		} else if form.To[0].Number == "2065551212" {
+		} else if form.To[0].Number == "12065551212" {
 			// start of a transfer leg
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte(`{ "uuid": "Call3","status": "started","direction": "outbound","conversation_uuid": "Conversation3"}`))

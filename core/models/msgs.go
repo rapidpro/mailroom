@@ -418,7 +418,23 @@ func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
 		metadata["quick_replies"] = m.QuickReplies()
 	}
 	if m.Templating() != nil {
-		metadata["templating"] = m.Templating()
+		mLanguage, mCountry := m.Locale().ToParts()
+
+		// TODO once we're queuing messages with locale and courier is reading that, can just add templating directly
+		// without language and country
+		metadata["templating"] = struct {
+			Template  *assets.TemplateReference `json:"template"`
+			Language  envs.Language             `json:"language"`
+			Country   envs.Country              `json:"country"`
+			Variables []string                  `json:"variables,omitempty"`
+			Namespace string                    `json:"namespace"`
+		}{
+			Template:  m.Templating_.Template(),
+			Language:  mLanguage,
+			Country:   mCountry,
+			Variables: m.Templating().Variables(),
+			Namespace: m.Templating().Namespace(),
+		}
 	}
 	if m.Topic() != flows.NilMsgTopic {
 		metadata["topic"] = string(m.Topic())
@@ -1017,12 +1033,14 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 
 		// not found? try org default language
 		if t == nil {
-			t = trans[oa.Env().DefaultLanguage()]
+			lang = oa.Env().DefaultLanguage()
+			t = trans[lang]
 		}
 
 		// not found? use broadcast base language
 		if t == nil {
-			t = trans[b.BaseLanguage]
+			lang = b.BaseLanguage
+			t = trans[lang]
 		}
 
 		if t == nil {
@@ -1066,7 +1084,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, unsendableReason)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, envs.NewLocale(lang, envs.NilCountry), unsendableReason)
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
