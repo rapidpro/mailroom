@@ -16,7 +16,6 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
@@ -461,11 +460,8 @@ func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es [
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				urnCountry := envs.DeriveCountryFromTel(urn.Path())
-				msgLocale := envs.NewLocale(event.Msg.TextLanguage, urnCountry)
-
 				// only send locale if it's a supported say language for Twilio
-				msgLocaleCode := msgLocale.ToBCP47()
+				msgLocaleCode := event.Msg.Locale().ToBCP47()
 				if _, valid := supportedSayLanguages[msgLocaleCode]; !valid {
 					msgLocaleCode = ""
 				}

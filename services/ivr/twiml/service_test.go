@@ -48,21 +48,21 @@ func TestResponseForSprint(t *testing.T) {
 		{
 			// ivr msg, supported text language specified
 			events: []flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "eng", "")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "", "eng-US")),
 			},
 			expected: `<Response><Say language="en-US">Hi there</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg, unsupported text language specified
 			events: []flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Amakuru", "kin", "")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Amakuru", "", "kin")),
 			},
 			expected: `<Response><Say>Amakuru</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg with audio attachment, text language ignored
 			events: []flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "eng", "/recordings/foo.wav")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "/recordings/foo.wav", "eng-US")),
 			},
 			expected: `<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
 		},
