@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 // CommitNameChangesHook is our hook for name changes

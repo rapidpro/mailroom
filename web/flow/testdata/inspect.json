@@ -338,5 +338,29 @@
             "waiting_exits": [],
             "parent_refs": []
         }
+    },
+    {
+        "label": "inspect flow with invalid base language",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "org_id": 1,
+            "dependency_mapping": {},
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Invalid Flow",
+                "spec_version": "13.2.0",
+                "language": "base",
+                "type": "messaging",
+                "revision": 1,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": []
+            }
+        },
+        "status": 422,
+        "response": {
+            "error": "unable to read flow: field 'language' is not a valid language code"
+        }
     }
 ]

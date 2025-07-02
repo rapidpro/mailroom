@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/shopspring/decimal"
 )
 
 // AirtimeTransferID is the type for airtime transfer IDs
-type AirtimeTransferID null.Int
+type AirtimeTransferID int
 
 // NilAirtimeTransferID is the nil value for airtime transfer IDs
 var NilAirtimeTransferID = AirtimeTransferID(0)
@@ -88,22 +88,7 @@ func InsertAirtimeTransfers(ctx context.Context, db Queryer, transfers []*Airtim
 	return BulkQuery(ctx, "inserted airtime transfers", db, sqlInsertAirtimeTransfers, ts)
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i AirtimeTransferID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *AirtimeTransferID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i AirtimeTransferID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *AirtimeTransferID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *AirtimeTransferID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i AirtimeTransferID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *AirtimeTransferID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i AirtimeTransferID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

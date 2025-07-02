@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -28,6 +27,10 @@ func init() {
 type PopulateDynamicGroupTask struct {
 	GroupID models.GroupID `json:"group_id"`
 	Query   string         `json:"query"`
+}
+
+func (t *PopulateDynamicGroupTask) Type() string {
+	return TypePopulateDynamicGroup
 }
 
 // Timeout is the maximum amount of time the task can run for
@@ -58,7 +61,7 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}
 
-	count, err := search.PopulateSmartGroup(ctx, rt.DB, rt.ES, oa, t.GroupID, t.Query)
+	count, err := search.PopulateSmartGroup(ctx, rt, rt.ES, oa, t.GroupID, t.Query)
 	if err != nil {
 		return errors.Wrapf(err, "error populating smart group: %d", t.GroupID)
 	}

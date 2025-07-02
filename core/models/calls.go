@@ -7,12 +7,12 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 )
 
 // CallID is the type for call IDs
-type CallID null.Int
+type CallID int
 
 // NilCallID is the nil value for call IDs
 const NilCallID = CallID(0)
@@ -420,7 +420,12 @@ func BulkUpdateCallStatuses(ctx context.Context, db Queryer, callIDs []CallID, s
 
 func (c *Call) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) error {
 	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
-	return errors.Wrap(err, "error attaching log to call")
+	if err != nil {
+		return errors.Wrap(err, "error attaching log to call")
+	}
+
+	clog.attached = true
+	return nil
 }
 
 // ActiveCallCount returns the number of ongoing calls for the passed in channel
@@ -433,22 +438,7 @@ func ActiveCallCount(ctx context.Context, db Queryer, id ChannelID) (int, error)
 	return count, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i CallID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *CallID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i CallID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *CallID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *CallID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i CallID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *CallID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i CallID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

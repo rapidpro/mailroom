@@ -2,174 +2,112 @@ package msgs
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/search"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
+	// TypeSendBroadcast is the task type for sending a broadcast
+	TypeSendBroadcast = "send_broadcast"
+
 	startBatchSize = 100
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.SendBroadcast, handleSendBroadcast)
-	mailroom.AddTaskFunction(queue.SendBroadcastBatch, handleSendBroadcastBatch)
+	tasks.RegisterType(TypeSendBroadcast, func() tasks.Task { return &SendBroadcastTask{} })
 }
 
-// handleSendBroadcast creates all the batches of contacts that need to be sent to
-func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
-	defer cancel()
-
-	// decode our task body
-	if task.Type != queue.SendBroadcast {
-		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
-	}
-	broadcast := &models.Broadcast{}
-	err := json.Unmarshal(task.Task, broadcast)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
-	}
-
-	return CreateBroadcastBatches(ctx, rt, broadcast)
+// SendBroadcastTask is the task send broadcasts
+type SendBroadcastTask struct {
+	*models.Broadcast
 }
 
-// CreateBroadcastBatches takes our master broadcast and creates batches of broadcast sends for all the unique contacts
-func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
-	// we are building a set of contact ids, start with the explicit ones
-	contactIDs := make(map[models.ContactID]bool)
-	for _, id := range bcast.ContactIDs() {
-		contactIDs[id] = true
-	}
+func (t *SendBroadcastTask) Type() string {
+	return TypeSendBroadcast
+}
 
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, bcast.GroupIDs())
-	for _, id := range groupContactIDs {
-		contactIDs[id] = true
-	}
+// Timeout is the maximum amount of time the task can run for
+func (t *SendBroadcastTask) Timeout() time.Duration {
+	return time.Minute * 60
+}
 
-	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
-	if err != nil {
-		return errors.Wrapf(err, "error getting org assets")
-	}
-
-	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, bcast.URNs())
-	if err != nil {
-		return errors.Wrapf(err, "error getting contact ids for urns")
-	}
-
-	urnContacts := make(map[models.ContactID]urns.URN)
-	repeatedContacts := make(map[models.ContactID]urns.URN)
-
-	q := queue.BatchQueue
-
-	// two or fewer contacts? queue to our handler queue for sending
-	if len(contactIDs) <= 2 {
-		q = queue.HandlerQueue
-	}
-
-	// we want to remove contacts that are also present in URN sends, these will be a special case in our last batch
-	for u, id := range urnMap {
-		if contactIDs[id] {
-			repeatedContacts[id] = u
-			delete(contactIDs, id)
-		}
-		urnContacts[id] = u
-	}
-
-	rc := rt.RP.Get()
-	defer rc.Close()
-
-	contacts := make([]models.ContactID, 0, 100)
-
-	// utility functions for queueing the current set of contacts
-	queueBatch := func(isLast bool) {
-		// if this is our last batch include those contacts that overlap with our urns
-		if isLast {
-			for id := range repeatedContacts {
-				contacts = append(contacts, id)
-			}
+// Perform handles sending the broadcast by creating batches of broadcast sends for all the unique contacts
+func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	if err := createBroadcastBatches(ctx, rt, t.Broadcast); err != nil {
+		if t.Broadcast.ID != models.NilBroadcastID {
+			models.MarkBroadcastFailed(ctx, rt.DB, t.Broadcast.ID)
 		}
 
-		batch := bcast.CreateBatch(contacts)
-
-		// also set our URNs
-		if isLast {
-			batch.IsLast = true
-			batch.URNs = urnContacts
+		// if error is user created query error.. don't escalate error to sentry
+		isQueryError, _ := contactql.IsQueryError(err)
+		if !isQueryError {
+			return err
 		}
-
-		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID()), batch, queue.DefaultPriority)
-		if err != nil {
-			logrus.WithError(err).Error("error while queuing broadcast batch")
-		}
-		contacts = make([]models.ContactID, 0, 100)
 	}
-
-	// build up batches of contacts to start
-	for c := range contactIDs {
-		if len(contacts) == startBatchSize {
-			queueBatch(false)
-		}
-		contacts = append(contacts, c)
-	}
-
-	// queue our last batch
-	queueBatch(true)
 
 	return nil
 }
 
-// handleSendBroadcastBatch sends our messages
-func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
-	defer cancel()
-
-	// decode our task body
-	if task.Type != queue.SendBroadcastBatch {
-		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
-	}
-	broadcast := &models.BroadcastBatch{}
-	err := json.Unmarshal(task.Task, broadcast)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
-	}
-
-	// try to send the batch
-	return SendBroadcastBatch(ctx, rt, broadcast)
-}
-
-// SendBroadcastBatch sends the passed in broadcast batch
-func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.BroadcastBatch) error {
-	// always set our broadcast as sent if it is our last
-	defer func() {
-		if bcast.IsLast {
-			err := models.MarkBroadcastSent(ctx, rt.DB, bcast.BroadcastID)
-			if err != nil {
-				logrus.WithError(err).Error("error marking broadcast as sent")
-			}
-		}
-	}()
-
+func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
 	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	// create this batch of messages
-	msgs, err := bcast.CreateMessages(ctx, rt, oa)
+	contactIDs, err := search.ResolveRecipients(ctx, rt, oa, nil, &search.Recipients{
+		ContactIDs:      bcast.ContactIDs,
+		GroupIDs:        bcast.GroupIDs,
+		URNs:            bcast.URNs,
+		Query:           string(bcast.Query),
+		ExcludeGroupIDs: nil,
+	}, -1)
 	if err != nil {
-		return errors.Wrapf(err, "error creating broadcast messages")
+		return errors.Wrap(err, "error resolving broadcast recipients")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	// if there are no contacts to send to, mark our broadcast as sent, we are done
+	if len(contactIDs) == 0 {
+		if bcast.ID != models.NilBroadcastID {
+			err = models.MarkBroadcastSent(ctx, rt.DB, bcast.ID)
+			if err != nil {
+				return errors.Wrapf(err, "error marking broadcast as sent")
+			}
+		}
+		return nil
+	}
+
+	// two or fewer contacts? queue to our handler queue for sending
+	q := queue.BatchQueue
+	if len(contactIDs) <= 2 {
+		q = queue.HandlerQueue
+	}
+
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	// create tasks for batches of contacts
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
+	for i, idBatch := range idBatches {
+		isLast := (i == len(idBatches)-1)
+
+		batch := bcast.CreateBatch(idBatch, isLast)
+		err = tasks.Queue(rc, q, bcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, queue.DefaultPriority)
+		if err != nil {
+			if i == 0 {
+				return errors.Wrap(err, "error queuing broadcast batch")
+			}
+			// if we've already queued other batches.. we don't want to error and have the task be retried
+			logrus.WithError(err).Error("error queuing broadcast batch")
+		}
+	}
+
 	return nil
 }

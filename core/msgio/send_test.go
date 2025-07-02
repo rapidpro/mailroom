@@ -28,7 +28,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 		status = models.MsgStatusFailed
 	}
 
-	flowMsg := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
+	flowMsg := testdata.InsertOutgoingMsg(rt, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
 	msgs, err := models.GetMessagesByID(context.Background(), rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg.ID())})
 	require.NoError(t, err)
 
@@ -43,8 +43,8 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 }
 
 func TestSendMessages(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetData)
@@ -55,9 +55,9 @@ func TestSendMessages(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Andoid channels
-	androidChannel1 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
-	androidChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
-	testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
+	androidChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
+	androidChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
+	testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -67,14 +67,14 @@ func TestSendMessages(t *testing.T) {
 		Msgs            []msgSpec
 		QueueSizes      map[string][]int
 		FCMTokensSynced []string
-		PendingMsgs     int
+		UnqueuedMsgs    int
 	}{
 		{
 			Description:     "no messages",
 			Msgs:            []msgSpec{},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "2 messages for Courier, and 1 Android",
@@ -102,7 +102,7 @@ func TestSendMessages(t *testing.T) {
 				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // 1 high priority message for Bob
 			},
 			FCMTokensSynced: []string{"FCMID1"},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "each Android channel synced once",
@@ -122,7 +122,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{"FCMID1", "FCMID2"},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "messages with FAILED status ignored",
@@ -135,7 +135,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     0,
+			UnqueuedMsgs:    0,
 		},
 		{
 			Description: "messages without channels set to PENDING",
@@ -147,7 +147,7 @@ func TestSendMessages(t *testing.T) {
 			},
 			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
-			PendingMsgs:     1,
+			UnqueuedMsgs:    1,
 		},
 	}
 
@@ -160,7 +160,7 @@ func TestSendMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, rt, db, fc, msgs)
+		msgio.SendMessages(ctx, rt, rt.DB, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
@@ -172,6 +172,6 @@ func TestSendMessages(t *testing.T) {
 
 		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'I'`).Returns(tc.UnqueuedMsgs, `initializing messages mismatch in '%s'`, tc.Description)
 	}
 }

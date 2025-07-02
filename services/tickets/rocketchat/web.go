@@ -20,7 +20,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/rocketchat"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleEventCallback))
+	web.RegisterRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}", web.MarshaledResponse(web.WithHTTPLogs(handleEventCallback)))
 }
 
 type eventCallbackRequest struct {
@@ -37,7 +37,7 @@ type agentMessageData struct {
 	} `json:"attachments"`
 }
 
-func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up ticketer

@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
 )
@@ -181,22 +182,24 @@ func (w *Worker) handleTask(task *queue.Task) {
 	log.Info("starting handling of task")
 	start := time.Now()
 
-	taskFunc, found := taskFunctions[task.Type]
-	if found {
-		err := taskFunc(context.Background(), w.foreman.rt, task)
-		if err != nil {
-			log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
-		}
-	} else {
-		log.Error("unable to find function for task type")
+	if err := PerformTask(w.foreman.rt, task); err != nil {
+		log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
 	}
 
 	elapsed := time.Since(start)
-
 	log.WithField("elapsed", elapsed).Info("task complete")
 
 	// additionally if any task took longer than 1 minute, log as warning
 	if elapsed > time.Minute {
 		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
 	}
+}
+
+func PerformTask(rt *runtime.Runtime, t *queue.Task) error {
+	taskFunc, found := taskFunctions[t.Type]
+	if !found {
+		return errors.Errorf("unable to find handler for task type %s", t.Type)
+	}
+
+	return taskFunc(context.Background(), rt, t)
 }

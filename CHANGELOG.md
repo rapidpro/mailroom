@@ -1,3 +1,306 @@
+v8.2.0 (2023-07-31)
+-------------------------
+ * Add dockerfile for dev
+
+v8.1.66 (2023-07-20)
+-------------------------
+ * Update deps including gocommon which changes requirement for storage paths to start with slash
+
+v8.1.65 (2023-07-18)
+-------------------------
+ * Limit how old surveyor submissions can be
+
+v8.1.64 (2023-07-10)
+-------------------------
+ * Update goflow
+
+v8.1.63 (2023-07-03)
+-------------------------
+ * Support requesting recordings for Twilio with basic auth
+
+v8.1.62 (2023-06-29)
+-------------------------
+ * Fix session storage path generation
+
+v8.1.61 (2023-06-28)
+-------------------------
+ * Write channel logs with channels/ key prefex
+
+v8.1.60 (2023-06-28)
+-------------------------
+ * Tweak channel log creation to prevent nil slices
+
+v8.1.59 (2023-06-28)
+-------------------------
+ * Update README
+
+v8.1.58 (2023-06-28)
+-------------------------
+ * Rename sessions bucket config setting for clarity and remove unused sessions prefix setting
+ * Write attached call logs only to S3
+
+v8.1.57 (2023-06-20)
+-------------------------
+ * Fix redaction of twiml IVR channel logs
+
+v8.1.56 (2023-06-08)
+-------------------------
+ * Support importing of contacts with non-active statuses
+ * Use the user that created an import when applying its modifiers
+
+v8.1.55 (2023-06-05)
+-------------------------
+ * Stop writing ChannelLog.call
+ * Stop returning sample contacts on preview endpoints which now only need to return total count
+
+v8.1.54 (2023-05-25)
+-------------------------
+ * Add endpoint to generate broadcast preview
+
+v8.1.53 (2023-05-25)
+-------------------------
+ * Rework firing campaign events so that skipping happens outside of runner
+
+v8.1.52 (2023-05-24)
+-------------------------
+ * Update to latest goflow
+
+v8.1.51 (2023-05-24)
+-------------------------
+ * Remove applying started-previously exclusion in runner now that it's applied at batch creation stage
+ * Refresh elastic indexes after changes in tests instead of waiting for a second
+ * Optimize case when recipients is only specific contacts and no exclusions
+ * Rework ResolveRecipients to use elastic
+
+v8.1.50 (2023-05-23)
+-------------------------
+ * Remove support for passing URNs to flow/preview_start as that's not a thing we do
+ * Make the name of the ES index for contacts configurable
+
+v8.1.49 (2023-05-18)
+-------------------------
+ * Remove support for ticket assignment with a note
+ * Add contact/bulk_create endpoint
+
+v8.1.48 (2023-05-15)
+-------------------------
+ * Fix loading of scheduled triggers
+ * Update test database
+
+v8.1.47 (2023-05-11)
+-------------------------
+ * Still queue a courier message even if fetching the flow fails
+ * Stop writing old FlowStart fields
+
+v8.1.46 (2023-05-10)
+-------------------------
+ * Update to latest null library
+ * Read from new flow start fields
+
+v8.1.45 (2023-05-09)
+-------------------------
+ * Always write new FlowStart fields
+ * Flow start batches should read from exclusions and remove legacy fields
+
+v8.1.44 (2023-05-08)
+-------------------------
+ * Start writing exclusions blob on start batch tasks
+
+v8.1.43 (2023-05-08)
+-------------------------
+ * Add contact locking to ticket/reopen endpoint
+
+v8.1.42 (2023-05-03)
+-------------------------
+ * Update to latest goflow which fixes parsing locations with non-ASCII chars
+
+v8.1.41 (2023-05-01)
+-------------------------
+ * Add contact locking to modify endpoint
+
+v8.1.40 (2023-05-01)
+-------------------------
+ * Add context paramter to LockContacts so it can error if context is done
+
+v8.1.39 (2023-04-27)
+-------------------------
+ * Refactor how we lock and unlock contacts
+
+v8.1.38 (2023-04-27)
+-------------------------
+ * Handled incoming messages should be associated with any open ticket
+ * Only load the last opened open ticket for a contact
+
+v8.1.37 (2023-04-20)
+-------------------------
+ * Add contact/inspect endpoint to return all URNs with channel if there is one
+
+v8.1.36 (2023-04-19)
+-------------------------
+ * Fix not queuing chat messages as high priority and add contact_last_seen_on
+ * Use services for github actions
+
+v8.1.35 (2023-04-18)
+-------------------------
+ * Fix goreleaser changelog generation and use latest action
+
+v8.1.34 (2023-04-17)
+-------------------------
+ * Add ticket_id to msg and use to set origin on messages queued to courier
+ * Remove fields from courier payload that it doesn't use
+
+v8.1.33 (2023-04-13)
+-------------------------
+ * Use envelope struct for marshalling courier messages and remove unused fields
+
+v8.1.32 (2023-04-03)
+-------------------------
+ * Fix not logging bodies of incoming IVR requests
+
+v8.1.31 (2023-03-16)
+-------------------------
+ * Remove no longer used exit type constants
+ * Remove support for broadcasts with an associated ticket
+
+v8.1.30 (2023-03-14)
+-------------------------
+ * Bump courier http client timeout
+ * Use Org.config and Channel.config as JSONB columns
+ * Fix YYYY-MM-DD date formats
+
+v8.1.29 (2023-03-13)
+-------------------------
+ * Don't set msg_type when handling messages as courier is already setting it
+
+v8.1.28 (2023-03-08)
+-------------------------
+ * Remove msg_type values INBOX and FLOW
+ * Re-organize web endpoints so each endpoint is in its own file
+
+v8.1.27 (2023-03-06)
+-------------------------
+ * Add Msg.created_by and populate for chat and broadcast messages
+
+v8.1.26 (2023-02-27)
+-------------------------
+ * Update goflow
+ * Improve detection of repeated outgoing messages
+
+v8.1.25 (2023-02-22)
+-------------------------
+ * Support Msg.status = I for outgoing messages that should be retried
+
+v8.1.24 (2023-02-22)
+-------------------------
+ * Update to latest goflow
+
+v8.1.23 (2023-02-20)
+-------------------------
+ * Use msg_type = T|V for outgoing messages
+
+v8.1.22 (2023-02-16)
+-------------------------
+ * Use generics to remove repeated code in server endpoints
+
+v8.1.21 (2023-02-15)
+-------------------------
+ * Cleanup server and http wrappers
+
+v8.1.20 (2023-02-15)
+-------------------------
+ * Add endpoint to send a single message
+ * Cleanup broadcasts and starts
+ * Update test database
+
+v8.1.19 (2023-02-13)
+-------------------------
+ * Stop writing Broadcast.send_all
+
+v8.1.18 (2023-02-13)
+-------------------------
+ * Update to latest goflow
+ * Support contact query based broadcasts by consolidating broadcast and flow start task code
+ * Remove support for sending broadcasts to specific URNs
+
+v8.1.17 (2023-02-09)
+-------------------------
+ * Update how we create messages from broadcasts and resolve translations
+
+v8.1.16 (2023-02-07)
+-------------------------
+ * Update to latest goflow
+
+v8.1.15 (2023-02-07)
+-------------------------
+ * Refactor so that web doesn't import testsuite
+ * Test queuing and popping of start flow tasks
+ * Convert FlowStart to basic struct for simpler marshalling etc
+
+v8.1.14 (2023-02-06)
+-------------------------
+ * Simplify FlowStartBatch
+
+v8.1.13 (2023-02-06)
+-------------------------
+ * Fix unmarshalling start tasks
+
+v8.1.12 (2023-02-06)
+-------------------------
+ * Refactor tasks
+
+v8.1.11 (2023-02-02)
+-------------------------
+ * Stop writing quick replies to metadata and fix not writing them to the db
+
+v8.1.10 (2023-02-02)
+-------------------------
+ * Fix test
+
+v8.1.9 (2023-02-02)
+-------------------------
+ * Update to latest goflow which updates ANTLR
+ * Ensure quick replies are included with retries and resends
+
+v8.1.8 (2023-02-02)
+-------------------------
+ * Start writing Msg.quick_replies as well as writing them to Msg.metadata
+
+v8.1.7 (2023-02-01)
+-------------------------
+ * Don't send machine_detection param to Nexmo if empty
+
+v8.1.6 (2023-02-01)
+-------------------------
+ * Update to nyaruka/null v2 and validator v10
+
+v8.1.5 (2023-01-31)
+-------------------------
+ * Rework more task types to use tasks package
+ * Stop adding language and country to msg.metadata.templating
+
+v8.1.4 (2023-01-26)
+-------------------------
+ * Start writing msgs_msg.locale
+
+v8.1.3 (2023-01-24)
+-------------------------
+ * Update test database
+ * Stop writing msgs_broadcast.text
+
+v8.1.2 (2023-01-24)
+-------------------------
+ * Stop reading from Broadcast.text
+
+v8.1.1 (2023-01-19)
+-------------------------
+ * Write new translations JSONB column when saving child broadcasts
+ * Remove support for legacy expressions in broadcasts
+
+v8.1.0 (2023-01-18)
+-------------------------
+ * Update to latest goflow which moves to flow spec version 13.2
+ * Tweak fetching contacts eligible for a new campaign event
+
 v8.0.0 (2023-01-09)
 -------------------------
  * Update test database to latest schema

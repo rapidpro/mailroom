@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 type TicketEventID int
@@ -29,7 +29,7 @@ type TicketEvent struct {
 		TicketID    TicketID        `json:"ticket_id"               db:"ticket_id"`
 		EventType   TicketEventType `json:"event_type"              db:"event_type"`
 		Note        null.String     `json:"note,omitempty"          db:"note"`
-		TopicID     TopicID         `json:"topic_id,omitempty"   db:"topic_id"`
+		TopicID     TopicID         `json:"topic_id,omitempty"      db:"topic_id"`
 		AssigneeID  UserID          `json:"assignee_id,omitempty"   db:"assignee_id"`
 		CreatedByID UserID          `json:"created_by_id,omitempty" db:"created_by_id"`
 		CreatedOn   time.Time       `json:"created_on"              db:"created_on"`
@@ -40,8 +40,8 @@ func NewTicketOpenedEvent(t *Ticket, userID UserID, assigneeID UserID) *TicketEv
 	return newTicketEvent(t, userID, TicketEventTypeOpened, "", NilTopicID, assigneeID)
 }
 
-func NewTicketAssignedEvent(t *Ticket, userID UserID, assigneeID UserID, note string) *TicketEvent {
-	return newTicketEvent(t, userID, TicketEventTypeAssigned, note, NilTopicID, assigneeID)
+func NewTicketAssignedEvent(t *Ticket, userID UserID, assigneeID UserID) *TicketEvent {
+	return newTicketEvent(t, userID, TicketEventTypeAssigned, "", NilTopicID, assigneeID)
 }
 
 func NewTicketNoteAddedEvent(t *Ticket, userID UserID, note string) *TicketEvent {

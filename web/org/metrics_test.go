@@ -11,20 +11,19 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMetrics(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	promToken := "2d26a50841ff48237238bbdd021150f6a33a4196"
-	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 12, 1);`, testdata.Org1.ID, promToken)
+	rt.DB.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 12, 1);`, testdata.Org1.ID, promToken)
 
 	adminToken := "5c26a50841ff48237238bbdd021150f6a33a4199"
-	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, testdata.Org1.ID, adminToken)
+	rt.DB.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, testdata.Org1.ID, adminToken)
 
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, rt, wg)

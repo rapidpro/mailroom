@@ -24,6 +24,10 @@ type InterruptSessionsTask struct {
 	FlowIDs    []models.FlowID    `json:"flow_ids,omitempty"`
 }
 
+func (t *InterruptSessionsTask) Type() string {
+	return TypeInterruptSessions
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *InterruptSessionsTask) Timeout() time.Duration {
 	return time.Hour

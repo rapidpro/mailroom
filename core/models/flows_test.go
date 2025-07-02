@@ -15,16 +15,16 @@ import (
 )
 
 func TestLoadFlows(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
-	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": -1}'::json WHERE id = $1`, testdata.SurveyorFlow.ID)
-	db.MustExec(`UPDATE flows_flow SET expires_after_minutes = 720 WHERE id = $1`, testdata.Favorites.ID)
-	db.MustExec(`UPDATE flows_flow SET expires_after_minutes = 1 WHERE id = $1`, testdata.PickANumber.ID)          // too small for messaging
-	db.MustExec(`UPDATE flows_flow SET expires_after_minutes = 12345678 WHERE id = $1`, testdata.SingleMessage.ID) // too large for messaging
-	db.MustExec(`UPDATE flows_flow SET expires_after_minutes = 123 WHERE id = $1`, testdata.SurveyorFlow.ID)       // surveyor flows shouldn't have expires
+	rt.DB.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
+	rt.DB.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": -1}'::json WHERE id = $1`, testdata.SurveyorFlow.ID)
+	rt.DB.MustExec(`UPDATE flows_flow SET expires_after_minutes = 720 WHERE id = $1`, testdata.Favorites.ID)
+	rt.DB.MustExec(`UPDATE flows_flow SET expires_after_minutes = 1 WHERE id = $1`, testdata.PickANumber.ID)          // too small for messaging
+	rt.DB.MustExec(`UPDATE flows_flow SET expires_after_minutes = 12345678 WHERE id = $1`, testdata.SingleMessage.ID) // too large for messaging
+	rt.DB.MustExec(`UPDATE flows_flow SET expires_after_minutes = 123 WHERE id = $1`, testdata.SurveyorFlow.ID)       // surveyor flows shouldn't have expires
 
 	sixtyMinutes := 60 * time.Minute
 	thirtyMinutes := 30 * time.Minute
@@ -115,33 +115,33 @@ func TestLoadFlows(t *testing.T) {
 
 	for _, tc := range tcs {
 		// test loading by UUID
-		dbFlow, err := models.LoadFlowByUUID(ctx, db, tc.org.ID, tc.uuid)
+		dbFlow, err := models.LoadFlowByUUID(ctx, rt.DB, tc.org.ID, tc.uuid)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 
 		// test loading by name
-		dbFlow, err = models.LoadFlowByName(ctx, db, tc.org.ID, tc.name)
+		dbFlow, err = models.LoadFlowByName(ctx, rt.DB, tc.org.ID, tc.name)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 
 		// test loading by ID
-		dbFlow, err = models.LoadFlowByID(ctx, db, tc.org.ID, tc.id)
+		dbFlow, err = models.LoadFlowByID(ctx, rt.DB, tc.org.ID, tc.id)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 	}
 
 	// test loading flow with wrong org
-	dbFlow, err := models.LoadFlowByID(ctx, db, testdata.Org2.ID, testdata.Favorites.ID)
+	dbFlow, err := models.LoadFlowByID(ctx, rt.DB, testdata.Org2.ID, testdata.Favorites.ID)
 	assert.NoError(t, err)
 	assert.Nil(t, dbFlow)
 }
 
 func TestFlowIDForUUID(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	org, _ := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 
 	id, err := models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
@@ -152,7 +152,7 @@ func TestFlowIDForUUID(t *testing.T) {
 	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Favorites.ID)
 	tx.Commit()
 
-	tx, err = db.BeginTxx(ctx, nil)
+	tx, err = rt.DB.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 	defer tx.Rollback()
 

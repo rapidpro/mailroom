@@ -10,13 +10,11 @@ import (
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
 	"github.com/pkg/errors"
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.JSONPayload(handleSearch)))
 }
 
 // Searches the contacts for an org
@@ -52,7 +50,7 @@ type searchRequest struct {
 //	    "allow_as_group": true
 //	  }
 //	}
-type searchResponse struct {
+type SearchResponse struct {
 	Query      string                `json:"query"`
 	ContactIDs []models.ContactID    `json:"contact_ids"`
 	Total      int64                 `json:"total"`
@@ -62,38 +60,23 @@ type searchResponse struct {
 }
 
 // handles a contact search request
-func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
-	request := &searchRequest{
-		Offset:   0,
-		PageSize: 50,
-		Sort:     "-id",
-	}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
+func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, r.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	var group *models.Group
-	if request.GroupID != 0 {
-		group = oa.GroupByID(request.GroupID)
-	} else if request.GroupUUID != "" {
-		group = oa.GroupByUUID(request.GroupUUID)
-	}
+	group := oa.GroupByID(r.GroupID)
 
 	// perform our search
-	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
+	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
 			return qerr, http.StatusBadRequest, nil
 		}
-		return nil, http.StatusInternalServerError, err
+		return nil, 0, err
 	}
 
 	// normalize and inspect the query
@@ -106,104 +89,13 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// build our response
-	response := &searchResponse{
+	response := &SearchResponse{
 		Query:      normalized,
 		ContactIDs: hits,
 		Total:      total,
-		Offset:     request.Offset,
-		Sort:       request.Sort,
+		Offset:     r.Offset,
+		Sort:       r.Sort,
 		Metadata:   metadata,
-	}
-
-	return response, http.StatusOK, nil
-}
-
-// Request to parse the passed in query
-//
-//	{
-//	  "org_id": 1,
-//	  "query": "age > 10",
-//	  "group_id": 234
-//	}
-type parseRequest struct {
-	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
-	Query     string           `json:"query"      validate:"required"`
-	ParseOnly bool             `json:"parse_only"`
-	GroupID   models.GroupID   `json:"group_id"`
-	GroupUUID assets.GroupUUID `json:"group_uuid"` // deprecated
-}
-
-// Response for a parse query request
-//
-//	{
-//	  "query": "age > 10",
-//	  "elastic_query": { .. },
-//	  "metadata": {
-//	    "fields": [
-//	      {"key": "age", "name": "Age"}
-//	    ],
-//	    "allow_as_group": true
-//	  }
-//	}
-type parseResponse struct {
-	Query        string                `json:"query"`
-	ElasticQuery interface{}           `json:"elastic_query"`
-	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
-}
-
-// handles a query parsing request
-func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
-	request := &parseRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
-	}
-
-	var group *models.Group
-	if request.GroupID != 0 {
-		group = oa.GroupByID(request.GroupID)
-	} else if request.GroupUUID != "" {
-		group = oa.GroupByUUID(request.GroupUUID)
-	}
-
-	env := oa.Env()
-	var resolver contactql.Resolver
-	if !request.ParseOnly {
-		resolver = oa.SessionAssets()
-	}
-
-	parsed, err := contactql.ParseQuery(env, request.Query, resolver)
-	if err != nil {
-		isQueryError, qerr := contactql.IsQueryError(err)
-		if isQueryError {
-			return qerr, http.StatusBadRequest, nil
-		}
-		return nil, http.StatusInternalServerError, err
-	}
-
-	// normalize and inspect the query
-	normalized := parsed.String()
-	metadata := contactql.Inspect(parsed)
-
-	var elasticSource interface{}
-	if !request.ParseOnly {
-		eq := search.BuildElasticQuery(oa, group, models.NilContactStatus, nil, parsed)
-		elasticSource, err = eq.Source()
-		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error getting elastic source")
-		}
-	}
-
-	// build our response
-	response := &parseResponse{
-		Query:        normalized,
-		ElasticQuery: elasticSource,
-		Metadata:     metadata,
 	}
 
 	return response, http.StatusOK, nil

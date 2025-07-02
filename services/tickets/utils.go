@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -19,7 +20,6 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 )
 
@@ -85,6 +85,17 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
 
+	// load the contact and generate as a flow contact
+	c, err := models.LoadContact(ctx, rt.DB, oa, ticket.ContactID())
+	if err != nil {
+		return nil, errors.Wrap(err, "error loading contact")
+	}
+
+	contact, err := c.FlowContact(oa)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating flow contact")
+	}
+
 	// upload files to create message attachments
 	attachments := make([]utils.Attachment, len(files))
 	for i, file := range files {
@@ -96,20 +107,23 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 		}
 	}
 
-	// build a simple translation
-	base := &models.BroadcastTranslation{Text: text, Attachments: attachments}
-	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
-
-	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID(), models.NilUserID)
-	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := batch.CreateMessages(ctx, rt, oa)
+	out, ch := models.NewMsgOut(oa, contact, text, attachments, nil, contact.Locale(oa.Env()))
+	msg, err := models.NewOutgoingTicketMsg(rt, oa.Org(), ch, contact, out, dates.Now(), ticket.ID(), models.NilUserID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating message batch")
+		return nil, errors.Wrap(err, "error creating outgoing message")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
-	return msgs[0], nil
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting outgoing message")
+	}
+
+	if err := models.RecordTicketReply(ctx, rt.DB, oa, ticket.ID(), models.NilUserID); err != nil {
+		return nil, errors.Wrap(err, "error recording ticket reply")
+	}
+
+	msgio.SendMessages(ctx, rt, rt.DB, nil, []*models.Msg{msg})
+	return msg, nil
 }
 
 var retries = httpx.NewFixedRetries(time.Second*5, time.Second*10)

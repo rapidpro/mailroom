@@ -26,7 +26,7 @@ import (
 )
 
 func TestWebhookCalled(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -44,13 +44,13 @@ func TestWebhookCalled(t *testing.T) {
 	}))
 
 	// add a few resthooks
-	db.MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'foo', 1, NOW(), NOW(), 1, 1);`)
-	db.MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'bar', 1, NOW(), NOW(), 1, 1);`)
+	rt.DB.MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'foo', 1, NOW(), NOW(), 1, 1);`)
+	rt.DB.MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'bar', 1, NOW(), NOW(), 1, 1);`)
 
 	// and a few targets
-	db.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/', 1, 1, 1);`)
-	db.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 2);`)
-	db.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 1);`)
+	rt.DB.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/', 1, 1, 1);`)
+	rt.DB.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 2);`)
+	rt.DB.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 1);`)
 
 	tcs := []handlers.TestCase{
 		{
@@ -116,8 +116,9 @@ func (s *failingWebhookService) Call(request *http.Request) (*flows.WebhookCall,
 }
 
 func TestUnhealthyWebhookCalls(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
@@ -128,13 +129,13 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	flowDef, err := os.ReadFile("testdata/webhook_flow.json")
 	require.NoError(t, err)
 
-	testdata.InsertFlow(db, testdata.Org1, flowDef)
+	testdata.InsertFlow(rt, testdata.Org1, flowDef)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	env := envs.NewBuilder().Build()
-	_, cathy := testdata.Cathy.Load(db, oa)
+	_, cathy := testdata.Cathy.Load(rt, oa)
 
 	// webhook service with a 2 second delay
 	svc := &failingWebhookService{delay: 2 * time.Second}
@@ -168,7 +169,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	total, _ = unhealthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
 	assert.Equal(t, int64(9), total)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
 
 	// however 1 more bad call means this node is considered unhealthy
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
@@ -179,17 +180,17 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	assert.Equal(t, int64(10), total)
 
 	// and now we have an incident
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
 
 	var incidentID models.IncidentID
-	db.Get(&incidentID, `SELECT id FROM notifications_incident`)
+	rt.DB.Get(&incidentID, `SELECT id FROM notifications_incident`)
 
 	// and a record of the nodes
-	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	assertredis.SMembers(t, rt.RP, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 
 	// another bad call won't create another incident..
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
-	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
+	assertredis.SMembers(t, rt.RP, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 }

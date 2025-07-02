@@ -21,7 +21,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -114,12 +114,11 @@ func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExterna
 func (s *Session) Scene() *Scene                      { return s.scene }
 
 // StoragePath returns the path for the session
-func (s *Session) StoragePath(cfg *runtime.Config) string {
+func (s *Session) StoragePath() string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
-	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/20060102T150405.123Z_session_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
+	// example output: orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/20060102T150405.123Z_session_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
 	return path.Join(
-		cfg.S3SessionPrefix,
 		"orgs",
 		fmt.Sprintf("%d", s.OrgID()),
 		"c",
@@ -803,7 +802,7 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 	uploads := make([]*storage.Upload, len(sessions))
 	for i, s := range sessions {
 		uploads[i] = &storage.Upload{
-			Path:        s.StoragePath(rt.Config),
+			Path:        s.StoragePath(),
 			Body:        []byte(s.Output()),
 			ContentType: "application/json",
 		}
@@ -850,7 +849,7 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 	}
 
 	// split into batches and exit each batch in a transaction
-	for _, idBatch := range chunkSlice(sessionIDs, 100) {
+	for _, idBatch := range ChunkSlice(sessionIDs, 100) {
 		tx, err := db.BeginTxx(ctx, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error starting transaction to exit sessions")

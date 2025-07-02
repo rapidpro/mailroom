@@ -8,15 +8,14 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadGroups(t *testing.T) {
-	ctx, _, db0, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	db := testsuite.NewMockDB(db0, func(funcName string, call int) error {
+	db := testsuite.NewMockDB(rt.DB, func(funcName string, call int) error {
 		// fail first query for groups
 		if funcName == "QueryxContext" && call == 0 {
 			return errors.New("boom")

@@ -183,22 +183,24 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 		flow, err := oa.FlowByUUID(flowUUID)
 		require.NoError(t, err)
 
-		options := runner.NewStartOptions()
-		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
-			for _, s := range session {
-				msg := msgsByContactID[s.ContactID()]
-				if msg != nil {
-					s.SetIncomingMsg(models.MsgID(msg.ID()), "")
+		options := &runner.StartOptions{
+			Interrupt: true,
+			TriggerBuilder: func(contact *flows.Contact) flows.Trigger {
+				msg := msgsByContactID[models.ContactID(contact.ID())]
+				if msg == nil {
+					return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Manual().Build()
 				}
-			}
-			return nil
-		}
-		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-			msg := msgsByContactID[models.ContactID(contact.ID())]
-			if msg == nil {
-				return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Manual().Build()
-			}
-			return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Msg(msg).Build()
+				return triggers.NewBuilder(oa.Env(), testFlow.Reference(false), contact).Msg(msg).Build()
+			},
+			CommitHook: func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
+				for _, s := range session {
+					msg := msgsByContactID[s.ContactID()]
+					if msg != nil {
+						s.SetIncomingMsg(models.MsgID(msg.ID()), "")
+					}
+				}
+				return nil
+			},
 		}
 
 		for _, c := range []*testdata.Contact{testdata.Cathy, testdata.Bob, testdata.George, testdata.Alexandria} {

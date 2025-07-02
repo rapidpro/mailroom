@@ -34,7 +34,6 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/web/contact"
 	_ "github.com/nyaruka/mailroom/web/docs"
-	_ "github.com/nyaruka/mailroom/web/expression"
 	_ "github.com/nyaruka/mailroom/web/flow"
 	_ "github.com/nyaruka/mailroom/web/ivr"
 	_ "github.com/nyaruka/mailroom/web/msg"

@@ -18,9 +18,9 @@ import (
 )
 
 func TestWithHTTPLogs(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	defer db.MustExec(`DELETE FROM request_logs_httplog`)
+	defer rt.DB.MustExec(`DELETE FROM request_logs_httplog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
@@ -30,7 +30,7 @@ func TestWithHTTPLogs(t *testing.T) {
 		},
 	}))
 
-	handler := func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+	handler := func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 		ticketer, _ := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
 
 		logger := l.Ticketer(ticketer)
@@ -61,5 +61,5 @@ func TestWithHTTPLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check HTTP logs were created
-	assertdb.Query(t, db, `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
+	assertdb.Query(t, rt.DB, `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
 }

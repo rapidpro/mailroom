@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/ivr"
@@ -58,22 +57,21 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 			return writeGenericErrorResponse(w, errors.Wrapf(err, "unable to get service for channel: %s", ch.UUID()))
 		}
 
+		recorder, err := httpx.NewRecorder(r, w, true)
+		if err != nil {
+			return svc.WriteErrorResponse(w, errors.Wrapf(err, "error reading request body"))
+		}
+
 		// validate this request's signature
 		err = svc.ValidateRequestSignature(r)
 		if err != nil {
 			return svc.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
 		}
 
-		recorder, err := httpx.NewRecorder(r, w, true)
-		if err != nil {
-			return errors.Wrapf(err, "error reading request body")
-		}
-
 		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))
 
 		call, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
 		if call != nil {
-			clog.SetCall(call)
 			if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
 				logrus.WithError(err).WithField("http_request", r).Error("error attaching ivr channel log")
 			}
@@ -85,7 +83,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 
 		clog.End()
 
-		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 
@@ -176,10 +174,7 @@ type IVRRequest struct {
 
 // writeGenericErrorResponse is just a small utility method to write out a simple JSON error when we don't have a client yet
 func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
-	_, err = w.Write(jsonx.MustMarshal(map[string]string{"error": err.Error()}))
-	return err
+	return web.WriteMarshalled(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 }
 
 func buildResumeURL(cfg *runtime.Config, channel *models.Channel, call *models.Call, urn urns.URN) string {

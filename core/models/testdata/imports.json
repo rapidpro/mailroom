@@ -26,6 +26,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Ann",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000"
                 ],
@@ -36,6 +37,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700002?id=10001&priority=1000"
                 ],
@@ -73,6 +75,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Ann",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000"
                 ],
@@ -83,6 +86,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700002?id=10001&priority=1000"
                 ],
@@ -93,6 +97,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -142,6 +147,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Ann",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000"
                 ],
@@ -152,6 +158,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700002?id=10001&priority=1000",
                     "tel:+593979000002?id=10004&priority=999"
@@ -165,6 +172,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -221,8 +229,8 @@
         "num_errored": 1,
         "errors": [
             {
-                "record": 0,
                 "row": 1,
+                "record": 0,
                 "message": "Unable to find or create contact with URNs tel:+16055700001, tel:+593979000001"
             }
         ],
@@ -231,6 +239,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Ann",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000"
                 ],
@@ -241,6 +250,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700002?id=10001&priority=1000",
                     "tel:+593979000002?id=10004&priority=999"
@@ -255,6 +265,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -297,8 +308,8 @@
         "num_errored": 1,
         "errors": [
             {
-                "record": 2,
                 "row": 4,
+                "record": 2,
                 "message": "Unable to find contact with UUID '68dc10e7-19ce-4052-b202-7c1b49e69ba0'"
             }
         ],
@@ -307,6 +318,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Anne",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000"
                 ],
@@ -317,6 +329,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "kin",
+                "status": "active",
                 "urns": [
                     "tel:+16055700002?id=10001&priority=1000",
                     "tel:+593979000002?id=10004&priority=999"
@@ -331,6 +344,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -367,6 +381,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Anne",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000",
                     "tel:+16055700002?id=10001&priority=999"
@@ -378,6 +393,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "kin",
+                "status": "active",
                 "urns": [
                     "tel:+593979000002?id=10004&priority=999"
                 ],
@@ -391,6 +407,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -421,8 +438,8 @@
         "num_errored": 1,
         "errors": [
             {
-                "record": 0,
                 "row": 1,
+                "record": 0,
                 "message": "Unable to find contact with UUID 'f7a8016d-69a6-434b-aae7-5142ce4a98ba'"
             }
         ],
@@ -431,6 +448,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Anne",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000",
                     "tel:+16055700002?id=10001&priority=999"
@@ -442,6 +460,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "kin",
+                "status": "active",
                 "urns": [
                     "tel:+593979000002?id=10004&priority=999"
                 ],
@@ -455,6 +474,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -494,8 +514,8 @@
         "num_errored": 1,
         "errors": [
             {
-                "record": 1,
                 "row": 2,
+                "record": 1,
                 "message": "Unable to find or create contact with URNs xyz:1234567"
             }
         ],
@@ -504,6 +524,7 @@
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
                 "name": "Anne",
                 "language": "",
+                "status": "active",
                 "urns": [
                     "tel:+16055700001?id=10000&priority=1000",
                     "tel:+16055700002?id=10001&priority=999",
@@ -516,6 +537,7 @@
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "name": "Bob",
                 "language": "kin",
+                "status": "active",
                 "urns": [
                     "tel:+593979000002?id=10004&priority=999"
                 ],
@@ -529,6 +551,7 @@
                 "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
                 "name": "Cat",
                 "language": "spa",
+                "status": "active",
                 "urns": [
                     "tel:+16055700003?id=10002&priority=1000",
                     "tel:+593979000001?id=10003&priority=999"
@@ -541,6 +564,112 @@
                     "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
                     "c153e265-f7c9-4539-9dbc-9b358714b638"
                 ]
+            }
+        ]
+    },
+    {
+        "description": "contacts with non-active statuses",
+        "specs": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "status": "archived",
+                "_import_row": 1
+            },
+            {
+                "name": "Blake",
+                "urns": [
+                    "tel:+16055700007"
+                ],
+                "status": "blocked",
+                "_import_row": 2
+            },
+            {
+                "name": "Ivan",
+                "urns": [
+                    "tel:+16055700008"
+                ],
+                "status": "invalid",
+                "_import_row": 3
+            }
+        ],
+        "num_created": 2,
+        "num_updated": 1,
+        "num_errored": 0,
+        "errors": [
+            {
+                "row": 3,
+                "record": 2,
+                "message": "'invalid' is not a valid status"
+            }
+        ],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "language": "",
+                "status": "archived",
+                "urns": [
+                    "tel:+16055700001?id=10000&priority=1000",
+                    "tel:+16055700002?id=10001&priority=999",
+                    "tel:+16055700005?id=10006&priority=998"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "kin",
+                "status": "active",
+                "urns": [
+                    "tel:+593979000002?id=10004&priority=999"
+                ],
+                "fields": {
+                    "age": "28",
+                    "joined": "2020-01-01T10:45:30.000000Z"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "status": "active",
+                "urns": [
+                    "tel:+16055700003?id=10002&priority=1000",
+                    "tel:+593979000001?id=10003&priority=999"
+                ],
+                "fields": {
+                    "age": "39",
+                    "joined": "2020-02-01T17:15:30.000000Z"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            },
+            {
+                "uuid": "9688d21d-95aa-4bed-afc7-f31b35731a3d",
+                "name": "Blake",
+                "language": "",
+                "status": "blocked",
+                "urns": [
+                    "tel:+16055700007?id=10007&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "297611a6-b583-45c3-8587-d4e530c948f0",
+                "name": "Ivan",
+                "language": "",
+                "status": "active",
+                "urns": [
+                    "tel:+16055700008?id=10008&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
             }
         ]
     }

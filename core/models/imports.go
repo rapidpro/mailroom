@@ -16,20 +16,20 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 )
 
 // ContactImportID is the type for contact import IDs
-type ContactImportID null.Int
+type ContactImportID int
 
-func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.Int(i).MarshalJSON() }
-func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, (*null.Int)(i)) }
-func (i ContactImportID) Value() (driver.Value, error)  { return null.Int(i).Value() }
-func (i *ContactImportID) Scan(value interface{}) error { return null.ScanInt(value, (*null.Int)(i)) }
+func (i *ContactImportID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ContactImportID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // ContactImportBatchID is the type for contact import batch IDs
-type ContactImportBatchID int64
+type ContactImportBatchID int
 
 // ContactImportStatus is the status of an import
 type ContactImportStatus string
@@ -104,9 +104,9 @@ type ContactImportBatch struct {
 }
 
 // Import does the actual import of this batch
-func (b *ContactImportBatch) Import(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
+func (b *ContactImportBatch) Import(ctx context.Context, rt *runtime.Runtime, orgID OrgID, userID UserID) error {
 	// if any error occurs this batch should be marked as failed
-	if err := b.tryImport(ctx, rt, orgID); err != nil {
+	if err := b.tryImport(ctx, rt, orgID, userID); err != nil {
 		b.markFailed(ctx, rt.DB)
 		return err
 	}
@@ -124,7 +124,7 @@ type importContact struct {
 	errors      []string
 }
 
-func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
+func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime, orgID OrgID, userID UserID) error {
 	if err := b.markProcessing(ctx, rt.DB); err != nil {
 		return errors.Wrap(err, "error marking as processing")
 	}
@@ -161,8 +161,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// and apply in bulk
-	// TODO pass user here who created the import?
-	_, err = ApplyModifiers(ctx, rt, oa, NilUserID, modifiersByContact)
+	_, err = ApplyModifiers(ctx, rt, oa, userID, modifiersByContact)
 	if err != nil {
 		return errors.Wrap(err, "error applying modifiers")
 	}
@@ -188,6 +187,8 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 		addModifier := func(m flows.Modifier) { imp.mods = append(imp.mods, m) }
 		addError := func(s string, args ...interface{}) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
 		spec := imp.spec
+
+		isActive := spec.Status == "" || spec.Status == flows.ContactStatusActive
 
 		uuid := spec.UUID
 		if uuid != "" {
@@ -228,6 +229,13 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 				addModifier(modifiers.NewLanguage(lang))
 			}
 		}
+		if !isActive {
+			if spec.Status == flows.ContactStatusArchived || spec.Status == flows.ContactStatusBlocked || spec.Status == flows.ContactStatusStopped {
+				addModifier(modifiers.NewStatus(spec.Status))
+			} else {
+				addError("'%s' is not a valid status", spec.Status)
+			}
+		}
 
 		for key, value := range spec.Fields {
 			field := sa.Fields().Get(key)
@@ -238,7 +246,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			}
 		}
 
-		if len(spec.Groups) > 0 {
+		if len(spec.Groups) > 0 && isActive {
 			groups := make([]*flows.Group, 0, len(spec.Groups))
 			for _, uuid := range spec.Groups {
 				group := sa.Groups().Get(uuid)
@@ -363,12 +371,13 @@ func LoadContactImportBatch(ctx context.Context, db Queryer, id ContactImportBat
 
 // ContactSpec describes a contact to be updated or created
 type ContactSpec struct {
-	UUID     flows.ContactUUID  `json:"uuid"`
-	Name     *string            `json:"name"`
-	Language *string            `json:"language"`
-	URNs     []urns.URN         `json:"urns"`
-	Fields   map[string]string  `json:"fields"`
-	Groups   []assets.GroupUUID `json:"groups"`
+	UUID     flows.ContactUUID   `json:"uuid"`
+	Name     *string             `json:"name"`
+	Language *string             `json:"language"`
+	Status   flows.ContactStatus `json:"status"`
+	URNs     []urns.URN          `json:"urns"`
+	Fields   map[string]string   `json:"fields"`
+	Groups   []assets.GroupUUID  `json:"groups"`
 
 	ImportRow int `json:"_import_row"`
 }

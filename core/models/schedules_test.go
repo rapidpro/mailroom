@@ -4,21 +4,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetExpired(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	// add a schedule and tie a broadcast to it
 	var s1 models.ScheduleID
-	err := db.Get(
+	err := rt.DB.Get(
 		&s1,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '1 DAY', 1, 1, $1) RETURNING id`,
@@ -26,16 +26,13 @@ func TestGetExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	b1 := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+	testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
 
-	// add a URN
-	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
-
 	// add another and tie a trigger to it
 	var s2 models.ScheduleID
-	err = db.Get(
+	err = rt.DB.Get(
 		&s2,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
@@ -43,7 +40,7 @@ func TestGetExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	var t1 models.TriggerID
-	err = db.Get(
+	err = rt.DB.Get(
 		&t1,
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
 			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
@@ -52,13 +49,13 @@ func TestGetExpired(t *testing.T) {
 	assert.NoError(t, err)
 
 	// add a few contacts to the trigger
-	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
+	rt.DB.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
-	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, testdata.DoctorsGroup.ID)
+	rt.DB.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, testdata.DoctorsGroup.ID)
 
 	var s3 models.ScheduleID
-	err = db.Get(
+	err = rt.DB.Get(
 		&s3,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '3 DAY', 1, 1, $1) RETURNING id`,
@@ -67,7 +64,7 @@ func TestGetExpired(t *testing.T) {
 	assert.NoError(t, err)
 
 	// get expired schedules
-	schedules, err := models.GetUnfiredSchedules(ctx, db)
+	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(schedules))
 
@@ -81,23 +78,22 @@ func TestGetExpired(t *testing.T) {
 	assert.Nil(t, schedules[1].Broadcast())
 	start := schedules[1].FlowStart()
 	assert.NotNil(t, start)
-	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
-	assert.Equal(t, testdata.Favorites.ID, start.FlowID())
-	assert.Equal(t, testdata.Org1.ID, start.OrgID())
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
+	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
+	assert.Equal(t, testdata.Favorites.ID, start.FlowID)
+	assert.Equal(t, testdata.Org1.ID, start.OrgID)
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs)
 
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()
 	assert.NotNil(t, bcast)
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
-	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState())
-	assert.Equal(t, "Test message", bcast.Translations()["eng"].Text)
-	assert.Equal(t, "Un Message", bcast.Translations()["fra"].Text)
-	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
-	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs())
+	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
+	assert.Equal(t, "Test message", bcast.Translations["eng"].Text)
+	assert.Equal(t, "Un Message", bcast.Translations["fra"].Text)
+	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
 }
 
 func TestNextFire(t *testing.T) {

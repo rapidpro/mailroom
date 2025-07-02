@@ -15,6 +15,8 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -23,13 +25,109 @@ import (
 )
 
 var courierHttpClient = &http.Client{
-	Timeout: 5 * time.Second,
+	Timeout: 1 * time.Minute, // big so we let courier determine when things timeout
 }
 
 const (
 	bulkPriority = 0
 	highPriority = 1
 )
+
+type MsgOrigin string
+
+const (
+	MsgOriginFlow      MsgOrigin = "flow"
+	MsgOriginBroadcast MsgOrigin = "broadcast"
+	MsgOriginTicket    MsgOrigin = "ticket"
+	MsgOriginChat      MsgOrigin = "chat"
+)
+
+// Msg is the format of a message queued to courier
+type Msg struct {
+	ID                   flows.MsgID           `json:"id"`
+	UUID                 flows.MsgUUID         `json:"uuid"`
+	OrgID                models.OrgID          `json:"org_id"`
+	Origin               MsgOrigin             `json:"origin"`
+	Text                 string                `json:"text"`
+	Attachments          []utils.Attachment    `json:"attachments,omitempty"`
+	QuickReplies         []string              `json:"quick_replies,omitempty"`
+	Locale               envs.Locale           `json:"locale,omitempty"`
+	HighPriority         bool                  `json:"high_priority"`
+	MsgCount             int                   `json:"tps_cost"`
+	CreatedOn            time.Time             `json:"created_on"`
+	ChannelUUID          assets.ChannelUUID    `json:"channel_uuid"`
+	ContactID            models.ContactID      `json:"contact_id"`
+	ContactURNID         models.URNID          `json:"contact_urn_id"`
+	URN                  urns.URN              `json:"urn"`
+	URNAuth              string                `json:"urn_auth,omitempty"`
+	Metadata             map[string]any        `json:"metadata,omitempty"`
+	Flow                 *assets.FlowReference `json:"flow,omitempty"`
+	ResponseToExternalID string                `json:"response_to_external_id,omitempty"`
+	IsResend             bool                  `json:"is_resend,omitempty"`
+
+	ContactLastSeenOn    *time.Time           `json:"contact_last_seen_on,omitempty"`
+	SessionID            models.SessionID     `json:"session_id,omitempty"`
+	SessionStatus        models.SessionStatus `json:"session_status,omitempty"`
+	SessionWaitStartedOn *time.Time           `json:"session_wait_started_on,omitempty"`
+	SessionTimeout       int                  `json:"session_timeout,omitempty"`
+}
+
+// NewCourierMsg creates a courier message in the format it's expecting to be queued
+func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, channel *models.Channel) (*Msg, error) {
+	msg := &Msg{
+		ID:           m.ID(),
+		UUID:         m.UUID(),
+		OrgID:        m.OrgID(),
+		Text:         m.Text(),
+		Attachments:  m.Attachments(),
+		QuickReplies: m.QuickReplies(),
+		Locale:       m.Locale(),
+		HighPriority: m.HighPriority(),
+		MsgCount:     m.MsgCount(),
+		CreatedOn:    m.CreatedOn(),
+		ChannelUUID:  channel.UUID(),
+		ContactID:    m.ContactID(),
+		ContactURNID: *m.ContactURNID(),
+		URN:          m.URN(),
+		URNAuth:      string(m.URNAuth()),
+		Metadata:     m.Metadata(),
+		IsResend:     m.IsResend,
+	}
+
+	if m.FlowID() != models.NilFlowID {
+		msg.Origin = MsgOriginFlow
+		flow, _ := oa.FlowByID(m.FlowID()) // always a chance flow no longer exists
+		if flow != nil {
+			msg.Flow = flow.Reference()
+		}
+	} else if m.BroadcastID() != models.NilBroadcastID {
+		msg.Origin = MsgOriginBroadcast
+	} else if m.TicketID() != models.NilTicketID {
+		msg.Origin = MsgOriginTicket
+	} else {
+		msg.Origin = MsgOriginChat
+	}
+
+	if m.Contact != nil {
+		msg.ContactLastSeenOn = m.Contact.LastSeenOn()
+	}
+
+	if m.Session != nil {
+		msg.SessionID = m.Session.ID()
+		msg.SessionStatus = m.Session.Status()
+		msg.ResponseToExternalID = string(m.Session.IncomingMsgExternalID())
+
+		if m.LastInSprint && m.Session.Timeout() != nil && m.Session.WaitStartedOn() != nil {
+			// These fields are set on the last outgoing message in a session's sprint. In the case
+			// of the session being at a wait with a timeout then the timeout will be set. It is up to
+			// Courier to update the session's timeout appropriately after sending the message.
+			msg.SessionWaitStartedOn = m.Session.WaitStartedOn()
+			msg.SessionTimeout = int(*m.Session.Timeout() / time.Second)
+		}
+	}
+
+	return msg, nil
+}
 
 var queuePushScript = redis.NewScript(6, `
 -- KEYS: [QueueType, QueueName, TPS, Priority, Items, EpochSecs]
@@ -61,11 +159,21 @@ end
 `)
 
 // PushCourierBatch pushes a batch of messages for a single contact and channel onto the appropriate courier queue
-func PushCourierBatch(rc redis.Conn, ch *models.Channel, batch []*models.Msg, timestamp string) error {
+func PushCourierBatch(rc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.Msg, timestamp string) error {
 	priority := bulkPriority
-	if batch[0].HighPriority() {
+	if msgs[0].HighPriority() {
 		priority = highPriority
 	}
+
+	batch := make([]*Msg, len(msgs))
+	for i, m := range msgs {
+		var err error
+		batch[i], err = NewCourierMsg(oa, m, ch)
+		if err != nil {
+			return errors.Wrap(err, "error creating courier message")
+		}
+	}
+
 	batchJSON := jsonx.MustMarshal(batch)
 
 	_, err := queuePushScript.Do(rc, "msgs", ch.UUID(), ch.TPS(), priority, batchJSON, timestamp)
@@ -73,7 +181,7 @@ func PushCourierBatch(rc redis.Conn, ch *models.Channel, batch []*models.Msg, ti
 }
 
 // QueueCourierMessages queues messages for a single contact to Courier
-func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*models.Msg) error {
+func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.Msg) error {
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -83,44 +191,36 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	now := dates.Now()
 	epochSeconds := strconv.FormatFloat(float64(now.UnixNano()/int64(time.Microsecond))/float64(1000000), 'f', 6, 64)
 
-	// we batch msgs by channel uuid
+	// we batch msgs by priority
 	batch := make([]*models.Msg, 0, len(msgs))
-	currentChannel := msgs[0].Channel()
+
 	currentPriority := msgs[0].HighPriority()
 
 	// commits our batch to redis
 	commitBatch := func() error {
 		if len(batch) > 0 {
 			start := time.Now()
-			err := PushCourierBatch(rc, currentChannel, batch, epochSeconds)
+			err := PushCourierBatch(rc, oa, channel, batch, epochSeconds)
 			if err != nil {
 				return err
 			}
-			logrus.WithFields(logrus.Fields{
-				"msgs":         len(batch),
-				"contact_id":   contactID,
-				"channel_uuid": currentChannel.UUID(),
-				"elapsed":      time.Since(start),
-			}).Info("msgs queued to courier")
+			logrus.WithFields(logrus.Fields{"msgs": len(batch), "contact_id": contactID, "channel_uuid": channel.UUID(), "elapsed": time.Since(start)}).Debug("msgs queued to courier")
 		}
 		return nil
 	}
 
 	for _, msg := range msgs {
 		// sanity check the state of the msg we're about to queue...
-		assert(msg.Channel() != nil && msg.ChannelUUID() != "", "can't queue a message to courier without a channel")
-		assert(msg.Channel().Type() != models.ChannelTypeAndroid, "can't queue an android message to courier")
 		assert(msg.URN() != urns.NilURN && msg.ContactURNID() != nil, "can't queue a message to courier without a URN")
 
-		// if this msg is the same channel and priority, add to current batch, otherwise start new batch
-		if msg.Channel() == currentChannel && msg.HighPriority() == currentPriority {
+		// if this msg is the same priority, add to current batch, otherwise start new batch
+		if msg.HighPriority() == currentPriority {
 			batch = append(batch, msg)
 		} else {
 			if err := commitBatch(); err != nil {
 				return err
 			}
 
-			currentChannel = msg.Channel()
 			currentPriority = msg.HighPriority()
 			batch = []*models.Msg{msg}
 		}

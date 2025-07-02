@@ -22,7 +22,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/mailgun"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/receive", web.WithHTTPLogs(handleReceive))
+	web.RegisterRoute(http.MethodPost, base+"/receive", web.MarshaledResponse(web.WithHTTPLogs(handleReceive)))
 }
 
 type receiveRequest struct {
@@ -61,7 +61,7 @@ type receiveResponse struct {
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
 
-func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
 	request := &receiveRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil

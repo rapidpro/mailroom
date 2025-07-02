@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 
 	"github.com/pkg/errors"
 )
 
 // ScheduleID is our internal type for schedule IDs
-type ScheduleID null.Int
+type ScheduleID int
 
 // NilScheduleID is our constant for a nil schedule id
 const NilScheduleID = ScheduleID(0)
@@ -208,36 +208,13 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 	o.timezone as timezone,
 	(SELECT ROW_TO_JSON(sb) FROM (
 		SELECT
-			b.id as broadcast_id,
-			(SELECT JSON_OBJECT_AGG(ts.key, ts.value) FROM (SELECT key, JSON_BUILD_OBJECT('text', t.value) as value FROM each(b.text) t) ts) as translations,
-			'unevaluated' as template_state,
-			b.base_language as base_language,
-			s.org_id as org_id,
-			(SELECT ARRAY_AGG(bc.contact_id) FROM (
-				SELECT
-					bc.contact_id
-				FROM
-					msgs_broadcast_contacts bc
-				WHERE
-					bc.broadcast_id = b.id
-			) bc) as contact_ids,
-			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (
-				SELECT
-					bg.contactgroup_id
-				FROM
-					msgs_broadcast_groups bg
-				WHERE
-					bg.broadcast_id = b.id
-			) bg) as group_ids,
-			(SELECT ARRAY_AGG(bu.urn) FROM (
-				SELECT
-				    cu.identity || '?id=' || cu.id as urn
-				FROM
-					msgs_broadcast_urns bus JOIN
-					contacts_contacturn cu ON cu.id = bus.contacturn_id
-				WHERE
-					bus.broadcast_id = b.id
-			) bu) as urns
+			b.id AS broadcast_id,
+			b.translations,
+			'unevaluated' AS template_state,
+			b.base_language,
+			s.org_id,
+			(SELECT ARRAY_AGG(bc.contact_id) FROM (SELECT bc.contact_id FROM msgs_broadcast_contacts bc WHERE bc.broadcast_id = b.id) bc) as contact_ids,
+			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT bg.contactgroup_id FROM msgs_broadcast_groups bg WHERE bg.broadcast_id = b.id) bg) as group_ids
 		FROM
 			msgs_broadcast b
 		WHERE
@@ -250,8 +227,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			'T' as start_type,
 			t.flow_id as flow_id,
 			f.flow_type as flow_type,
-			TRUE as restart_participants,
-			TRUE as include_active,
+			'{}'::jsonb AS exclusions,
 			(SELECT ARRAY_AGG(tc.contact_id) FROM (
 				SELECT
 					tc.contact_id
@@ -316,22 +292,7 @@ func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
 	return unfired, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i ScheduleID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *ScheduleID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i ScheduleID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *ScheduleID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *ScheduleID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ScheduleID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ScheduleID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ScheduleID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

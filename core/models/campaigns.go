@@ -13,7 +13,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -602,18 +602,16 @@ func ScheduleCampaignEvent(ctx context.Context, rt *runtime.Runtime, orgID OrgID
 	tz := oa.Env().Timezone()
 
 	for _, el := range eligible {
-		if el.RelToValue != nil {
-			start := *el.RelToValue
+		start := *el.RelToValue
 
-			// calculate next fire for this contact
-			scheduled, err := event.ScheduleForTime(tz, time.Now(), start)
-			if err != nil {
-				return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, eventID)
-			}
+		// calculate next fire for this contact
+		scheduled, err := event.ScheduleForTime(tz, time.Now(), start)
+		if err != nil {
+			return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, eventID)
+		}
 
-			if scheduled != nil {
-				fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
-			}
+		if scheduled != nil {
+			fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
 		}
 	}
 
@@ -642,7 +640,7 @@ const sqlEligibleContactsForField = `
     SELECT c.id AS contact_id, (c.fields->$2->>'datetime')::timestamptz AS rel_to_value
       FROM contacts_contact c
 INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
-     WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL`
+     WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND (c.fields->$2->>'datetime')::timestamptz IS NOT NULL`
 
 func campaignEventEligibleContacts(ctx context.Context, db Queryer, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string

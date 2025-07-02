@@ -183,7 +183,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on call")
 	}
 
-	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
+	if err := models.InsertChannelLogs(ctx, rt, clogs); err != nil {
 		return errors.Wrap(err, "error inserting channel logs")
 	}
 

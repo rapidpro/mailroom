@@ -11,13 +11,13 @@ import (
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // ChannelID is the type for channel IDs
-type ChannelID null.Int
+type ChannelID int
 
 // NilChannelID is the nil value for channel IDs
 const NilChannelID = ChannelID(0)
@@ -43,6 +43,7 @@ type Channel struct {
 	c struct {
 		ID                 ChannelID                `json:"id"`
 		UUID               assets.ChannelUUID       `json:"uuid"`
+		OrgID              OrgID                    `json:"org_id"`
 		Parent             *assets.ChannelReference `json:"parent"`
 		Name               string                   `json:"name"`
 		Address            string                   `json:"address"`
@@ -60,6 +61,9 @@ type Channel struct {
 
 // ID returns the id of this channel
 func (c *Channel) ID() ChannelID { return c.c.ID }
+
+// OrgID returns the org id of this channel
+func (c *Channel) OrgID() OrgID { return c.c.OrgID }
 
 // UUID returns the UUID of this channel
 func (c *Channel) UUID() assets.ChannelUUID { return c.c.UUID }
@@ -150,10 +154,11 @@ const sqlSelectChannelsByID = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
+	c.org_id as org_id,
 	c.name as name,
 	c.channel_type as channel_type,
 	COALESCE(c.tps, 10) as tps,
-	COALESCE(c.config, '{}')::json as config
+	c.config as config
 FROM 
 	channels_channel c
 WHERE 
@@ -190,6 +195,7 @@ const sqlSelectChannels = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
+	c.org_id as org_id,
 	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
 	c.name as name,
 	c.channel_type as channel_type,
@@ -197,7 +203,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,
-	COALESCE(c.config, '{}')::json as config,
+	c.config as config,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 
@@ -206,11 +212,11 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		WHEN 'A' THEN 'answer'
 		WHEN 'U' THEN 'ussd'
 		END 
-		FROM unnest(regexp_split_to_array(c.role,'')) as r)
+		FROM unnest(regexp_split_to_array(c.role,'')) AS r)
 	) as roles,
-	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
-	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international,
-	JSON_EXTRACT_PATH(c.config::json, 'machine_detection') as machine_detection
+	jsonb_extract_path(c.config, 'matching_prefixes') AS match_prefixes,
+	jsonb_extract_path(c.config, 'allow_international') AS allow_international,
+	jsonb_extract_path(c.config, 'machine_detection') AS machine_detection
 FROM 
 	channels_channel c
 WHERE 
@@ -230,22 +236,7 @@ func OrgIDForChannelUUID(ctx context.Context, db Queryer, channelUUID assets.Cha
 	return orgID, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i ChannelID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *ChannelID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i ChannelID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *ChannelID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *ChannelID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ChannelID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ChannelID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ChannelID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

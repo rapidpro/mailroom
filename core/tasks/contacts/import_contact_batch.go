@@ -24,6 +24,10 @@ type ImportContactBatchTask struct {
 	ContactImportBatchID models.ContactImportBatchID `json:"contact_import_batch_id"`
 }
 
+func (t *ImportContactBatchTask) Type() string {
+	return TypeImportContactBatch
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *ImportContactBatchTask) Timeout() time.Duration {
 	return time.Minute * 10
@@ -33,21 +37,21 @@ func (t *ImportContactBatchTask) Timeout() time.Duration {
 func (t *ImportContactBatchTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	batch, err := models.LoadContactImportBatch(ctx, rt.DB, t.ContactImportBatchID)
 	if err != nil {
-		return errors.Wrapf(err, "unable to load contact import batch with id %d", t.ContactImportBatchID)
+		return errors.Wrap(err, "error loading contact import batch")
 	}
 
-	batchErr := batch.Import(ctx, rt, orgID)
+	imp, err := models.LoadContactImport(ctx, rt.DB, batch.ImportID)
+	if err != nil {
+		return errors.Wrap(err, "error loading contact import")
+	}
+
+	batchErr := batch.Import(ctx, rt, orgID, imp.CreatedByID)
 
 	// decrement the redis key that holds remaining batches to see if the overall import is now finished
 	rc := rt.RP.Get()
 	defer rc.Close()
 	remaining, _ := redis.Int(rc.Do("decr", fmt.Sprintf("contact_import_batches_remaining:%d", batch.ImportID)))
 	if remaining == 0 {
-		imp, err := models.LoadContactImport(ctx, rt.DB, batch.ImportID)
-		if err != nil {
-			return errors.Wrap(err, "error loading contact import")
-		}
-
 		// if any batch failed, then import is considered failed
 		status := models.ContactImportStatusComplete
 		for _, s := range imp.BatchStatuses {
