@@ -16,5 +16,6 @@ type Runtime struct {
 	ES                *elastic.Client
 	AttachmentStorage storage.Storage
 	SessionStorage    storage.Storage
+	LogStorage        storage.Storage
 	Config            *Config
 }

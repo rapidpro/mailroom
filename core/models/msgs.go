@@ -2,36 +2,31 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/excellent"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
-	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// maximum number of repeated messages to same contact allowed in 5 minute window
+const msgRepetitionLimit = 20
+
 // MsgID is our internal type for msg ids, which can be null/0
-type MsgID null.Int
+type MsgID int64
 
 // NilMsgID is our constant for a nil msg id
 const NilMsgID = MsgID(0)
@@ -54,23 +49,22 @@ const (
 type MsgType string
 
 const (
-	MsgTypeInbox = MsgType("I")
-	MsgTypeFlow  = MsgType("F")
-	MsgTypeIVR   = MsgType("V")
-	MsgTypeUSSD  = MsgType("U")
+	MsgTypeText  = MsgType("T")
+	MsgTypeVoice = MsgType("V")
 )
 
 type MsgStatus string
 
 const (
-	MsgStatusPending   = MsgStatus("P") // incoming msg created but not yet handled, or outgoing message that failed to queue
-	MsgStatusHandled   = MsgStatus("H") // incoming msg handled
-	MsgStatusQueued    = MsgStatus("Q") // outgoing msg created and queued to courier
-	MsgStatusWired     = MsgStatus("W") // outgoing msg requested to be sent via channel
-	MsgStatusSent      = MsgStatus("S") // outgoing msg having received sent confirmation from channel
-	MsgStatusDelivered = MsgStatus("D") // outgoing msg having received delivery confirmation from channel
-	MsgStatusErrored   = MsgStatus("E") // outgoing msg which has errored and will be retried
-	MsgStatusFailed    = MsgStatus("F") // outgoing msg which has failed permanently
+	MsgStatusPending      = MsgStatus("P") // incoming msg created but not yet handled
+	MsgStatusHandled      = MsgStatus("H") // incoming msg handled
+	MsgStatusInitializing = MsgStatus("I") // outgoing message that failed to queue
+	MsgStatusQueued       = MsgStatus("Q") // outgoing msg created and queued to courier
+	MsgStatusWired        = MsgStatus("W") // outgoing msg requested to be sent via channel
+	MsgStatusSent         = MsgStatus("S") // outgoing msg having received sent confirmation from channel
+	MsgStatusDelivered    = MsgStatus("D") // outgoing msg having received delivery confirmation from channel
+	MsgStatusErrored      = MsgStatus("E") // outgoing msg which has errored and will be retried
+	MsgStatusFailed       = MsgStatus("F") // outgoing msg which has failed permanently
 )
 
 type MsgFailedReason null.String
@@ -91,109 +85,90 @@ var unsendableToFailedReason = map[flows.UnsendableReason]MsgFailedReason{
 	flows.UnsendableReasonNoDestination: MsgFailedNoDestination,
 }
 
-// BroadcastID is our internal type for broadcast ids, which can be null/0
-type BroadcastID null.Int
-
-// NilBroadcastID is our constant for a nil broadcast id
-const NilBroadcastID = BroadcastID(0)
-
-// TemplateState represents what state are templates are in, either already evaluated, not evaluated or
-// that they are unevaluated legacy templates
-type TemplateState string
-
-const (
-	TemplateStateEvaluated   = TemplateState("evaluated")
-	TemplateStateLegacy      = TemplateState("legacy")
-	TemplateStateUnevaluated = TemplateState("unevaluated")
-)
-
 // Msg is our type for mailroom messages
 type Msg struct {
 	m struct {
-		ID                   flows.MsgID        `db:"id"              json:"id"`
-		BroadcastID          BroadcastID        `db:"broadcast_id"    json:"broadcast_id,omitempty"`
-		UUID                 flows.MsgUUID      `db:"uuid"            json:"uuid"`
-		Text                 string             `db:"text"            json:"text"`
-		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
-		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
-		ModifiedOn           time.Time          `db:"modified_on"     json:"modified_on"`
-		SentOn               *time.Time         `db:"sent_on"         json:"sent_on"`
-		QueuedOn             time.Time          `db:"queued_on"       json:"queued_on"`
-		Direction            MsgDirection       `db:"direction"       json:"direction"`
-		Status               MsgStatus          `db:"status"          json:"status"`
-		Visibility           MsgVisibility      `db:"visibility"      json:"-"`
-		MsgType              MsgType            `db:"msg_type"        json:"-"`
-		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
-		ErrorCount           int                `db:"error_count"     json:"error_count"`
-		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
-		FailedReason         MsgFailedReason    `db:"failed_reason"   json:"-"`
-		ExternalID           null.String        `db:"external_id"     json:"-"`
-		ResponseToExternalID null.String        `                     json:"response_to_external_id,omitempty"`
-		Attachments          pq.StringArray     `db:"attachments"     json:"attachments,omitempty"`
-		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
-		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
-		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
-		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
-		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
-		IsResend             bool               `                     json:"is_resend,omitempty"`
-		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
-		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
-		OrgID                OrgID              `db:"org_id"          json:"org_id"`
-		FlowID               FlowID             `db:"flow_id"         json:"-"`
+		ID    flows.MsgID   `db:"id"`
+		UUID  flows.MsgUUID `db:"uuid"`
+		OrgID OrgID         `db:"org_id"`
 
-		// extra data from handling added to the courier payload
-		SessionID     SessionID             `json:"session_id,omitempty"`
-		SessionStatus SessionStatus         `json:"session_status,omitempty"`
-		Flow          *assets.FlowReference `json:"flow,omitempty"`
+		// origin
+		BroadcastID BroadcastID `db:"broadcast_id"`
+		FlowID      FlowID      `db:"flow_id"`
+		TicketID    TicketID    `db:"ticket_id"`
+		CreatedByID UserID      `db:"created_by_id"`
 
-		// These fields are set on the last outgoing message in a session's sprint. In the case
-		// of the session being at a wait with a timeout then the timeout will be set. It is up to
-		// Courier to update the session's timeout appropriately after sending the message.
-		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
-		SessionTimeout       int        `json:"session_timeout,omitempty"`
+		// content
+		Text         string         `db:"text"`
+		Attachments  pq.StringArray `db:"attachments"`
+		QuickReplies pq.StringArray `db:"quick_replies"`
+		Locale       envs.Locale    `db:"locale"`
+
+		HighPriority bool          `db:"high_priority"`
+		Direction    MsgDirection  `db:"direction"`
+		Status       MsgStatus     `db:"status"`
+		Visibility   MsgVisibility `db:"visibility"`
+		MsgType      MsgType       `db:"msg_type"`
+		MsgCount     int           `db:"msg_count"`
+		CreatedOn    time.Time     `db:"created_on"`
+		ModifiedOn   time.Time     `db:"modified_on"`
+		ExternalID   null.String   `db:"external_id"`
+		Metadata     null.Map      `db:"metadata"`
+		ChannelID    ChannelID     `db:"channel_id"`
+		ContactID    ContactID     `db:"contact_id"`
+		ContactURNID *URNID        `db:"contact_urn_id"`
+		URN          urns.URN      `db:"urn_urn"`
+		URNAuth      null.String   `db:"urn_auth"`
+
+		SentOn       *time.Time      `db:"sent_on"`
+		QueuedOn     time.Time       `db:"queued_on"`
+		ErrorCount   int             `db:"error_count"`
+		NextAttempt  *time.Time      `db:"next_attempt"`
+		FailedReason MsgFailedReason `db:"failed_reason"`
 	}
 
-	channel *Channel
+	// transient fields set during message creation that provide extra data when queuing to courier
+	Contact      *flows.Contact
+	Session      *Session
+	LastInSprint bool
+	IsResend     bool
 }
 
-func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
-func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
-func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
-func (m *Msg) Channel() *Channel                { return m.channel }
-func (m *Msg) Text() string                     { return m.m.Text }
-func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
-func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
-func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
-func (m *Msg) SentOn() *time.Time               { return m.m.SentOn }
-func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
-func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
-func (m *Msg) Status() MsgStatus                { return m.m.Status }
-func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
-func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
-func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
-func (m *Msg) FailedReason() MsgFailedReason    { return m.m.FailedReason }
-func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
-func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
-func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
-func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
-func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
-func (m *Msg) URN() urns.URN                    { return m.m.URN }
-func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
-func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
-func (m *Msg) FlowID() FlowID                   { return m.m.FlowID }
-func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
-func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
-func (m *Msg) IsResend() bool                   { return m.m.IsResend }
+func (m *Msg) ID() flows.MsgID               { return m.m.ID }
+func (m *Msg) BroadcastID() BroadcastID      { return m.m.BroadcastID }
+func (m *Msg) UUID() flows.MsgUUID           { return m.m.UUID }
+func (m *Msg) Text() string                  { return m.m.Text }
+func (m *Msg) QuickReplies() []string        { return m.m.QuickReplies }
+func (m *Msg) Locale() envs.Locale           { return m.m.Locale }
+func (m *Msg) HighPriority() bool            { return m.m.HighPriority }
+func (m *Msg) CreatedOn() time.Time          { return m.m.CreatedOn }
+func (m *Msg) ModifiedOn() time.Time         { return m.m.ModifiedOn }
+func (m *Msg) SentOn() *time.Time            { return m.m.SentOn }
+func (m *Msg) QueuedOn() time.Time           { return m.m.QueuedOn }
+func (m *Msg) Direction() MsgDirection       { return m.m.Direction }
+func (m *Msg) Status() MsgStatus             { return m.m.Status }
+func (m *Msg) Visibility() MsgVisibility     { return m.m.Visibility }
+func (m *Msg) Type() MsgType                 { return m.m.MsgType }
+func (m *Msg) ErrorCount() int               { return m.m.ErrorCount }
+func (m *Msg) NextAttempt() *time.Time       { return m.m.NextAttempt }
+func (m *Msg) FailedReason() MsgFailedReason { return m.m.FailedReason }
+func (m *Msg) ExternalID() null.String       { return m.m.ExternalID }
+func (m *Msg) Metadata() map[string]any      { return m.m.Metadata }
+func (m *Msg) MsgCount() int                 { return m.m.MsgCount }
+func (m *Msg) ChannelID() ChannelID          { return m.m.ChannelID }
+func (m *Msg) URN() urns.URN                 { return m.m.URN }
+func (m *Msg) URNAuth() null.String          { return m.m.URNAuth }
+func (m *Msg) OrgID() OrgID                  { return m.m.OrgID }
+func (m *Msg) FlowID() FlowID                { return m.m.FlowID }
+func (m *Msg) TicketID() TicketID            { return m.m.TicketID }
+func (m *Msg) ContactID() ContactID          { return m.m.ContactID }
+func (m *Msg) ContactURNID() *URNID          { return m.m.ContactURNID }
 
 func (m *Msg) SetChannel(channel *Channel) {
-	m.channel = channel
 	if channel != nil {
 		m.m.ChannelID = channel.ID()
-		m.m.ChannelUUID = channel.UUID()
 	} else {
 		m.m.ChannelID = NilChannelID
-		m.m.ChannelUUID = ""
 	}
 }
 
@@ -226,10 +201,6 @@ func (m *Msg) Attachments() []utils.Attachment {
 	return attachments
 }
 
-func (m *Msg) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.m)
-}
-
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
 func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, call *Call, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
@@ -241,7 +212,7 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, call *Call, in *flows.MsgI
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeIVR
+	m.MsgType = MsgTypeVoice
 	m.ContactID = call.ContactID()
 
 	urnID := call.ContactURNID()
@@ -267,11 +238,12 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	msg.SetURN(out.URN())
 	m.UUID = out.UUID()
 	m.Text = out.Text()
+	m.Locale = out.Locale()
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusWired
 	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeIVR
+	m.MsgType = MsgTypeVoice
 	m.ContactID = call.ContactID()
 
 	urnID := call.ContactURNID()
@@ -292,28 +264,150 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	return msg
 }
 
+// NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
+func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingTextMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID, NilTicketID, NilUserID)
+}
+
+// NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
+func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, bb *BroadcastBatch) (*Msg, error) {
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, bb.BroadcastID, NilTicketID, bb.CreatedByID)
+}
+
+// NewOutgoingTicketMsg creates an outgoing message from a ticket
+func NewOutgoingTicketMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, ticketID TicketID, userID UserID) (*Msg, error) {
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, ticketID, userID)
+}
+
+// NewOutgoingChatMsg creates an outgoing message from chat
+func NewOutgoingChatMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, userID UserID) (*Msg, error) {
+	return newOutgoingTextMsg(rt, org, channel, contact, out, createdOn, nil, nil, NilBroadcastID, NilTicketID, userID)
+}
+
+func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID, ticketID TicketID, userID UserID) (*Msg, error) {
+	msg := &Msg{}
+	m := &msg.m
+	m.UUID = out.UUID()
+	m.OrgID = org.ID()
+	m.ContactID = ContactID(contact.ID())
+	m.BroadcastID = broadcastID
+	m.TicketID = ticketID
+	m.Text = out.Text()
+	m.QuickReplies = out.QuickReplies()
+	m.Locale = out.Locale()
+	m.HighPriority = false
+	m.Direction = DirectionOut
+	m.Status = MsgStatusQueued
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeText
+	m.MsgCount = 1
+	m.CreatedOn = createdOn
+	m.CreatedByID = userID
+	m.Metadata = null.Map(buildMsgMetadata(out))
+
+	msg.SetChannel(channel)
+	msg.SetURN(out.URN())
+
+	// if we have attachments, add them
+	if len(out.Attachments()) > 0 {
+		for _, a := range out.Attachments() {
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
+		}
+	}
+
+	if out.UnsendableReason() != flows.NilUnsendableReason {
+		m.Status = MsgStatusFailed
+		m.FailedReason = unsendableToFailedReason[out.UnsendableReason()]
+	} else if org.Suspended() {
+		// we fail messages for suspended orgs right away
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedSuspended
+	} else {
+		// also fail right away if this looks like a loop
+		repetitions, err := GetMsgRepetitions(rt.RP, contact, out)
+		if err != nil {
+			return nil, errors.Wrap(err, "error looking up msg repetitions")
+		}
+		if repetitions >= msgRepetitionLimit {
+			m.Status = MsgStatusFailed
+			m.FailedReason = MsgFailedLooping
+
+			logrus.WithFields(logrus.Fields{"contact_id": contact.ID(), "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
+		}
+	}
+
+	// if we're a chat/ticket message, or we're responding to an incoming message in a flow, send as high priority
+	if (broadcastID == NilBroadcastID && session == nil) || (session != nil && session.IncomingMsgID() != NilMsgID) {
+		m.HighPriority = true
+	}
+
+	// if we're sending to a phone, message may have to be sent in multiple parts
+	if m.URN.Scheme() == urns.TelScheme {
+		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
+	}
+
+	if flow != nil {
+		m.FlowID = flow.ID()
+	}
+
+	// set transient fields which we'll use when queuing to courier
+	msg.Contact = contact
+	msg.Session = session
+
+	return msg, nil
+}
+
+func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
+	metadata := make(map[string]interface{})
+	if m.Templating() != nil {
+		metadata["templating"] = m.Templating()
+	}
+	if m.Topic() != flows.NilMsgTopic {
+		metadata["topic"] = string(m.Topic())
+	}
+	return metadata
+}
+
+// NewIncomingSurveyorMsg creates a new incoming message for the passed in text and attachment
+func NewIncomingSurveyorMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
+	msg := &Msg{}
+
+	msg.SetChannel(channel)
+	msg.SetURN(in.URN())
+
+	m := &msg.m
+	m.UUID = in.UUID()
+	m.Text = in.Text()
+	m.Direction = DirectionIn
+	m.Status = MsgStatusHandled
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeText
+	m.ContactID = contactID
+	m.OrgID = orgID
+	m.CreatedOn = createdOn
+
+	// add any attachments
+	for _, a := range in.Attachments() {
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
+	}
+
+	return msg
+}
+
 var msgRepetitionsScript = redis.NewScript(3, `
 local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
+
+local msg_key = string.format("%d|%s", contact_id, string.lower(string.sub(text, 1, 128)))
 local count = 1
 
 -- try to look up in window
-local record = redis.call("HGET", key, contact_id)
+local record = redis.call("HGET", key, msg_key)
 if record then
-	local record_count = tonumber(string.sub(record, 1, 2))
-	local record_text = string.sub(record, 4, -1)
-
-	if record_text == text then 
-		count = math.min(record_count + 1, 99)
-	else
-		count = 1
-	end		
+	count = tonumber(record) + 1
 end
 
--- create our new record with our updated count
-record = string.format("%02d:%s", count, text)
-
--- write our new record with updated count and set expiration
-redis.call("HSET", key, contact_id, record)
+-- write updated count and set expiration
+redis.call("HSET", key, msg_key, count)
 redis.call("EXPIRE", key, 300)
 
 return count
@@ -329,151 +423,17 @@ func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut
 	return redis.Int(msgRepetitionsScript.Do(rc, key, contact.ID(), msg.Text()))
 }
 
-// NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
-func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID)
-}
-
-// NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
-func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
-}
-
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
-	msg := &Msg{}
-	m := &msg.m
-	m.UUID = out.UUID()
-	m.OrgID = org.ID()
-	m.ContactID = ContactID(contact.ID())
-	m.BroadcastID = broadcastID
-	m.Text = out.Text()
-	m.HighPriority = false
-	m.Direction = DirectionOut
-	m.Status = MsgStatusQueued
-	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeFlow
-	m.MsgCount = 1
-	m.CreatedOn = createdOn
-	m.Metadata = null.NewMap(buildMsgMetadata(out))
-
-	msg.SetChannel(channel)
-	msg.SetURN(out.URN())
-
-	if out.UnsendableReason() != flows.NilUnsendableReason {
-		m.Status = MsgStatusFailed
-		m.FailedReason = unsendableToFailedReason[out.UnsendableReason()]
-	} else if org.Suspended() {
-		// we fail messages for suspended orgs right away
-		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedSuspended
-	} else {
-		// also fail right away if this looks like a loop
-		repetitions, err := GetMsgRepetitions(rt.RP, contact, out)
-		if err != nil {
-			return nil, errors.Wrap(err, "error looking up msg repetitions")
-		}
-		if repetitions >= 20 {
-			m.Status = MsgStatusFailed
-			m.FailedReason = MsgFailedLooping
-
-			logrus.WithFields(logrus.Fields{"contact_id": contact.ID(), "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
-		}
-	}
-
-	// if we have a session, set fields on the message from that
-	if session != nil {
-		m.ResponseToExternalID = session.IncomingMsgExternalID()
-		m.SessionID = session.ID()
-		m.SessionStatus = session.Status()
-
-		if flow != nil {
-			m.FlowID = flow.ID()
-			m.Flow = flow.Reference()
-		}
-
-		// if we're responding to an incoming message, send as high priority
-		if session.IncomingMsgID() != NilMsgID {
-			m.HighPriority = true
-		}
-	}
-
-	// if we have attachments, add them
-	if len(out.Attachments()) > 0 {
-		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
-		}
-	}
-
-	// if we're sending to a phone, message may have to be sent in multiple parts
-	if m.URN.Scheme() == urns.TelScheme {
-		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
-	}
-
-	return msg, nil
-}
-
-func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
-	metadata := make(map[string]interface{})
-	if len(m.QuickReplies()) > 0 {
-		metadata["quick_replies"] = m.QuickReplies()
-	}
-	if m.Templating() != nil {
-		mLanguage, mCountry := m.Locale().ToParts()
-
-		// TODO once we're queuing messages with locale and courier is reading that, can just add templating directly
-		// without language and country
-		metadata["templating"] = struct {
-			Template  *assets.TemplateReference `json:"template"`
-			Language  envs.Language             `json:"language"`
-			Country   envs.Country              `json:"country"`
-			Variables []string                  `json:"variables,omitempty"`
-			Namespace string                    `json:"namespace"`
-		}{
-			Template:  m.Templating_.Template(),
-			Language:  mLanguage,
-			Country:   mCountry,
-			Variables: m.Templating().Variables(),
-			Namespace: m.Templating().Namespace(),
-		}
-	}
-	if m.Topic() != flows.NilMsgTopic {
-		metadata["topic"] = string(m.Topic())
-	}
-	return metadata
-}
-
-// NewIncomingMsg creates a new incoming message for the passed in text and attachment
-func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
-	msg := &Msg{}
-
-	msg.SetChannel(channel)
-	msg.SetURN(in.URN())
-
-	m := &msg.m
-	m.UUID = in.UUID()
-	m.Text = in.Text()
-	m.Direction = DirectionIn
-	m.Status = MsgStatusHandled
-	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeFlow
-	m.ContactID = contactID
-	m.OrgID = orgID
-	m.CreatedOn = createdOn
-
-	// add any attachments
-	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
-	}
-
-	return msg
-}
-
 var loadMessagesSQL = `
 SELECT 
 	id,
+	uuid,	
 	broadcast_id,
-	uuid,
+	flow_id,
+	ticket_id,
 	text,
+	attachments,
+	quick_replies,
+	locale,
 	created_on,
 	direction,
 	status,
@@ -484,7 +444,6 @@ SELECT
 	failed_reason,
 	coalesce(high_priority, FALSE) as high_priority,
 	external_id,
-	attachments,
 	metadata,
 	channel_id,
 	contact_id,
@@ -507,9 +466,14 @@ func GetMessagesByID(ctx context.Context, db Queryer, orgID OrgID, direction Msg
 var loadMessagesForRetrySQL = `
 SELECT 
 	m.id,
-	m.broadcast_id,
 	m.uuid,
+	m.broadcast_id,
+	m.flow_id,
+	m.ticket_id,
 	m.text,
+	m.attachments,
+	m.quick_replies,
+	m.locale,
 	m.created_on,
 	m.direction,
 	m.status,
@@ -520,7 +484,6 @@ SELECT
 	m.failed_reason,
 	m.high_priority,
 	m.external_id,
-	m.attachments,
 	m.metadata,
 	m.channel_id,
 	m.contact_id,
@@ -535,7 +498,7 @@ INNER JOIN
 INNER JOIN 
 	channels_channel c ON c.id = m.channel_id
 WHERE
-	m.direction = 'O' AND m.status IN ('P', 'E') AND m.next_attempt <= NOW() AND c.is_active = TRUE
+	m.direction = 'O' AND m.status IN ('I', 'E') AND m.next_attempt <= NOW() AND c.is_active = TRUE
 ORDER BY
     m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
@@ -553,8 +516,6 @@ func loadMessages(ctx context.Context, db Queryer, sql string, params ...interfa
 	defer rows.Close()
 
 	msgs := make([]*Msg, 0)
-	channelIDsSeen := make(map[ChannelID]bool)
-	channelIDs := make([]ChannelID, 0, 5)
 
 	for rows.Next() {
 		msg := &Msg{}
@@ -564,25 +525,6 @@ func loadMessages(ctx context.Context, db Queryer, sql string, params ...interfa
 		}
 
 		msgs = append(msgs, msg)
-
-		if msg.ChannelID() != NilChannelID && !channelIDsSeen[msg.ChannelID()] {
-			channelIDsSeen[msg.ChannelID()] = true
-			channelIDs = append(channelIDs, msg.ChannelID())
-		}
-	}
-
-	channels, err := GetChannelsByID(ctx, db, channelIDs)
-	if err != nil {
-		return nil, errors.Wrap(err, "error fetching channels for messages")
-	}
-
-	channelsByID := make(map[ChannelID]*Channel)
-	for _, ch := range channels {
-		channelsByID[ch.ID()] = ch
-	}
-
-	for _, msg := range msgs {
-		msg.SetChannel(channelsByID[msg.m.ChannelID])
 	}
 
 	return msgs, nil
@@ -607,12 +549,6 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
-// SetTimeout sets the timeout for this message
-func (m *Msg) SetTimeout(start time.Time, timeout time.Duration) {
-	m.m.SessionWaitStartedOn = &start
-	m.m.SessionTimeout = int(timeout / time.Second)
-}
-
 // InsertMessages inserts the passed in messages in a single query
 func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 	is := make([]interface{}, len(msgs))
@@ -620,51 +556,37 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 		is[i] = &msgs[i].m
 	}
 
-	return BulkQuery(ctx, "insert messages", tx, insertMsgSQL, is)
+	return BulkQuery(ctx, "insert messages", tx, sqlInsertMsgSQL, is)
 }
 
-const insertMsgSQL = `
+const sqlInsertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
+msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id)
-  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
+		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id, ticket_id, created_by_id)
+  VALUES(:uuid, :text, :attachments, :quick_replies, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
+		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id, :ticket_id, :created_by_id)
 RETURNING 
-	id as id, 
-	now() as modified_on,
-	now() as queued_on
+	id AS id, 
+	modified_on AS modified_on,
+	queued_on AS queued_on
 `
 
-// UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
+// MarkMessageHandled updates a message after handling
+func MarkMessageHandled(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatus, visibility MsgVisibility, flowID FlowID, ticketID TicketID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
-		`UPDATE 
-			msgs_msg 
-		SET 
-			status = $2,
-			visibility = $3,
-			msg_type = $4,
-			flow_id = $5,
-			attachments = $6,
-			log_uuids = array_cat(log_uuids, $7)
-		WHERE
-			id = $1`,
-		msgID, status, visibility, msgType, flow, pq.Array(attachments), pq.Array(logUUIDs))
-
-	if err != nil {
-		return errors.Wrapf(err, "error updating msg: %d", msgID)
-	}
-
-	return nil
+		`UPDATE msgs_msg SET status = $2, visibility = $3, flow_id = $4, ticket_id = $5, attachments = $6, log_uuids = array_cat(log_uuids, $7) WHERE id = $1`,
+		msgID, status, visibility, flowID, ticketID, pq.Array(attachments), pq.Array(logUUIDs),
+	)
+	return errors.Wrapf(err, "error marking msg #%d as handled", msgID)
 }
 
-// MarkMessagesForRequeuing marks the passed in messages as pending(P) with a next attempt value
+// MarkMessagesForRequeuing marks the passed in messages as initializing(I) with a next attempt value
 // so that the retry messages task will pick them up.
 func MarkMessagesForRequeuing(ctx context.Context, db Queryer, msgs []*Msg) error {
 	nextAttempt := time.Now().Add(10 * time.Minute)
-	return updateMessageStatus(ctx, db, msgs, MsgStatusPending, &nextAttempt)
+	return updateMessageStatus(ctx, db, msgs, MsgStatusInitializing, &nextAttempt)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued(Q)
@@ -690,486 +612,10 @@ func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status Ms
 	return BulkQuery(ctx, "updating message status", db, sqlUpdateMsgStatus, is)
 }
 
-// BroadcastTranslation is the translation for the passed in language
-type BroadcastTranslation struct {
-	Text         string             `json:"text"`
-	Attachments  []utils.Attachment `json:"attachments,omitempty"`
-	QuickReplies []string           `json:"quick_replies,omitempty"`
-}
-
-// Broadcast represents a broadcast that needs to be sent
-type Broadcast struct {
-	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"  db:"id"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		Text          hstore.Hstore                           `                               db:"text"`
-		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"           db:"base_language"`
-		URNs          []urns.URN                              `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                  db:"org_id"`
-		CreatedByID   UserID                                  `json:"created_by_id,omitempty" db:"created_by_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"     db:"parent_id"`
-		TicketID      TicketID                                `json:"ticket_id,omitempty"     db:"ticket_id"`
-	}
-}
-
-func (b *Broadcast) ID() BroadcastID                                       { return b.b.BroadcastID }
-func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
-func (b *Broadcast) CreatedByID() UserID                                   { return b.b.CreatedByID }
-func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
-func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
-func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
-func (b *Broadcast) BaseLanguage() envs.Language                           { return b.b.BaseLanguage }
-func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
-func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
-func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
-
-func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
-func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
-
-// NewBroadcast creates a new broadcast with the passed in parameters
-func NewBroadcast(
-	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, createdByID UserID) *Broadcast {
-
-	bcast := &Broadcast{}
-	bcast.b.OrgID = orgID
-	bcast.b.BroadcastID = id
-	bcast.b.Translations = translations
-	bcast.b.TemplateState = state
-	bcast.b.BaseLanguage = baseLanguage
-	bcast.b.URNs = urns
-	bcast.b.ContactIDs = contactIDs
-	bcast.b.GroupIDs = groupIDs
-	bcast.b.TicketID = ticketID
-	bcast.b.CreatedByID = createdByID
-
-	return bcast
-}
-
-// InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
-func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
-	child := NewBroadcast(
-		parent.OrgID(),
-		NilBroadcastID,
-		parent.b.Translations,
-		parent.b.TemplateState,
-		parent.b.BaseLanguage,
-		parent.b.URNs,
-		parent.b.ContactIDs,
-		parent.b.GroupIDs,
-		parent.b.TicketID,
-		parent.b.CreatedByID,
-	)
-	child.b.ParentID = parent.ID()
-
-	// populate text from our translations
-	child.b.Text.Map = make(map[string]sql.NullString)
-	for lang, t := range child.b.Translations {
-		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
-		if len(t.Attachments) > 0 || len(t.QuickReplies) > 0 {
-			return nil, errors.Errorf("cannot clone broadcast with quick replies or attachments")
-		}
-	}
-
-	// insert our broadcast
-	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.ID())
-	}
-
-	// build up all our contact associations
-	contacts := make([]interface{}, 0, len(child.b.ContactIDs))
-	for _, contactID := range child.b.ContactIDs {
-		contacts = append(contacts, &broadcastContact{
-			BroadcastID: child.ID(),
-			ContactID:   contactID,
-		})
-	}
-
-	// insert our contacts
-	err = BulkQuery(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
-	}
-
-	// build up all our group associations
-	groups := make([]interface{}, 0, len(child.b.GroupIDs))
-	for _, groupID := range child.b.GroupIDs {
-		groups = append(groups, &broadcastGroup{
-			BroadcastID: child.ID(),
-			GroupID:     groupID,
-		})
-	}
-
-	// insert our groups
-	err = BulkQuery(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
-	}
-
-	// finally our URNs
-	urns := make([]interface{}, 0, len(child.b.URNs))
-	for _, urn := range child.b.URNs {
-		urnID := GetURNID(urn)
-		if urnID == NilURNID {
-			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
-		}
-		urns = append(urns, &broadcastURN{
-			BroadcastID: child.ID(),
-			URNID:       urnID,
-		})
-	}
-
-	// insert our urns
-	err = BulkQuery(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
-	}
-
-	return child, nil
-}
-
-type broadcastURN struct {
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	URNID       URNID       `db:"contacturn_id"`
-}
-
-type broadcastContact struct {
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	ContactID   ContactID   `db:"contact_id"`
-}
-
-type broadcastGroup struct {
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	GroupID     GroupID     `db:"contactgroup_id"`
-}
-
-const insertBroadcastSQL = `
-INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, is_active)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE,    TRUE)
-RETURNING
-	id
-`
-
-const insertBroadcastContactsSQL = `
-INSERT INTO
-	msgs_broadcast_contacts( broadcast_id,  contact_id)
-	                 VALUES(:broadcast_id,     :contact_id)
-`
-
-const insertBroadcastGroupsSQL = `
-INSERT INTO
-	msgs_broadcast_groups( broadcast_id,  contactgroup_id)
-	               VALUES(:broadcast_id,     :contactgroup_id)
-`
-
-const insertBroadcastURNsSQL = `
-INSERT INTO
-	msgs_broadcast_urns( broadcast_id,  contacturn_id)
-	             VALUES(:broadcast_id, :contacturn_id)
-`
-
-// NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
-func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
-	// converst our translations to our type
-	translations := make(map[envs.Language]*BroadcastTranslation)
-	for l, t := range event.Translations {
-		translations[l] = &BroadcastTranslation{
-			Text:         t.Text,
-			Attachments:  t.Attachments,
-			QuickReplies: t.QuickReplies,
-		}
-	}
-
-	// resolve our contact references
-	contactIDs, err := GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error resolving contact references")
-	}
-
-	// and our groups
-	groupIDs := make([]GroupID, 0, len(event.Groups))
-	for i := range event.Groups {
-		group := oa.GroupByUUID(event.Groups[i].UUID)
-		if group != nil {
-			groupIDs = append(groupIDs, group.ID())
-		}
-	}
-
-	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, NilUserID), nil
-}
-
-func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
-	return &BroadcastBatch{
-		BroadcastID:   b.b.BroadcastID,
-		BaseLanguage:  b.b.BaseLanguage,
-		Translations:  b.b.Translations,
-		TemplateState: b.b.TemplateState,
-		OrgID:         b.b.OrgID,
-		CreatedByID:   b.b.CreatedByID,
-		TicketID:      b.b.TicketID,
-		ContactIDs:    contactIDs,
-	}
-}
-
-// BroadcastBatch represents a batch of contacts that need messages sent for
-type BroadcastBatch struct {
-	BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
-	Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-	BaseLanguage  envs.Language                           `json:"base_language"`
-	TemplateState TemplateState                           `json:"template_state"`
-	URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
-	ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-	IsLast        bool                                    `json:"is_last"`
-	OrgID         OrgID                                   `json:"org_id"`
-	CreatedByID   UserID                                  `json:"created_by_id"`
-	TicketID      TicketID                                `json:"ticket_id"`
-}
-
-func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets) ([]*Msg, error) {
-	repeatedContacts := make(map[ContactID]bool)
-	broadcastURNs := b.URNs
-
-	// build our list of contact ids
-	contactIDs := b.ContactIDs
-
-	// build a map of the contacts that are present both in our URN list and our contact id list
-	if broadcastURNs != nil {
-		for _, id := range contactIDs {
-			_, found := broadcastURNs[id]
-			if found {
-				repeatedContacts[id] = true
-			}
-		}
-
-		// if we have URN we need to send to, add those contacts as well if not already repeated
-		for id := range broadcastURNs {
-			if !repeatedContacts[id] {
-				contactIDs = append(contactIDs, id)
-			}
-		}
-	}
-
-	// load all our contacts
-	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
-	}
-
-	channels := oa.SessionAssets().Channels()
-
-	// for each contact, build our message
-	msgs := make([]*Msg, 0, len(contacts))
-
-	// utility method to build up our message
-	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		if c.Status() != ContactStatusActive {
-			return nil, nil
-		}
-
-		contact, err := c.FlowContact(oa)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error creating flow contact")
-		}
-
-		urn := urns.NilURN
-		var channel *Channel
-
-		// we are forcing to send to a non-preferred URN, find the channel
-		if forceURN != urns.NilURN {
-			for _, u := range contact.URNs() {
-				if u.URN().Identity() == forceURN.Identity() {
-					c := channels.GetForURN(u, assets.ChannelRoleSend)
-					if c == nil {
-						return nil, nil
-					}
-					urn = u.URN()
-					channel = oa.ChannelByUUID(c.UUID())
-					break
-				}
-			}
-		} else {
-			// no forced URN, find the first URN we can send to
-			for _, u := range contact.URNs() {
-				c := channels.GetForURN(u, assets.ChannelRoleSend)
-				if c != nil {
-					urn = u.URN()
-					channel = oa.ChannelByUUID(c.UUID())
-					break
-				}
-			}
-		}
-
-		// no urn and channel? move on
-		if channel == nil {
-			return nil, nil
-		}
-
-		// resolve our translations, the order is:
-		//   1) valid contact language
-		//   2) org default language
-		//   3) broadcast base language
-		lang := contact.Language()
-		if lang != envs.NilLanguage {
-			found := false
-			for _, l := range oa.Env().AllowedLanguages() {
-				if l == lang {
-					found = true
-					break
-				}
-			}
-			if !found {
-				lang = envs.NilLanguage
-			}
-		}
-
-		// have a valid contact language, try that
-		trans := b.Translations
-		t := trans[lang]
-
-		// not found? try org default language
-		if t == nil {
-			lang = oa.Env().DefaultLanguage()
-			t = trans[lang]
-		}
-
-		// not found? use broadcast base language
-		if t == nil {
-			lang = b.BaseLanguage
-			t = trans[lang]
-		}
-
-		if t == nil {
-			logrus.WithField("base_language", b.BaseLanguage).WithField("translations", trans).Error("unable to find translation for broadcast")
-			return nil, nil
-		}
-
-		template := ""
-
-		// if this is a legacy template, migrate it forward
-		if b.TemplateState == TemplateStateLegacy {
-			template, _ = expressions.MigrateTemplate(t.Text, nil)
-		} else if b.TemplateState == TemplateStateUnevaluated {
-			template = t.Text
-		}
-
-		text := t.Text
-
-		// if we have a template, evaluate it
-		if template != "" {
-			// build up the minimum viable context for templates
-			templateCtx := types.NewXObject(map[string]types.XValue{
-				"contact": flows.Context(oa.Env(), contact),
-				"fields":  flows.Context(oa.Env(), contact.Fields()),
-				"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
-				"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
-			})
-			text, _ = excellent.EvaluateTemplate(oa.Env(), templateCtx, template, nil)
-		}
-
-		// don't do anything if we have no text or attachments
-		if text == "" && len(t.Attachments) == 0 {
-			return nil, nil
-		}
-
-		unsendableReason := flows.NilUnsendableReason
-		if contact.Status() != flows.ContactStatusActive {
-			unsendableReason = flows.UnsendableReasonContactStatus
-		} else if urn == urns.NilURN || channel == nil {
-			unsendableReason = flows.UnsendableReasonNoDestination
-		}
-
-		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, envs.NewLocale(lang, envs.NilCountry), unsendableReason)
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error creating outgoing message")
-		}
-
-		return msg, nil
-	}
-
-	// run through all our contacts to create our messages
-	for _, c := range contacts {
-		// use the preferred URN if present
-		urn := broadcastURNs[c.ID()]
-		msg, err := buildMessage(c, urn)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error creating broadcast message")
-		}
-		if msg != nil {
-			msgs = append(msgs, msg)
-		}
-
-		// if this is a contact that will receive two messages, calculate that one as well
-		if repeatedContacts[c.ID()] {
-			m2, err := buildMessage(c, urns.NilURN)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error creating broadcast message")
-			}
-
-			// add this message if it isn't a duplicate
-			if m2 != nil && m2.URN() != msg.URN() {
-				msgs = append(msgs, m2)
-			}
-		}
-	}
-
-	// insert them in a single request
-	err = InsertMessages(ctx, rt.DB, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting broadcast messages")
-	}
-
-	// if the broadcast was a ticket reply, update the ticket
-	if b.TicketID != NilTicketID {
-		if err := b.updateTicket(ctx, rt.DB, oa); err != nil {
-			return nil, err
-		}
-	}
-
-	return msgs, nil
-}
-
-func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
-	if err != nil {
-		return err
-	}
-
-	// record reply counts for org, user and team
-	replyCounts := map[string]int{scopeOrg(oa): 1}
-
-	if b.CreatedByID != NilUserID {
-		user := oa.UserByID(b.CreatedByID)
-		if user != nil {
-			replyCounts[scopeUser(oa, user)] = 1
-			if user.Team() != nil {
-				replyCounts[scopeTeam(user.Team())] = 1
-			}
-		}
-	}
-
-	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
-		return err
-	}
-
-	if firstReplySeconds >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplySeconds); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 const sqlUpdateMsgForResending = `
 UPDATE msgs_msg m
    SET channel_id = r.channel_id::int,
-       status = 'P',
+       status = 'Q',
        error_count = 0,
        failed_reason = NULL,
        queued_on = r.queued_on::timestamp with time zone,
@@ -1215,24 +661,19 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 
 		if ch != nil {
 			channel := oa.ChannelByUUID(ch.UUID())
-			msg.channel = channel
-
 			msg.m.ChannelID = channel.ID()
-			msg.m.ChannelUUID = channel.UUID()
 			msg.m.Status = MsgStatusPending
 			msg.m.QueuedOn = dates.Now()
 			msg.m.SentOn = nil
 			msg.m.ErrorCount = 0
 			msg.m.FailedReason = ""
-			msg.m.IsResend = true // mark message as being a resend so it will be queued to courier as such
+			msg.IsResend = true // mark message as being a resend so it will be queued to courier as such
 
 			resends = append(resends, msg.m)
 			resent = append(resent, msg)
 		} else {
 			// if we don't have channel or a URN, fail again
-			msg.channel = nil
 			msg.m.ChannelID = NilChannelID
-			msg.m.ChannelUUID = assets.ChannelUUID("")
 			msg.m.Status = MsgStatusFailed
 			msg.m.QueuedOn = dates.Now()
 			msg.m.SentOn = nil
@@ -1281,68 +722,40 @@ func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID
 	return nil
 }
 
-// MarkBroadcastSent marks the passed in broadcast as sent
-func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
-	// noop if it is a nil id
-	if id == NilBroadcastID {
-		return nil
+func NewMsgOut(oa *OrgAssets, c *flows.Contact, text string, atts []utils.Attachment, qrs []string, locale envs.Locale) (*flows.MsgOut, *Channel) {
+	// resolve URN + channel for this contact
+	urn := urns.NilURN
+	var channel *Channel
+	var channelRef *assets.ChannelReference
+	for _, dest := range c.ResolveDestinations(false) {
+		urn = dest.URN.URN()
+		channel = oa.ChannelByUUID(dest.Channel.UUID())
+		channelRef = dest.Channel.Reference()
+		break
 	}
 
-	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
-	if err != nil {
-		return errors.Wrapf(err, "error setting broadcast with id %d as sent", id)
+	// is this message sendable?
+	unsendableReason := flows.NilUnsendableReason
+	if c.Status() != flows.ContactStatusActive {
+		unsendableReason = flows.UnsendableReasonContactStatus
+	} else if urn == urns.NilURN || channel == nil {
+		unsendableReason = flows.UnsendableReasonNoDestination
 	}
-	return nil
+
+	return flows.NewMsgOut(urn, channelRef, text, atts, qrs, nil, flows.NilMsgTopic, locale, unsendableReason), channel
 }
 
 // NilID implementations
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i MsgID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
+func (i *MsgID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i MsgID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *MsgID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i MsgID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *MsgID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
+func (i *BroadcastID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i BroadcastID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *BroadcastID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i BroadcastID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// Value returns the db value, null is returned for 0
-func (i MsgID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *MsgID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i BroadcastID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *BroadcastID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i BroadcastID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *BroadcastID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for ""
-func (s MsgFailedReason) Value() (driver.Value, error) {
-	return null.String(s).Value()
-}
-
-// Scan scans from the db value. null values become ""
-func (s *MsgFailedReason) Scan(value interface{}) error {
-	return null.ScanString(value, (*null.String)(s))
-}
+func (s MsgFailedReason) Value() (driver.Value, error) { return null.StringValue(s) }
+func (s *MsgFailedReason) Scan(value any) error        { return null.ScanString(value, s) }

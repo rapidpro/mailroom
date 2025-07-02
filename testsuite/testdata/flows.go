@@ -5,11 +5,10 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/mailroom/runtime"
 )
 
 type Flow struct {
@@ -17,12 +16,20 @@ type Flow struct {
 	UUID assets.FlowUUID
 }
 
+func (f *Flow) Load(rt *runtime.Runtime, oa *models.OrgAssets) *models.Flow {
+	flow, err := oa.FlowByID(f.ID)
+	if err != nil {
+		panic(err)
+	}
+	return flow
+}
+
 func (f *Flow) Reference() *assets.FlowReference {
 	return &assets.FlowReference{UUID: f.UUID, Name: ""}
 }
 
 // InsertFlow inserts a flow
-func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
+func InsertFlow(rt *runtime.Runtime, org *Org, definition []byte) *Flow {
 	uuid, err := jsonparser.GetString(definition, "uuid")
 	if err != nil {
 		panic(err)
@@ -33,18 +40,18 @@ func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
 	}
 
 	var id models.FlowID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO flows_flow(org_id, uuid, name, flow_type, version_number, base_language, expires_after_minutes, ignore_triggers, has_issues, is_active, is_archived, is_system, created_by_id, created_on, modified_by_id, modified_on, saved_on, saved_by_id) 
 		VALUES($1, $2, $3, 'M', '13.1.0', 'eng', 10, FALSE, FALSE, TRUE, FALSE, FALSE, $4, NOW(), $4, NOW(), NOW(), $4) RETURNING id`, org.ID, uuid, name, Admin.ID,
 	))
 
-	db.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, is_active, created_by_id, created_on, modified_by_id, modified_on) 
+	rt.DB.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, is_active, created_by_id, created_on, modified_by_id, modified_on) 
 	VALUES($1, $2, '13.1.0', 1, TRUE, $3, NOW(), $3, NOW())`, id, definition, Admin.ID)
 
 	return &Flow{ID: id, UUID: assets.FlowUUID(uuid)}
 }
 
-func ImportFlows(db *sqlx.DB, org *Org, path string) []*Flow {
+func ImportFlows(rt *runtime.Runtime, org *Org, path string) []*Flow {
 	assetsJSON, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
@@ -58,7 +65,7 @@ func ImportFlows(db *sqlx.DB, org *Org, path string) []*Flow {
 	flows := []*Flow{}
 
 	_, err = jsonparser.ArrayEach(flowsJSON, func(flowJSON []byte, dataType jsonparser.ValueType, offset int, err error) {
-		flow := InsertFlow(db, org, flowJSON)
+		flow := InsertFlow(rt, org, flowJSON)
 		flows = append(flows, flow)
 	})
 	if err != nil {
@@ -69,22 +76,22 @@ func ImportFlows(db *sqlx.DB, org *Org, path string) []*Flow {
 }
 
 // InsertFlowStart inserts a flow start
-func InsertFlowStart(db *sqlx.DB, org *Org, flow *Flow, contacts []*Contact) models.StartID {
+func InsertFlowStart(rt *runtime.Runtime, org *Org, flow *Flow, contacts []*Contact) models.StartID {
 	var id models.StartID
-	must(db.Get(&id,
-		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, created_on, modified_on, restart_participants, include_active, contact_count, status, created_by_id)
-		 VALUES($1, $2, $3, 'M', NOW(), NOW(), TRUE, TRUE, 2, 'P', 1) RETURNING id`, uuids.New(), org.ID, flow.ID,
+	must(rt.DB.Get(&id,
+		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, exclusions, created_on, modified_on, contact_count, status, created_by_id)
+		 VALUES($1, $2, $3, 'M', '{}', NOW(), NOW(), 2, 'P', 1) RETURNING id`, uuids.New(), org.ID, flow.ID,
 	))
 
 	for _, c := range contacts {
-		db.MustExec(`INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES($1, $2)`, id, c.ID)
+		rt.DB.MustExec(`INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES($1, $2)`, id, c.ID)
 	}
 
 	return id
 }
 
 // InsertFlowSession inserts a flow session
-func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, callID models.CallID) models.SessionID {
+func InsertFlowSession(rt *runtime.Runtime, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, callID models.CallID) models.SessionID {
 	now := time.Now()
 	tomorrow := now.Add(time.Hour * 24)
 
@@ -97,7 +104,7 @@ func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType mode
 	}
 
 	var id models.SessionID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, call_id, wait_started_on, wait_expires_on, wait_resume_on_expire, ended_on) 
 		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, endedOn,
 	))
@@ -105,9 +112,9 @@ func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType mode
 }
 
 // InsertWaitingSession inserts a waiting flow session
-func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, callID models.CallID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
+func InsertWaitingSession(rt *runtime.Runtime, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, callID models.CallID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
 	var id models.SessionID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, call_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
 		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
 	))
@@ -115,7 +122,7 @@ func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType m
 }
 
 // InsertFlowRun inserts a flow run
-func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus) models.FlowRunID {
+func InsertFlowRun(rt *runtime.Runtime, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus) models.FlowRunID {
 	now := time.Now()
 
 	var exitedOn *time.Time
@@ -124,9 +131,9 @@ func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *C
 	}
 
 	var id models.FlowRunID
-	must(db.Get(&id,
+	must(rt.DB.Get(&id,
 		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, responded, created_on, modified_on, exited_on) 
-		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), $7) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, exitedOn,
+		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), $7) RETURNING id`, uuids.New(), org.ID, sessionID, contact.ID, flow.ID, status, exitedOn,
 	))
 	return id
 }

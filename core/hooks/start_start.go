@@ -3,11 +3,12 @@ package hooks
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -30,12 +31,12 @@ func (h *startStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sql
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(start.GroupIDs()) > 0 || start.Query() != "" {
+			if len(start.GroupIDs) > 0 || start.Query != "" {
 				taskQ = queue.BatchQueue
 				priority = queue.HighPriority
 			}
 
-			err := queue.AddTask(rc, taskQ, queue.StartFlow, int(oa.OrgID()), start, priority)
+			err := tasks.Queue(rc, taskQ, oa.OrgID(), &starts.StartFlowTask{FlowStart: start}, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing flow start")
 			}

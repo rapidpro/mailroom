@@ -83,7 +83,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	}
 
 	// log any error inserting our channel logs, but continue
-	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
+	if err := models.InsertChannelLogs(ctx, rt, clogs); err != nil {
 		logrus.WithError(err).Error("error inserting channel logs")
 	}
 

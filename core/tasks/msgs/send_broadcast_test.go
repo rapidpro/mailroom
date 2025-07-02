@@ -14,25 +14,27 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestBroadcastEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
-	defer rc.Close()
+func TestSendBroadcastTask(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
+	rc := rt.RP.Get()
+	defer rc.Close()
+
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	eng := envs.Language("eng")
-	basic := map[envs.Language]*events.BroadcastTranslation{
+	basic := flows.BroadcastTranslations{
 		eng: {
 			Text:         "hello world",
 			Attachments:  nil,
@@ -41,80 +43,139 @@ func TestBroadcastEvents(t *testing.T) {
 	}
 
 	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
-	doctorsOnly := []*assets.GroupReference{doctors}
-
 	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
-	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
-	db.MustExec(
-		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdata.George.URNID,
-	)
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdata.George.URNID)
 	george := flows.NewContactReference(testdata.George.UUID, "George")
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[envs.Language]*events.BroadcastTranslation
-		BaseLanguage envs.Language
-		Groups       []*assets.GroupReference
-		Contacts     []*flows.ContactReference
-		URNs         []urns.URN
-		Queue        string
-		BatchCount   int
-		MsgCount     int
-		MsgText      string
+		translations       flows.BroadcastTranslations
+		baseLanguage       envs.Language
+		groups             []*assets.GroupReference
+		contacts           []*flows.ContactReference
+		urns               []urns.URN
+		queue              string
+		expectedBatchCount int
+		expectedMsgCount   int
+		expectedMsgText    string
 	}{
-		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
-		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{ // 0
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           nil,
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   121,
+			expectedMsgText:    "hello world",
+		},
+		{ // 1
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           georgeOnly,
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   122,
+			expectedMsgText:    "hello world",
+		},
+		{ // 2
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           georgeOnly,
+			urns:               nil,
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 3
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             []*assets.GroupReference{doctors},
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               nil,
+			queue:              queue.BatchQueue,
+			expectedBatchCount: 2,
+			expectedMsgCount:   121,
+			expectedMsgText:    "hello world",
+		},
+		{ // 4
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               nil,
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 5
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               []urns.URN{urns.URN("tel:+12065551212")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
+		{ // 6
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           []*flows.ContactReference{cathy},
+			urns:               []urns.URN{urns.URN("tel:+250700000001")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   2,
+			expectedMsgText:    "hello world",
+		},
+		{ // 7
+			translations:       basic,
+			baseLanguage:       eng,
+			groups:             nil,
+			contacts:           nil,
+			urns:               []urns.URN{urns.URN("tel:+250700000001")},
+			queue:              queue.HandlerQueue,
+			expectedBatchCount: 1,
+			expectedMsgCount:   1,
+			expectedMsgText:    "hello world",
+		},
 	}
 
 	lastNow := time.Now()
 	time.Sleep(10 * time.Millisecond)
 
 	for i, tc := range tcs {
+		testsuite.ReindexElastic(ctx)
+
 		// handle our start task
-		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, tc.URNs)
-		bcast, err := models.NewBroadcastFromEvent(ctx, db, oa, event)
+		event := events.NewBroadcastCreated(tc.translations, tc.baseLanguage, tc.groups, tc.contacts, "", tc.urns)
+		bcast, err := models.NewBroadcastFromEvent(ctx, rt.DB, oa, event)
 		assert.NoError(t, err)
 
-		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
+		err = tasks.Queue(rc, tc.queue, testdata.Org1.ID, &msgs.SendBroadcastTask{Broadcast: bcast}, queue.DefaultPriority)
 		assert.NoError(t, err)
 
-		// pop all our tasks and execute them
-		var task *queue.Task
-		count := 0
-		for {
-			task, err = queue.PopNextTask(rc, tc.Queue)
-			assert.NoError(t, err)
-			if task == nil {
-				break
-			}
-
-			count++
-			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
-			batch := &models.BroadcastBatch{}
-			err = json.Unmarshal(task.Task, batch)
-			assert.NoError(t, err)
-
-			err = msgs.SendBroadcastBatch(ctx, rt, batch)
-			assert.NoError(t, err)
-		}
+		taskCounts := testsuite.FlushTasks(t, rt)
 
 		// assert our count of batches
-		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
+		assert.Equal(t, tc.expectedBatchCount, taskCounts["send_broadcast_batch"], "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
-			Returns(tc.MsgCount, "%d: unexpected msg count", i)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.expectedMsgText).
+			Returns(tc.expectedMsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
@@ -122,8 +183,8 @@ func TestBroadcastEvents(t *testing.T) {
 }
 
 func TestBroadcastTask(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -132,51 +193,19 @@ func TestBroadcastTask(t *testing.T) {
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
-	// insert a broadcast so we can check it is being set to sent
-	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
-
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
-	modelTicket := ticket.Load(db)
-
-	evaluated := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hello world",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
-
-	legacy := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hi @(PROPER(contact.name)) legacy URN: @contact.tel_e164 Gender: @contact.gender",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
-
-	template := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
-
 	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
-		BroadcastID   models.BroadcastID
-		Translations  map[envs.Language]*models.BroadcastTranslation
+		Translations  flows.BroadcastTranslations
 		TemplateState models.TemplateState
 		BaseLanguage  envs.Language
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
-		TicketID      models.TicketID
 		CreatedByID   models.UserID
 		Queue         string
 		BatchCount    int
@@ -184,14 +213,18 @@ func TestBroadcastTask(t *testing.T) {
 		MsgText       string
 	}{
 		{
-			models.NilBroadcastID,
-			evaluated,
+			flows.BroadcastTranslations{
+				eng: {
+					Text:         "hello world",
+					Attachments:  nil,
+					QuickReplies: nil,
+				},
+			},
 			models.TemplateStateEvaluated,
 			eng,
 			doctorsOnly,
 			cathyOnly,
 			nil,
-			models.NilTicketID,
 			testdata.Admin.ID,
 			queue.BatchQueue,
 			2,
@@ -199,29 +232,18 @@ func TestBroadcastTask(t *testing.T) {
 			"hello world",
 		},
 		{
-			legacyID,
-			legacy,
-			models.TemplateStateLegacy,
-			eng,
-			nil,
-			cathyOnly,
-			nil,
-			models.NilTicketID,
-			models.NilUserID,
-			queue.HandlerQueue,
-			1,
-			1,
-			"hi Cathy legacy URN: +12065551212 Gender: F",
-		},
-		{
-			models.NilBroadcastID,
-			template,
+			flows.BroadcastTranslations{
+				eng: {
+					Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
+					Attachments:  nil,
+					QuickReplies: nil,
+				},
+			},
 			models.TemplateStateUnevaluated,
 			eng,
 			nil,
 			cathyOnly,
 			nil,
-			ticket.ID,
 			testdata.Agent.ID,
 			queue.HandlerQueue,
 			1,
@@ -234,9 +256,9 @@ func TestBroadcastTask(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	for i, tc := range tcs {
-		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.CreatedByID)
-		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, "", tc.CreatedByID)
+
+		err = (&msgs.SendBroadcastTask{Broadcast: bcast}).Perform(ctx, rt, testdata.Org1.ID)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -250,12 +272,12 @@ func TestBroadcastTask(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
-			batch := &models.BroadcastBatch{}
-			err = json.Unmarshal(task.Task, batch)
+			assert.Equal(t, "send_broadcast_batch", task.Type)
+			taskObj := &msgs.SendBroadcastBatchTask{}
+			err = json.Unmarshal(task.Task, taskObj)
 			assert.NoError(t, err)
 
-			err = msgs.SendBroadcastBatch(ctx, rt, batch)
+			err = taskObj.Perform(ctx, rt, testdata.Org1.ID)
 			assert.NoError(t, err)
 		}
 
@@ -263,29 +285,10 @@ func TestBroadcastTask(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
-
-		// make sure our broadcast is marked as sent
-		if tc.BroadcastID != models.NilBroadcastID {
-			assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
-				Returns(1, "%d: broadcast not marked as sent", i)
-		}
-
-		// if we had a ticket, make sure its replied_on and last_activity_on were updated
-		if tc.TicketID != models.NilTicketID {
-			assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
-				Returns(1, "%d: ticket last_activity_on not updated", i)
-			assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND replied_on IS NOT NULL`, tc.TicketID).
-				Returns(1, "%d: ticket replied_on not updated", i)
-		}
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
-
-	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
-	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text, ':u:', $2::text)`, testdata.Org1.ID, testdata.Agent.ID).Returns(1)
-
-	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailytiming WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
 }

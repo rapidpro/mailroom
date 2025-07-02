@@ -24,7 +24,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

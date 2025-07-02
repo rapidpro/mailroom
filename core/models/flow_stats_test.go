@@ -14,7 +14,7 @@ import (
 )
 
 func TestRecordFlowStatistics(t *testing.T) {
-	ctx, rt, _, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 
@@ -34,12 +34,12 @@ func TestRecordFlowStatistics(t *testing.T) {
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session1, session2, session3}, []flows.Sprint{session1Sprint1, session2Sprint1, session3Sprint1})
 	require.NoError(t, err)
 
-	assertredis.Keys(t, rp, []string{
+	assertredis.Keys(t, rt.RP, []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 	})
 
 	// all 3 contacts went from first msg to the color split - no operands recorded for this segment
-	assertredis.ZRange(t, rp, "recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", 0, -1,
+	assertredis.ZRange(t, rt.RP, "recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", 0, -1,
 		[]string{"LZbbzXDPJH|123|", "reuPYVP90u|234|", "qWARtWDACk|345|"},
 	)
 
@@ -57,7 +57,7 @@ func TestRecordFlowStatistics(t *testing.T) {
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session3}, []flows.Sprint{session3Sprint3})
 	require.NoError(t, err)
 
-	assertredis.Keys(t, rp, []string{
+	assertredis.Keys(t, rt.RP, []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 		"recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", // color split :: Blue exit -> next node
 		"recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", // color split :: Other exit -> next node
@@ -68,17 +68,17 @@ func TestRecordFlowStatistics(t *testing.T) {
 	})
 
 	// check recent operands for color split :: Blue exit -> next node
-	assertredis.ZRange(t, rp, "recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", 0, -1,
+	assertredis.ZRange(t, rt.RP, "recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", 0, -1,
 		[]string{"2SS5dyuJzp|123|blue", "6MBPV0gqT9|234|BLUE"},
 	)
 
 	// check recent operands for color split :: Other exit -> next node
-	assertredis.ZRange(t, rp, "recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", 0, -1,
+	assertredis.ZRange(t, rt.RP, "recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", 0, -1,
 		[]string{"uI8bPiuaeA|345|teal", "2Vz/MpdX9s|345|azure"},
 	)
 
 	// check recent operands for split by expression :: Other exit -> next node
-	assertredis.ZRange(t, rp, "recent_contacts:2b698218-87e5-4ab8-922e-e65f91d12c10:88d8bf00-51ce-4e5e-aae8-4f957a0761a0", 0, -1,
+	assertredis.ZRange(t, rt.RP, "recent_contacts:2b698218-87e5-4ab8-922e-e65f91d12c10:88d8bf00-51ce-4e5e-aae8-4f957a0761a0", 0, -1,
 		[]string{"2MsZZ/N3TH|123|0", "KKLrT60Tr9|234|0"},
 	)
 }

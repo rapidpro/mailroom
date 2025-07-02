@@ -21,41 +21,41 @@ import (
 )
 
 func TestIncidentWebhooksUnhealthy(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
 	oa := testdata.Org1.Load(rt)
 
-	id1, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, []flows.NodeUUID{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	id1, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa, []flows.NodeUUID{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 	require.NoError(t, err)
 	assert.NotEqual(t, 0, id1)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident`).Returns(1)
+	assertredis.SMembers(t, rt.RP, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// raising same incident doesn't create a new one...
-	id2, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, []flows.NodeUUID{"3b1743cd-bd8b-449e-8e8a-11a3bc479766"})
+	id2, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa, []flows.NodeUUID{"3b1743cd-bd8b-449e-8e8a-11a3bc479766"})
 	require.NoError(t, err)
 	assert.Equal(t, id1, id2)
 
 	// but will add new nodes to the incident's node set
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident`).Returns(1)
+	assertredis.SMembers(t, rt.RP, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// when the incident has ended, a new one can be created
-	db.MustExec(`UPDATE notifications_incident SET ended_on = NOW()`)
+	rt.DB.MustExec(`UPDATE notifications_incident SET ended_on = NOW()`)
 
-	id3, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, nil)
+	id3, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa, nil)
 	require.NoError(t, err)
 	assert.NotEqual(t, id1, id3)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident`).Returns(2)
 
 }
 
 func TestGetOpenIncidents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -63,28 +63,28 @@ func TestGetOpenIncidents(t *testing.T) {
 	oa2 := testdata.Org2.Load(rt)
 
 	// create incident for org 1
-	id1, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa1, nil)
+	id1, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa1, nil)
 	require.NoError(t, err)
 
-	incidents, err := models.GetOpenIncidents(ctx, db, []models.IncidentType{models.IncidentTypeWebhooksUnhealthy})
+	incidents, err := models.GetOpenIncidents(ctx, rt.DB, []models.IncidentType{models.IncidentTypeWebhooksUnhealthy})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(incidents))
 	assert.Equal(t, id1, incidents[0].ID)
 	assert.Equal(t, models.IncidentTypeWebhooksUnhealthy, incidents[0].Type)
 
 	// but then end it
-	err = incidents[0].End(ctx, db)
+	err = incidents[0].End(ctx, rt.DB)
 	require.NoError(t, err)
 
 	// and create another one...
-	id2, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa1, nil)
+	id2, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa1, nil)
 	require.NoError(t, err)
 
 	// create an incident for org 2
-	id3, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa2, nil)
+	id3, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.RP, oa2, nil)
 	require.NoError(t, err)
 
-	incidents, err = models.GetOpenIncidents(ctx, db, []models.IncidentType{models.IncidentTypeWebhooksUnhealthy})
+	incidents, err = models.GetOpenIncidents(ctx, rt.DB, []models.IncidentType{models.IncidentTypeWebhooksUnhealthy})
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(incidents))
@@ -96,7 +96,7 @@ func TestGetOpenIncidents(t *testing.T) {
 }
 
 func TestWebhookNode(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 

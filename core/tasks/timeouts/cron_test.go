@@ -16,17 +16,17 @@ import (
 )
 
 func TestTimeouts(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
+	ctx, rt := testsuite.Runtime()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// need to create a session that has an expired timeout
 	s1TimeoutOn := time.Now()
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, &s1TimeoutOn)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, &s1TimeoutOn)
 	s2TimeoutOn := time.Now().Add(time.Hour * 24)
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, &s2TimeoutOn)
+	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, &s2TimeoutOn)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -40,7 +40,7 @@ func TestTimeouts(t *testing.T) {
 	assert.NotNil(t, task)
 
 	// decode the task
-	eventTask := &handler.HandleEventTask{}
+	eventTask := &handler.HandleContactEventTask{}
 	err = json.Unmarshal(task.Task, eventTask)
 	assert.NoError(t, err)
 

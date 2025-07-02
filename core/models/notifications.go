@@ -11,7 +11,7 @@ import (
 )
 
 // NotificationID is our type for notification ids
-type NotificationID int
+type NotificationID int64
 
 type NotificationType string
 

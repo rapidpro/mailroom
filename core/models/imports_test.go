@@ -18,34 +18,33 @@ import (
 	"github.com/nyaruka/goflow/test"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestContactImports(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start with no contacts or URNs
-	db.MustExec(`DELETE FROM contacts_contacturn`)
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
-	db.MustExec(`DELETE FROM contacts_contact`)
-	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
-	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
+	rt.DB.MustExec(`DELETE FROM contacts_contacturn`)
+	rt.DB.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
+	rt.DB.MustExec(`DELETE FROM contacts_contact`)
+	rt.DB.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
+	rt.DB.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
 
 	// add contact in other org to make sure we can't update it
-	testdata.InsertContact(db, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa", models.ContactStatusActive)
+	testdata.InsertContact(rt, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa", models.ContactStatusActive)
 
 	// add dynamic group to test imported contacts are added to it
-	testdata.InsertContactGroup(db, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
+	testdata.InsertContactGroup(rt, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
 	// give our org a country by setting country on a channel
-	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	testJSON := testsuite.ReadFile("testdata/imports.json")
 
@@ -67,13 +66,13 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
-		batchID := testdata.InsertContactImportBatch(db, importID, tc.Specs)
+		importID := testdata.InsertContactImport(rt, testdata.Org1, testdata.Admin)
+		batchID := testdata.InsertContactImportBatch(rt, importID, tc.Specs)
 
-		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
+		batch, err := models.LoadContactImportBatch(ctx, rt.DB, batchID)
 		require.NoError(t, err)
 
-		err = batch.Import(ctx, rt, testdata.Org1.ID)
+		err = batch.Import(ctx, rt, testdata.Org1.ID, testdata.Admin.ID)
 		require.NoError(t, err)
 
 		results := &struct {
@@ -82,11 +81,11 @@ func TestContactImports(t *testing.T) {
 			NumErrored int             `db:"num_errored"`
 			Errors     json.RawMessage `db:"errors"`
 		}{}
-		err = db.Get(results, `SELECT num_created, num_updated, num_errored, errors FROM contacts_contactimportbatch WHERE id = $1`, batchID)
+		err = rt.DB.Get(results, `SELECT num_created, num_updated, num_errored, errors FROM contacts_contactimportbatch WHERE id = $1`, batchID)
 		require.NoError(t, err)
 
 		// load all contacts and convert to specs
-		contacts := loadAllContacts(t, db, oa)
+		contacts := loadAllContacts(t, rt, oa)
 		specs := make([]*models.ContactSpec, len(contacts))
 		for i, contact := range contacts {
 			name := contact.Name()
@@ -108,6 +107,7 @@ func TestContactImports(t *testing.T) {
 				UUID:     contact.UUID(),
 				Name:     &name,
 				Language: &lang,
+				Status:   contact.Status(),
 				URNs:     contact.URNs().RawURNs(),
 				Fields:   fields,
 				Groups:   groupUUIDs,
@@ -146,20 +146,20 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestLoadContactImport(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
-	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[
+	importID := testdata.InsertContactImport(rt, testdata.Org1, testdata.Admin)
+	batch1ID := testdata.InsertContactImportBatch(rt, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
 	]`))
-	testdata.InsertContactImportBatch(db, importID, []byte(`[
+	testdata.InsertContactImportBatch(rt, importID, []byte(`[
 		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
 	]`))
 
-	imp, err := models.LoadContactImport(ctx, db, importID)
+	imp, err := models.LoadContactImport(ctx, rt.DB, importID)
 	require.NoError(t, err)
 
 	assert.Equal(t, testdata.Org1.ID, imp.OrgID)
@@ -168,7 +168,7 @@ func TestLoadContactImport(t *testing.T) {
 	assert.Nil(t, imp.FinishedOn)
 	assert.Equal(t, "P", imp.BatchStatuses)
 
-	batch1, err := models.LoadContactImportBatch(ctx, db, batch1ID)
+	batch1, err := models.LoadContactImportBatch(ctx, rt.DB, batch1ID)
 	require.NoError(t, err)
 
 	assert.Equal(t, importID, batch1.ImportID)
@@ -177,18 +177,18 @@ func TestLoadContactImport(t *testing.T) {
 	assert.Equal(t, 0, batch1.RecordStart)
 	assert.Equal(t, 2, batch1.RecordEnd)
 
-	err = batch1.Import(ctx, rt, testdata.Org1.ID)
+	err = batch1.Import(ctx, rt, testdata.Org1.ID, testdata.Admin.ID)
 	require.NoError(t, err)
 
-	imp, err = models.LoadContactImport(ctx, db, importID)
+	imp, err = models.LoadContactImport(ctx, rt.DB, importID)
 	require.NoError(t, err)
 
 	batchStatuses := strings.Split(imp.BatchStatuses, "")
 	sort.Strings(batchStatuses)
 	assert.Equal(t, []string{"C", "P"}, batchStatuses)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'P' AND finished_on IS NULL`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'P' AND finished_on IS NULL`).Returns(1)
 }
 
 func TestContactSpecUnmarshal(t *testing.T) {
@@ -221,8 +221,8 @@ func TestContactSpecUnmarshal(t *testing.T) {
 }
 
 // utility to load all contacts for the given org and return as slice sorted by ID
-func loadAllContacts(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) []*flows.Contact {
-	rows, err := db.Queryx(`SELECT id FROM contacts_contact WHERE org_id = $1`, oa.OrgID())
+func loadAllContacts(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) []*flows.Contact {
+	rows, err := rt.DB.Queryx(`SELECT id FROM contacts_contact WHERE org_id = $1`, oa.OrgID())
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -233,7 +233,7 @@ func loadAllContacts(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) []*flows.C
 		allIDs = append(allIDs, id)
 	}
 
-	contacts, err := models.LoadContacts(context.Background(), db, oa, allIDs)
+	contacts, err := models.LoadContacts(context.Background(), rt.DB, oa, allIDs)
 	require.NoError(t, err)
 
 	sort.Slice(contacts, func(i, j int) bool { return contacts[i].ID() < contacts[j].ID() })

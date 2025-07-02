@@ -11,8 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/note", web.RequireAuthToken(handleAddNote)) // deprecated
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(handleAddNote))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(web.JSONPayload(handleAddNote)))
 }
 
 type addNoteRequest struct {
@@ -29,26 +28,20 @@ type addNoteRequest struct {
 //	  "ticket_ids": [1234, 2345],
 //	  "note": "spam"
 //	}
-func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
-	request := &addNoteRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *addNoteRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
-	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+	tickets, err := models.LoadTickets(ctx, rt.DB, r.TicketIDs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", r.OrgID)
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
+	evts, err := models.TicketsAddNote(ctx, rt.DB, oa, r.UserID, tickets, r.Note)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
-	}
-
-	evts, err := models.TicketsAddNote(ctx, rt.DB, oa, request.UserID, tickets, request.Note)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error adding notes to tickets")
+		return nil, 0, errors.Wrap(err, "error adding notes to tickets")
 	}
 
 	return newBulkResponse(evts), http.StatusOK, nil

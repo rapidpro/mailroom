@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 type ChannelEventType string
@@ -59,11 +59,12 @@ func (e *ChannelEvent) IsNewContact() bool    { return e.e.NewContact }
 func (e *ChannelEvent) OccurredOn() time.Time { return e.e.OccurredOn }
 
 func (e *ChannelEvent) Extra() map[string]interface{} {
-	return e.e.Extra.Map()
+	return e.e.Extra
 }
 
 func (e *ChannelEvent) ExtraValue(key string) string {
-	return e.e.Extra.GetString(key, "")
+	v, _ := e.e.Extra[key].(string)
+	return v
 }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
@@ -99,8 +100,10 @@ func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelI
 	e.URNID = urnID
 	e.NewContact = isNewContact
 
-	if extra != nil {
-		e.Extra = null.NewMap(extra)
+	if extra == nil {
+		e.Extra = null.Map{}
+	} else {
+		e.Extra = null.Map(extra)
 	}
 
 	now := time.Now()

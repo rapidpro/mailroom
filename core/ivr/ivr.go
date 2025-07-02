@@ -2,6 +2,7 @@ package ivr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
@@ -22,10 +25,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -120,7 +120,6 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, call *models.Call) (*m
 	}
 
 	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, svc.RedactValues(channel))
-	clog.SetCall(call)
 	defer clog.End()
 
 	// try to request our call hangup
@@ -188,7 +187,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 	// create our call object
 	conn, err := models.InsertCall(
-		ctx, rt.DB, oa.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
+		ctx, rt.DB, oa.OrgID(), channel.ID(), start.StartID, contact.ID(), models.URNID(urnID),
 		models.CallDirectionOut, models.CallStatusPending, "",
 	)
 	if err != nil {
@@ -199,7 +198,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 	// log any error inserting our channel log, but continue
 	if clog != nil {
-		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
 			logrus.WithError(err).Error("error inserting channel log")
 		}
 	}
@@ -253,7 +252,6 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 	}
 
 	clog := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, svc.RedactValues(channel))
-	clog.SetCall(call)
 	defer clog.End()
 
 	// try to request our call start
@@ -308,7 +306,7 @@ func StartIVRFlow(
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
-	flow, err := oa.FlowByID(start.FlowID())
+	flow, err := oa.FlowByID(start.FlowID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
@@ -335,16 +333,16 @@ func StartIVRFlow(
 	}
 
 	var params *types.XObject
-	if len(start.Extra()) > 0 {
-		params, err = types.ReadXObject(start.Extra())
+	if !start.Params.IsNull() {
+		params, err = types.ReadXObject(start.Params)
 		if err != nil {
-			return errors.Wrap(err, "unable to read JSON from flow start extra")
+			return errors.Wrap(err, "unable to read JSON from flow start params")
 		}
 	}
 
 	var history *flows.SessionHistory
-	if len(start.SessionHistory()) > 0 {
-		history, err = models.ReadSessionHistory(start.SessionHistory())
+	if !start.SessionHistory.IsNull() {
+		history, err = models.ReadSessionHistory(start.SessionHistory)
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start history")
 		}
@@ -354,9 +352,9 @@ func StartIVRFlow(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
 	var trigger flows.Trigger
-	if len(start.ParentSummary()) > 0 {
+	if !start.ParentSummary.IsNull() {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(history, start.ParentSummary()).
+			FlowAction(history, json.RawMessage(start.ParentSummary)).
 			WithCall(channel.ChannelReference(), urn).
 			Build()
 	} else {
@@ -614,9 +612,9 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 			return errors.Wrapf(err, "unable to load start: %d", call.StartID())
 		}
 
-		flow, err := oa.FlowByID(start.FlowID())
+		flow, err := oa.FlowByID(start.FlowID)
 		if err != nil {
-			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
+			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID)
 		}
 
 		call.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)

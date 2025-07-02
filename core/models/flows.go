@@ -10,7 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -18,7 +18,7 @@ import (
 )
 
 // FlowID is the type for flow IDs
-type FlowID null.Int
+type FlowID int
 
 // NilFlowID is nil value for flow IDs
 const NilFlowID = FlowID(0)
@@ -90,7 +90,7 @@ func (f *Flow) Version() string { return f.f.Version }
 func (f *Flow) IVRRetryWait() *time.Duration {
 	wait := CallRetryWait
 
-	value := f.f.Config.Get(flowConfigIVRRetryMinutes, nil)
+	value := f.f.Config[flowConfigIVRRetryMinutes]
 	fv, isFloat := value.(float64)
 	if isFloat {
 		minutes := int(fv)
@@ -225,22 +225,7 @@ var sqlSelectFlowByName = fmt.Sprintf(baseSqlSelectFlow,
 )
 var sqlSelectFlowByID = fmt.Sprintf(baseSqlSelectFlow, `WHERE org_id = $1 AND id = $2 AND is_active = TRUE AND is_archived = FALSE`)
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i FlowID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *FlowID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i FlowID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *FlowID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *FlowID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i FlowID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *FlowID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i FlowID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

@@ -9,11 +9,30 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/pkg/errors"
 )
 
 // QueueHandleTask queues a single task for the given contact
 func QueueHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) error {
+	return queueHandleTask(rc, contactID, task, false)
+}
+
+// QueueTicketEvent queues a ticket event to be handled
+func QueueTicketEvent(rc redis.Conn, contactID models.ContactID, evt *models.TicketEvent) error {
+	eventJSON := jsonx.MustMarshal(evt)
+	var task *queue.Task
+
+	switch evt.EventType() {
+	case models.TicketEventTypeClosed:
+		task = &queue.Task{
+			Type:     TicketClosedEventType,
+			OrgID:    int(evt.OrgID()),
+			Task:     eventJSON,
+			QueuedOn: dates.Now(),
+		}
+	}
+
 	return queueHandleTask(rc, contactID, task, false)
 }
 
@@ -38,38 +57,10 @@ func queueHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task
 		return errors.Wrapf(err, "error adding contact event")
 	}
 
-	return queueContactTask(rc, models.OrgID(task.OrgID), contactID)
-}
-
-// pushes a single contact task on our queue. Note this does not push the actual content of the task
-// only that a task exists for the contact, addHandleTask should be used if the task has already been pushed
-// off the contact specific queue.
-func queueContactTask(rc redis.Conn, orgID models.OrgID, contactID models.ContactID) error {
-	// create our contact event
-	contactTask := &HandleEventTask{ContactID: contactID}
-
-	// then add a handle task for that contact on our global handler queue
-	err := queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, int(orgID), contactTask, queue.DefaultPriority)
+	// then add a handle task for that contact on our global handler queue to
+	err = tasks.Queue(rc, queue.HandlerQueue, models.OrgID(task.OrgID), &HandleContactEventTask{ContactID: contactID}, queue.DefaultPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error adding handle event task")
 	}
 	return nil
-}
-
-// QueueTicketEvent queues a ticket event to be handled
-func QueueTicketEvent(rc redis.Conn, contactID models.ContactID, evt *models.TicketEvent) error {
-	eventJSON := jsonx.MustMarshal(evt)
-	var task *queue.Task
-
-	switch evt.EventType() {
-	case models.TicketEventTypeClosed:
-		task = &queue.Task{
-			Type:     TicketClosedEventType,
-			OrgID:    int(evt.OrgID()),
-			Task:     eventJSON,
-			QueuedOn: dates.Now(),
-		}
-	}
-
-	return queueHandleTask(rc, contactID, task, false)
 }

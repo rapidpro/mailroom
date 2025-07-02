@@ -18,7 +18,7 @@ import (
 )
 
 func TestBroadcastCreated(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -49,9 +49,9 @@ func TestBroadcastCreated(t *testing.T) {
 					bcast := models.Broadcast{}
 					err = json.Unmarshal(task.Task, &bcast)
 					assert.NoError(t, err)
-					assert.Nil(t, bcast.ContactIDs())
-					assert.Nil(t, bcast.GroupIDs())
-					assert.Equal(t, 1, len(bcast.URNs()))
+					assert.Nil(t, bcast.ContactIDs)
+					assert.Nil(t, bcast.GroupIDs)
+					assert.Equal(t, 1, len(bcast.URNs))
 					return nil
 				},
 			},

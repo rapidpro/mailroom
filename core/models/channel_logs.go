@@ -3,13 +3,18 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"path"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
 
@@ -43,7 +48,6 @@ type ChannelLog struct {
 	uuid      ChannelLogUUID
 	type_     ChannelLogType
 	channel   *Channel
-	call      *Call
 	httpLogs  []*httpx.Log
 	errors    []ChannelError
 	createdOn time.Time
@@ -51,6 +55,7 @@ type ChannelLog struct {
 
 	recorder *httpx.Recorder
 	redactor stringsx.Redactor
+	attached bool
 }
 
 // NewChannelLog creates a new channel log with the given type and channel
@@ -68,6 +73,8 @@ func newChannelLog(t ChannelLogType, ch *Channel, r *httpx.Recorder, redactVals 
 		uuid:      ChannelLogUUID(uuids.New()),
 		type_:     t,
 		channel:   ch,
+		httpLogs:  []*httpx.Log{},
+		errors:    []ChannelError{},
 		createdOn: dates.Now(),
 
 		recorder: r,
@@ -76,10 +83,6 @@ func newChannelLog(t ChannelLogType, ch *Channel, r *httpx.Recorder, redactVals 
 }
 
 func (l *ChannelLog) UUID() ChannelLogUUID { return l.uuid }
-
-func (l *ChannelLog) SetCall(c *Call) {
-	l.call = c
-}
 
 func (l *ChannelLog) HTTP(t *httpx.Trace) {
 	l.httpLogs = append(l.httpLogs, l.traceToLog(t))
@@ -102,16 +105,31 @@ func (l *ChannelLog) traceToLog(t *httpx.Trace) *httpx.Log {
 	return httpx.NewLog(t, 2048, 50000, l.redactor)
 }
 
+// if we have an error or a non 2XX/3XX http response then log is considered an error
+func (l *ChannelLog) isError() bool {
+	if len(l.errors) > 0 {
+		return true
+	}
+
+	for _, l := range l.httpLogs {
+		if l.StatusCode < 200 || l.StatusCode >= 400 {
+			return true
+		}
+	}
+
+	return false
+}
+
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( uuid,  channel_id,  call_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
-                         VALUES(:uuid, :channel_id, :call_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
+INSERT INTO channels_channellog( uuid,  channel_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
+                         VALUES(:uuid, :channel_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
+// channel log to be inserted into the database
 type dbChannelLog struct {
 	ID        ChannelLogID    `db:"id"`
 	UUID      ChannelLogUUID  `db:"uuid"`
 	ChannelID ChannelID       `db:"channel_id"`
-	CallID    CallID          `db:"call_id"`
 	Type      ChannelLogType  `db:"log_type"`
 	HTTPLogs  json.RawMessage `db:"http_logs"`
 	Errors    json.RawMessage `db:"errors"`
@@ -120,37 +138,73 @@ type dbChannelLog struct {
 	CreatedOn time.Time       `db:"created_on"`
 }
 
-// InsertChannelLogs writes the given channel logs to the db
-func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
-	vs := make([]*dbChannelLog, len(logs))
-	for i, l := range logs {
-		// if we have an error or a non 2XX/3XX http response then this log is marked as an error
-		isError := len(l.errors) > 0
-		if !isError {
-			for _, l := range l.httpLogs {
-				if l.StatusCode < 200 || l.StatusCode >= 400 {
-					isError = true
-					break
-				}
-			}
-		}
+// channel log to be written to logs storage
+type stChannelLog struct {
+	UUID        ChannelLogUUID     `json:"uuid"`
+	Type        ChannelLogType     `json:"type"`
+	HTTPLogs    []*httpx.Log       `json:"http_logs"`
+	Errors      []ChannelError     `json:"errors"`
+	ElapsedMS   int                `json:"elapsed_ms"`
+	CreatedOn   time.Time          `json:"created_on"`
+	ChannelUUID assets.ChannelUUID `json:"-"`
+}
 
-		v := &dbChannelLog{
-			UUID:      ChannelLogUUID(uuids.New()),
-			ChannelID: l.channel.ID(),
-			Type:      l.type_,
-			HTTPLogs:  jsonx.MustMarshal(l.httpLogs),
-			Errors:    jsonx.MustMarshal(l.errors),
-			IsError:   isError,
-			CreatedOn: time.Now(),
-			ElapsedMS: int(l.elapsed / time.Millisecond),
+func (l *stChannelLog) path() string {
+	return path.Join("channels", string(l.ChannelUUID), string(l.UUID[:4]), fmt.Sprintf("%s.json", l.UUID))
+}
+
+// InsertChannelLogs writes the given channel logs to the db
+func InsertChannelLogs(ctx context.Context, rt *runtime.Runtime, logs []*ChannelLog) error {
+	attached := make([]*stChannelLog, 0, len(logs))
+	unattached := make([]*dbChannelLog, 0, len(logs))
+
+	for _, l := range logs {
+		if l.attached {
+			// if log is attached to a call or message, only write to storage
+			attached = append(attached, &stChannelLog{
+				UUID:        l.uuid,
+				Type:        l.type_,
+				HTTPLogs:    l.httpLogs,
+				Errors:      l.errors,
+				ElapsedMS:   int(l.elapsed / time.Millisecond),
+				CreatedOn:   l.createdOn,
+				ChannelUUID: l.channel.UUID(),
+			})
+		} else {
+			// otherwise write to database so it's retrievable
+			unattached = append(unattached, &dbChannelLog{
+				UUID:      ChannelLogUUID(uuids.New()),
+				ChannelID: l.channel.ID(),
+				Type:      l.type_,
+				HTTPLogs:  jsonx.MustMarshal(l.httpLogs),
+				Errors:    jsonx.MustMarshal(l.errors),
+				IsError:   l.isError(),
+				CreatedOn: l.createdOn,
+				ElapsedMS: int(l.elapsed / time.Millisecond),
+			})
 		}
-		if l.call != nil {
-			v.CallID = l.call.ID()
-		}
-		vs[i] = v
 	}
 
-	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, vs)
-	return errors.Wrapf(err, "error inserting channel logs")
+	if len(attached) > 0 {
+		uploads := make([]*storage.Upload, len(attached))
+		for i, l := range attached {
+			uploads[i] = &storage.Upload{
+				Path:        l.path(),
+				ContentType: "application/json",
+				Body:        jsonx.MustMarshal(l),
+			}
+		}
+		if err := rt.LogStorage.BatchPut(ctx, uploads); err != nil {
+			return errors.Wrapf(err, "error writing attached channel logs to storage")
+		}
+	}
+
+	if len(unattached) > 0 {
+		err := BulkQuery(ctx, "insert channel log", rt.DB, sqlInsertChannelLog, unattached)
+		if err != nil {
+			return errors.Wrapf(err, "error inserting unattached channel logs")
+		}
+	}
+
+	return nil
 }

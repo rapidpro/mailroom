@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/core/tasks/msgs"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -64,8 +68,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			continue
 		}
 
-		var task interface{}
-		var taskName string
+		var task tasks.Task
 
 		// if it is a broadcast
 		if s.Broadcast() != nil {
@@ -78,12 +81,12 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			}
 
 			// add our task to send this broadcast
-			task = bcast
-			taskName = queue.SendBroadcast
+			task = &msgs.SendBroadcastTask{Broadcast: bcast}
 			broadcasts++
 
 		} else if s.FlowStart() != nil {
 			start := s.FlowStart()
+			start.UUID = uuids.New()
 
 			// insert our flow start
 			err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
@@ -94,8 +97,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			}
 
 			// add our flow start task
-			task = start
-			taskName = queue.StartFlow
+			task = &starts.StartFlowTask{FlowStart: start}
 			triggers++
 		} else {
 			log.Info("schedule found with no associated active broadcast or trigger, ignoring")
@@ -120,9 +122,9 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 		// add our task if we have one
 		if task != nil {
-			err = queue.AddTask(rc, queue.BatchQueue, taskName, int(s.OrgID()), task, queue.HighPriority)
+			err = tasks.Queue(rc, queue.BatchQueue, s.OrgID(), task, queue.HighPriority)
 			if err != nil {
-				log.WithError(err).Error("error firing task with name: ", taskName)
+				log.WithError(err).Errorf("error queueing %s task from schedule", task.Type())
 			}
 		}
 	}

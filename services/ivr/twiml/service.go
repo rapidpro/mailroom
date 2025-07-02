@@ -62,7 +62,7 @@ const (
 )
 
 // https://www.twilio.com/docs/voice/twiml/say
-var supportedSayLanguages = utils.StringSet([]string{
+var supportedSayLanguages = utils.Set([]string{
 	"da-DK",
 	"de-DE",
 	"en-AU",
@@ -136,7 +136,9 @@ func NewService(httpClient *http.Client, accountSID string, authToken string) iv
 }
 
 func (s *service) DownloadMedia(url string) (*http.Response, error) {
-	return http.Get(url)
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	req.SetBasicAuth(s.accountSID, s.authToken)
+	return http.DefaultClient.Do(req)
 }
 
 func (s *service) CheckStartRequest(r *http.Request) models.CallError {
@@ -530,5 +532,8 @@ func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es [
 }
 
 func (s *service) RedactValues(ch *models.Channel) []string {
-	return []string{ch.ConfigValue(authTokenConfig, "")}
+	return []string{
+		httpx.BasicAuth(ch.ConfigValue(accountSIDConfig, ""), ch.ConfigValue(authTokenConfig, "")),
+		ch.ConfigValue(authTokenConfig, ""),
+	}
 }

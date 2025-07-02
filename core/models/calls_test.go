@@ -11,21 +11,21 @@ import (
 )
 
 func TestCalls(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
-	defer db.MustExec(`DELETE FROM ivr_call`)
+	defer rt.DB.MustExec(`DELETE FROM ivr_call`)
 
-	conn, err := models.InsertCall(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.CallDirectionOut, models.CallStatusPending, "")
+	conn, err := models.InsertCall(ctx, rt.DB, testdata.Org1.ID, testdata.TwilioChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.CallDirectionOut, models.CallStatusPending, "")
 	assert.NoError(t, err)
 
 	assert.NotEqual(t, models.CallID(0), conn.ID())
 
-	err = conn.UpdateExternalID(ctx, db, "test1")
+	err = conn.UpdateExternalID(ctx, rt.DB, "test1")
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT count(*) from ivr_call where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from ivr_call where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
 
-	conn2, err := models.GetCallByID(ctx, db, testdata.Org1.ID, conn.ID())
+	conn2, err := models.GetCallByID(ctx, rt.DB, testdata.Org1.ID, conn.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, "test1", conn2.ExternalID())
 }

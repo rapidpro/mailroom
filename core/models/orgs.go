@@ -8,7 +8,6 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -24,7 +23,7 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -141,7 +140,11 @@ func (o *Org) UnmarshalJSON(b []byte) error {
 
 // ConfigValue returns the string value for the passed in config (or default if not found)
 func (o *Org) ConfigValue(key string, def string) string {
-	return o.o.Config.GetString(key, def)
+	v, ok := o.o.Config[key].(string)
+	if ok {
+		return v
+	}
+	return def
 }
 
 // EmailService returns the email service for this org
@@ -205,14 +208,7 @@ func (o *Org) attachmentPath(prefix string, filename string) string {
 	}
 	parts = append(parts, filename)
 
-	path := filepath.Join(parts...)
-
-	// ensure path begins with /
-	if !strings.HasPrefix(path, "/") {
-		path = fmt.Sprintf("/%s", path)
-	}
-
-	return path
+	return filepath.Join(parts...)
 }
 
 // gets the underlying org for the given session assets
@@ -248,8 +244,8 @@ const selectOrgByID = `
 SELECT ROW_TO_JSON(o) FROM (SELECT
 	id,
 	is_suspended,
-	COALESCE(o.config::json,'{}'::json) AS config,
-	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
+	o.config AS config,
+	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' ELSE 'YYYY-MM-DD' END) AS date_format, 
 	'tt:mm' AS time_format,
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,

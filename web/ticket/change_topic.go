@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/change_topic", web.RequireAuthToken(handleChangeTopic))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/change_topic", web.RequireAuthToken(web.JSONPayload(handleChangeTopic)))
 }
 
 type changeTopicRequest struct {
@@ -28,26 +28,20 @@ type changeTopicRequest struct {
 //	  "ticket_ids": [1234, 2345],
 //	  "topic_id": 345
 //	}
-func handleChangeTopic(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
-	request := &changeTopicRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+func handleChangeTopic(ctx context.Context, rt *runtime.Runtime, r *changeTopicRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to load org assets")
 	}
 
-	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+	tickets, err := models.LoadTickets(ctx, rt.DB, r.TicketIDs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, errors.Wrapf(err, "error loading tickets for org: %d", r.OrgID)
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
+	evts, err := models.TicketsChangeTopic(ctx, rt.DB, oa, r.UserID, tickets, r.TopicID)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
-	}
-
-	evts, err := models.TicketsChangeTopic(ctx, rt.DB, oa, request.UserID, tickets, request.TopicID)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error changing topic of tickets")
+		return nil, 0, errors.Wrap(err, "error changing topic of tickets")
 	}
 
 	return newBulkResponse(evts), http.StatusOK, nil

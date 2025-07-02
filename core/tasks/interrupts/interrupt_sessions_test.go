@@ -14,15 +14,15 @@ import (
 )
 
 func TestInterrupts(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
 	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.CallID) models.SessionID {
-		sessionID := testdata.InsertWaitingSession(db, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
+		sessionID := testdata.InsertWaitingSession(rt, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
 
 		// give session one waiting run too
-		testdata.InsertFlowRun(db, org, sessionID, contact, flow, models.RunStatusWaiting)
+		testdata.InsertFlowRun(rt, org, sessionID, contact, flow, models.RunStatusWaiting)
 		return sessionID
 	}
 
@@ -60,10 +60,10 @@ func TestInterrupts(t *testing.T) {
 
 	for i, tc := range tcs {
 		// mark any remaining flow sessions as inactive
-		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
+		rt.DB.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio call
-		twilioCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
+		twilioCallID := testdata.InsertCall(rt, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 
 		sessionIDs := make([]models.SessionID, 5)
 
@@ -90,12 +90,12 @@ func TestInterrupts(t *testing.T) {
 		// check session statuses are as expected
 		for j, sID := range sessionIDs {
 			var status string
-			err := db.Get(&status, `SELECT status FROM flows_flowsession WHERE id = $1`, sID)
+			err := rt.DB.Get(&status, `SELECT status FROM flows_flowsession WHERE id = $1`, sID)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedStatuses[j], status, "%d: status mismatch for session #%d", i, j)
 
 			// check for runs with a different status to the session
-			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.expectedStatuses[j]).
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.expectedStatuses[j]).
 				Returns(0, "%d: unexpected un-interrupted runs for session #%d", i, j)
 		}
 	}

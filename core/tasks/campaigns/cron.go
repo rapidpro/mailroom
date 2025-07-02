@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 
@@ -122,7 +123,7 @@ func queueFiresTask(rp *redis.Pool, orgID models.OrgID, task *FireCampaignEventT
 	rc := rp.Get()
 	defer rc.Close()
 
-	err := queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(orgID), task, queue.DefaultPriority)
+	err := tasks.Queue(rc, queue.BatchQueue, orgID, task, queue.DefaultPriority)
 	if err != nil {
 		return errors.Wrap(err, "error queuing task")
 	}

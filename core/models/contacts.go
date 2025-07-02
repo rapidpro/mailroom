@@ -18,17 +18,18 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null/v2"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // URNID is our type for urn ids, which can be null
-type URNID null.Int
+type URNID int
 
 // ContactID is our type for contact ids, which can be null
-type ContactID null.Int
+type ContactID int
 
 // URN priority constants
 const (
@@ -80,7 +81,7 @@ type Contact struct {
 	fields        map[string]*flows.Value
 	groups        []*Group
 	urns          []urns.URN
-	tickets       []*Ticket
+	ticket        *Ticket
 	createdOn     time.Time
 	modifiedOn    time.Time
 	lastSeenOn    *time.Time
@@ -95,6 +96,7 @@ func (c *Contact) Status() ContactStatus           { return c.status }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
+func (c *Contact) Ticket() *Ticket                 { return c.ticket }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
@@ -204,11 +206,11 @@ func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 		}
 	}
 
-	// convert our tickets to flow tickets
-	tickets := make([]*flows.Ticket, len(c.tickets))
+	// convert our ticket to a flow ticket
+	var ticket *flows.Ticket
 	var err error
-	for i, t := range c.tickets {
-		tickets[i], err = t.FlowTicket(oa)
+	if c.ticket != nil {
+		ticket, err = c.ticket.FlowTicket(oa)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating flow ticket")
 		}
@@ -228,7 +230,7 @@ func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 		c.urns,
 		groups,
 		c.fields,
-		tickets,
+		ticket,
 		assets.IgnoreMissing,
 	)
 	if err != nil {
@@ -245,7 +247,7 @@ func LoadContact(ctx context.Context, db Queryer, oa *OrgAssets, id ContactID) (
 		return nil, err
 	}
 	if len(contacts) == 0 {
-		return nil, nil
+		return nil, errors.Errorf("no such contact #%d in org #%d", id, oa.OrgID())
 	}
 	return contacts[0], nil
 }
@@ -253,6 +255,10 @@ func LoadContact(ctx context.Context, db Queryer, oa *OrgAssets, id ContactID) (
 // LoadContacts loads a set of contacts for the passed in ids. Note that the order of the returned contacts
 // won't necessarily match the order of the ids.
 func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactID) ([]*Contact, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
 	start := time.Now()
 
 	rows, err := db.QueryxContext(ctx, sqlSelectContact, pq.Array(ids), oa.OrgID())
@@ -323,15 +329,14 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 		}
 		contact.urns = contactURNs
 
-		// initialize our tickets
-		tickets := make([]*Ticket, 0, len(e.Tickets))
-		for _, t := range e.Tickets {
+		// grab the last opened open ticket
+		if len(e.Tickets) > 0 {
+			t := e.Tickets[0]
 			ticketer := oa.TicketerByID(t.TicketerID)
 			if ticketer != nil {
-				tickets = append(tickets, NewTicket(t.UUID, oa.OrgID(), NilUserID, NilFlowID, contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil))
+				contact.ticket = NewTicket(t.UUID, oa.OrgID(), NilUserID, NilFlowID, contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil)
 			}
 		}
-		contact.tickets = tickets
 
 		contacts = append(contacts, contact)
 	}
@@ -385,6 +390,10 @@ func GetContactIDsFromReferences(ctx context.Context, db Queryer, orgID OrgID, r
 
 // gets the contact IDs for the passed in org and set of UUIDs
 func getContactIDsFromUUIDs(ctx context.Context, db Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+
 	ids, err := queryContactIDs(ctx, db, `SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`, orgID, pq.Array(uuids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contact ids by UUID")
@@ -544,7 +553,7 @@ LEFT JOIN (
 				'ticketer_id', t.ticketer_id,
 				'topic_id', t.topic_id,
 				'assignee_id', t.assignee_id
-			) ORDER BY t.opened_on ASC, t.id ASC
+			) ORDER BY t.opened_on DESC, t.id DESC
 		) as tickets
 	FROM
 		tickets_ticket t
@@ -612,7 +621,6 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 // * If URNs exist but are orphaned it creates a new contact and assigns those URNs to them.
 // * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
 // * If URNs exists and belongs to multiple contacts it will return an error.
-//
 func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, bool, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
@@ -647,34 +655,40 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 	return contact, flowContact, created, nil
 }
 
-// GetOrCreateContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
-// the passed in URNs with the ids of the contacts.
-func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+// GetOrCreateContactsFromURNs will fetch or create the contacts for the passed in URNs, returning a map of the fetched
+// contacts and another map of the created contacts.
+func GetOrCreateContactsFromURNs(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]*Contact, map[urns.URN]*Contact, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
 	}
 
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	owners, err := contactsFromURNs(ctx, db, oa, urnz)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up contacts for URNs")
+		return nil, nil, errors.Wrap(err, "error looking up contacts for URNs")
 	}
+
+	fetched := make(map[urns.URN]*Contact, len(urnz))
+	created := make(map[urns.URN]*Contact, len(urnz))
 
 	// create any contacts that are missing
-	for urn, contactID := range owners {
-		if contactID == NilContactID {
+	for urn, contact := range owners {
+		if contact == nil {
 			contact, _, _, err := GetOrCreateContact(ctx, db, oa, []urns.URN{urn}, NilChannelID)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error creating contact")
+				return nil, nil, errors.Wrapf(err, "error creating contact")
 			}
-			owners[urn] = contact.ID()
+			created[urn] = contact
+		} else {
+			fetched[urn] = contact
 		}
 	}
-	return owners, nil
+
+	return fetched, created, nil
 }
 
-// looks up the contacts who own the given urns (which should be normalized by the caller) and returns that information as a map
+// looks up the contact IDs who own the given urns (which should be normalized by the caller) and returns that information as a map
 func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urns.URN) (map[urns.URN]ContactID, error) {
 	identityToOriginal := make(map[urns.URN]urns.URN, len(urnz))
 	identities := make([]urns.URN, len(urnz))
@@ -703,6 +717,39 @@ func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urn
 	}
 
 	return owners, nil
+}
+
+// like contactIDsFromURNs but fetches the contacts
+func contactsFromURNs(ctx context.Context, db Queryer, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]*Contact, error) {
+	ids, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the ids of the contacts that exist
+	existingIDs := make([]ContactID, 0, len(ids))
+	for _, id := range ids {
+		if id != NilContactID {
+			existingIDs = append(existingIDs, id)
+		}
+	}
+
+	fetched, err := LoadContacts(ctx, db, oa, existingIDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error loading contacts")
+	}
+
+	// and transform those into a map by URN
+	fetchedByID := make(map[ContactID]*Contact, len(fetched))
+	for _, c := range fetched {
+		fetchedByID[c.ID()] = c
+	}
+	byURN := make(map[urns.URN]*Contact, len(ids))
+	for urn, id := range ids {
+		byURN[urn] = fetchedByID[id]
+	}
+
+	return byURN, nil
 }
 
 func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN, channelID ChannelID) (ContactID, bool, error) {
@@ -1136,7 +1183,7 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 
 // UpdateContactModifiedOn updates modified_on the passed in contacts
 func UpdateContactModifiedOn(ctx context.Context, db Queryer, contactIDs []ContactID) error {
-	for _, idBatch := range chunkSlice(contactIDs, 100) {
+	for _, idBatch := range ChunkSlice(contactIDs, 100) {
 		_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(idBatch))
 		if err != nil {
 			return errors.Wrap(err, "error updating modified_on for contact batch")
@@ -1307,51 +1354,15 @@ type ContactURNsChanged struct {
 	URNs      []urns.URN
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i URNID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
+func (i *URNID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i URNID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *URNID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i URNID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *URNID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i URNID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *URNID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i ContactID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *ContactID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i ContactID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *ContactID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// GetContactLocker returns the locker for a particular contact
-func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
-	key := fmt.Sprintf("lock:c:%d:%d", orgID, contactID)
-	return redisx.NewLocker(key, time.Minute*5)
-}
+func (i *ContactID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ContactID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ContactID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ContactID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // ContactStatusChange struct used for our contact status change
 type ContactStatusChange struct {
@@ -1416,3 +1427,65 @@ FROM (
 WHERE
 	c.id = r.id::int
 `
+
+// LockContacts tries to grab locks for the given contacts, returning the locks and the skipped contacts
+func LockContacts(ctx context.Context, rt *runtime.Runtime, orgID OrgID, ids []ContactID, retry time.Duration) (map[ContactID]string, []ContactID, error) {
+	locks := make(map[ContactID]string, len(ids))
+	skipped := make([]ContactID, 0, 5)
+
+	// this is set to true at the end of the function so the defer calls won't release the locks unless we're returning
+	// early due to an error
+	success := false
+
+	for _, contactID := range ids {
+		// error if context has finished before we have
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		default:
+		}
+
+		locker := getContactLocker(orgID, contactID)
+
+		lock, err := locker.Grab(rt.RP, retry)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "error attempting to grab lock")
+		}
+
+		// no error but we didn't get the lock
+		if lock == "" {
+			skipped = append(skipped, contactID)
+			continue
+		}
+
+		locks[contactID] = lock
+
+		// if we error we want to release all locks on way out
+		defer func() {
+			if !success {
+				locker.Release(rt.RP, lock)
+			}
+		}()
+	}
+
+	success = true
+	return locks, skipped, nil
+}
+
+// UnlockContacts unlocks the given contacts using the given lock values
+func UnlockContacts(rt *runtime.Runtime, orgID OrgID, locks map[ContactID]string) error {
+	for contactID, lock := range locks {
+		locker := getContactLocker(orgID, contactID)
+
+		err := locker.Release(rt.RP, lock)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// returns the locker for a particular contact
+func getContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
+	return redisx.NewLocker(fmt.Sprintf("lock:c:%d:%d", orgID, contactID), time.Minute*5)
+}
