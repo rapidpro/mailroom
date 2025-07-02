@@ -1,12 +1,13 @@
-build:
-  main: ./cmd/mailroom/main.go
-  binary: mailroom
-  goos:
-    - darwin
-    - linux
-  goarch:
-    - amd64
-    - arm64
+version: 2
+builds:
+  - main: ./cmd/mailroom/main.go
+    binary: mailroom
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
 
 changelog:
   filters:
