@@ -1,3 +1,7 @@
+v26.1.37 (2026-02-22)
+-------------------------
+ * Update to latest goflow
+
 v26.1.36 (2026-02-19)
 -------------------------
  * Fix startup check for opensearch
