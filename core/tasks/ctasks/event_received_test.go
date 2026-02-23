@@ -99,7 +99,7 @@ func TestEventReceived(t *testing.T) {
 		assertdb.Query(t, rt.DB, `SELECT status FROM channels_channelevent WHERE id = $1`, eventID).Columns(map[string]any{"status": "H"}, "%d: event state mismatch", i)
 
 		actual := tc
-		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true, test.MockStartTime)
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
 		for i, dba := range tc.DBAssertions {

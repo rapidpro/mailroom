@@ -170,7 +170,7 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		// clone test case and populate with actual values
 		actual := tc
 		actual.ExpectedTasks = testsuite.GetQueuedTasks(t, rt)
-		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true, test.MockStartTime)
 		actual.IndexedMessages = testsuite.GetIndexedMessages(t, rt, true)
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
