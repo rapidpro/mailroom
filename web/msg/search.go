@@ -15,7 +15,7 @@ func init() {
 	web.InternalRoute(http.MethodPost, "/msg/search", web.JSONPayload(handleSearch))
 }
 
-// Searches messages in the OpenSearch messages index
+// Searches messages in the OpenSearch messages index and returns the matching events from DynamoDB.
 //
 //	{
 //	  "org_id": 1,
@@ -32,13 +32,18 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	msgs, total, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text)
+	results, total, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error searching messages: %w", err)
 	}
 
-	return map[string]any{
-		"total":    total,
-		"messages": msgs,
-	}, http.StatusOK, nil
+	wrapped := make([]any, len(results))
+	for i, r := range results {
+		wrapped[i] = map[string]any{
+			"contact": map[string]any{"uuid": r.ContactUUID},
+			"event":   r.Event,
+		}
+	}
+
+	return map[string]any{"total": total, "results": wrapped}, http.StatusOK, nil
 }

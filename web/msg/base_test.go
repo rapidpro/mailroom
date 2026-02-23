@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -17,7 +18,7 @@ import (
 func TestSend(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetDynamo)
 
 	// add an unreachable contact (i.e. no URNs)
 	testdb.InsertContact(t, rt, testdb.Org1, "f5e5c595-0cba-4eb9-b1e6-41d7f7f0add6", "Mr Unreachable", "eng", models.ContactStatusActive)
@@ -32,7 +33,7 @@ func TestSend(t *testing.T) {
 func TestDelete(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetDynamo)
 
 	testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f5", testdb.TwilioChannel, testdb.Ann, "1", models.MsgStatusHandled)
 	testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad9-9791-770d-a47d-8f4a6ea3ad13", testdb.TwilioChannel, testdb.Ann, "2", models.MsgStatusPending)
@@ -44,7 +45,7 @@ func TestDelete(t *testing.T) {
 func TestHandle(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetDynamo)
 
 	testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f5", testdb.TwilioChannel, testdb.Ann, "hello", models.MsgStatusHandled)
 	testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad9-9791-770d-a47d-8f4a6ea3ad13", testdb.TwilioChannel, testdb.Ann, "hello", models.MsgStatusPending)
@@ -56,7 +57,7 @@ func TestHandle(t *testing.T) {
 func TestResend(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetDynamo)
 
 	testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f5", testdb.TwilioChannel, testdb.Ann, "hello", models.MsgStatusHandled)
 	testdb.InsertOutgoingMsg(t, rt, testdb.Org1, "0199bad9-9791-770d-a47d-8f4a6ea3ad13", testdb.TwilioChannel, testdb.Ann, "how can we help", nil, models.MsgStatusSent, false)
@@ -70,7 +71,7 @@ func TestResend(t *testing.T) {
 func TestBroadcast(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetDynamo)
 
 	optIn := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
 	require.Equal(t, models.OptInID(30000), optIn.ID)
@@ -94,11 +95,11 @@ func TestBroadcastPreview(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	_, rt := testsuite.Runtime(t)
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetOpenSearch)
+	defer testsuite.Reset(t, rt, testsuite.ResetOpenSearch|testsuite.ResetDynamo)
 
-	// index some test messages
+	// index some test messages into OpenSearch
 	for _, msg := range []search.MessageDoc{
 		{Timestamp: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "2ef672d8-a10f-4aaf-8e2a-e83844efa94a", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
 		{Timestamp: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "3af672d8-b10f-4bbf-9e3b-f93955fgb95b", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
@@ -110,8 +111,18 @@ func TestSearch(t *testing.T) {
 	rt.Search.Messages.Flush()
 
 	// refresh the index to make documents searchable
-	_, err := rt.Search.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{"messages"}})
+	_, err := rt.Search.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
 	require.NoError(t, err)
+
+	// write corresponding events to DynamoDB
+	for _, item := range []*dynamo.Item{
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Ann.UUID), SK: "evt#2ef672d8-a10f-4aaf-8e2a-e83844efa94a"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello world", "created_on": "2025-05-01T12:00:00Z"}},
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Bob.UUID), SK: "evt#3af672d8-b10f-4bbf-9e3b-f93955fgb95b"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello there friend", "created_on": "2025-05-01T13:00:00Z"}},
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Cat.UUID), SK: "evt#4bf783e9-c21g-5ccg-af4c-g04a66ghc06c"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_created", "text": "goodbye world", "created_on": "2025-05-01T14:00:00Z"}},
+	} {
+		err := dynamo.PutItem(ctx, rt.Dynamo.History.Client(), rt.Dynamo.History.Table(), item)
+		require.NoError(t, err)
+	}
 
 	testsuite.RunWebTests(t, rt, "testdata/search.json")
 }
