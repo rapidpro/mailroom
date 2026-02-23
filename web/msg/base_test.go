@@ -101,9 +101,9 @@ func TestSearch(t *testing.T) {
 
 	// index some test messages into OpenSearch
 	for _, msg := range []search.MessageDoc{
-		{Timestamp: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "2ef672d8-a10f-4aaf-8e2a-e83844efa94a", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
-		{Timestamp: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "3af672d8-b10f-4bbf-9e3b-f93955fgb95b", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
-		{Timestamp: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "4bf783e9-c21g-5ccg-af4c-g04a66ghc06c", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
+		{Timestamp: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
+		{Timestamp: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
+		{Timestamp: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
 	} {
 		rt.Search.Messages.Queue(jsonx.MustMarshal(msg))
 	}
@@ -116,9 +116,9 @@ func TestSearch(t *testing.T) {
 
 	// write corresponding events to DynamoDB
 	for _, item := range []*dynamo.Item{
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Ann.UUID), SK: "evt#2ef672d8-a10f-4aaf-8e2a-e83844efa94a"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello world", "created_on": "2025-05-01T12:00:00Z"}},
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Bob.UUID), SK: "evt#3af672d8-b10f-4bbf-9e3b-f93955fgb95b"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello there friend", "created_on": "2025-05-01T13:00:00Z"}},
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Cat.UUID), SK: "evt#4bf783e9-c21g-5ccg-af4c-g04a66ghc06c"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_created", "text": "goodbye world", "created_on": "2025-05-01T14:00:00Z"}},
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Ann.UUID), SK: "evt#01968bb7-ca00-7000-8000-000000000001"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello world", "created_on": "2025-05-01T12:00:00Z"}},
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Bob.UUID), SK: "evt#01968bee-b880-7000-8000-000000000002"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello there friend", "created_on": "2025-05-01T13:00:00Z"}},
+		{Key: dynamo.Key{PK: "con#" + string(testdb.Cat.UUID), SK: "evt#01968c25-a700-7000-8000-000000000003"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_created", "text": "goodbye world", "created_on": "2025-05-01T14:00:00Z"}},
 	} {
 		err := dynamo.PutItem(ctx, rt.Dynamo.History.Client(), rt.Dynamo.History.Table(), item)
 		require.NoError(t, err)
