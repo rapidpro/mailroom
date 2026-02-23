@@ -2,6 +2,7 @@ package ctasks_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
@@ -36,7 +37,7 @@ func TestMsgDeleted(t *testing.T) {
 		"0199c4cf-486a-79af-9892-79254b6ac5b7": "V",
 	})
 
-	items := testsuite.GetHistoryItems(t, rt, false)
+	items := testsuite.GetHistoryItems(t, rt, false, time.Time{})
 	if assert.Equal(t, 2, len(items)) {
 		assert.Equal(t, "con#a393abc0-283d-4c9b-a1b3-641a035c34bf", items[0].PK)
 		assert.Equal(t, "evt#0199c4cb-f111-7ce8-9ce9-614d61a2c198#del", items[0].SK)

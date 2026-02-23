@@ -6,9 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	dbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
@@ -200,20 +205,64 @@ func GetIndexedMessages(t *testing.T, rt *runtime.Runtime, clear bool) []search.
 	return docs
 }
 
-func GetHistoryItems(t *testing.T, rt *runtime.Runtime, clear bool) []*dynamo.Item {
+func GetHistoryItems(t *testing.T, rt *runtime.Runtime, clear bool, after time.Time) []*dynamo.Item {
+	t.Helper()
+
 	rt.Dynamo.History.Flush()
 
-	items := dyntest.ScanAll(t, rt.Dynamo.History.Client(), "TestHistory")
+	allItems := dyntest.ScanAll(t, rt.Dynamo.History.Client(), "TestHistory")
 
-	if clear {
-		dyntest.Truncate(t, rt.Dynamo.History.Client(), "TestHistory")
+	if after.IsZero() {
+		if clear {
+			dyntest.Truncate(t, rt.Dynamo.History.Client(), "TestHistory")
+		}
+		return allItems
+	}
+
+	// filter items by UUID7 time boundary
+	afterMs := after.UnixMilli()
+	items := make([]*dynamo.Item, 0, len(allItems))
+
+	for _, item := range allItems {
+		if skUUID7TimeMs(item.SK) >= afterMs {
+			items = append(items, item)
+		}
+	}
+
+	if clear && len(items) > 0 {
+		client := rt.Dynamo.History.Client()
+		table := rt.Dynamo.History.Table()
+		for _, item := range items {
+			_, err := client.DeleteItem(t.Context(), &dynamodb.DeleteItemInput{
+				TableName: aws.String(table),
+				Key: map[string]dbtypes.AttributeValue{
+					"PK": &dbtypes.AttributeValueMemberS{Value: item.PK},
+					"SK": &dbtypes.AttributeValueMemberS{Value: item.SK},
+				},
+			})
+			require.NoError(t, err)
+		}
 	}
 
 	return items
 }
 
-func GetHistoryEventTypes(t *testing.T, rt *runtime.Runtime, clear bool) map[flows.ContactUUID][]string {
-	items := GetHistoryItems(t, rt, clear)
+// skUUID7TimeMs extracts the millisecond timestamp from a sort key like "evt#<uuid7>" or "evt#<uuid7>#<tag>"
+func skUUID7TimeMs(sk string) int64 {
+	if len(sk) < 40 { // "evt#" (4) + UUID (36)
+		return 0
+	}
+	// UUID7 first 48 bits = 12 hex chars at positions 0-7 and 9-12 of the UUID
+	hex := sk[4:12] + sk[13:17]
+	ms, err := strconv.ParseInt(hex, 16, 64)
+	if err != nil {
+		return 0
+	}
+	return ms
+}
+
+func GetHistoryEventTypes(t *testing.T, rt *runtime.Runtime, clear bool, after time.Time) map[flows.ContactUUID][]string {
+	items := GetHistoryItems(t, rt, clear, after)
 
 	evtTypes := make(map[flows.ContactUUID][]string, len(items))
 

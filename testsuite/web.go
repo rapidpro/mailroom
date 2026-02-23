@@ -111,7 +111,7 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		actual.HTTPMocks = clonedMocks
 		actual.actualResponse, err = io.ReadAll(resp.Body)
 		actual.ExpectedTasks = GetQueuedTasks(t, rt)
-		actual.ExpectedHistory = GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = GetHistoryItems(t, rt, true, test.MockStartTime)
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
 		for i, dba := range tc.DBAssertions {
