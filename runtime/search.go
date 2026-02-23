@@ -22,7 +22,7 @@ func newOpenSearch(cfg *Config) (*OpenSearch, error) {
 	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch-messages"), 30*time.Second)
 
 	return &OpenSearch{
-		Messages:      osearch.NewWriter(client, "messages", osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
+		Messages:      osearch.NewWriter(client, cfg.OpenSearchMessagesIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
 		MessagesSpool: spool,
 	}, nil
 }

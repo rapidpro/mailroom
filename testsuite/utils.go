@@ -171,14 +171,14 @@ func GetIndexedMessages(t *testing.T, rt *runtime.Runtime, clear bool) []search.
 	client := rt.Search.Messages.Client()
 
 	// refresh the index to make documents searchable
-	refreshResp, err := client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{"messages"}})
+	refreshResp, err := client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
 	if err != nil || refreshResp.Inspect().Response.IsError() {
 		return nil // data stream doesn't exist yet, no messages indexed
 	}
 
 	// search all documents, sorted by timestamp for deterministic ordering
 	resp, err := client.Search(t.Context(), &opensearchapi.SearchReq{
-		Indices: []string{"messages"},
+		Indices: []string{rt.Config.OpenSearchMessagesIndex},
 		Body:    strings.NewReader(`{"query": {"match_all": {}}, "sort": [{"@timestamp": "asc"}]}`),
 	})
 	require.NoError(t, err)
@@ -191,10 +191,10 @@ func GetIndexedMessages(t *testing.T, rt *runtime.Runtime, clear bool) []search.
 
 	if clear {
 		// delete data stream (and its backing indices) if it exists
-		client.DataStream.Delete(t.Context(), opensearchapi.DataStreamDeleteReq{DataStream: "messages"})
+		client.DataStream.Delete(t.Context(), opensearchapi.DataStreamDeleteReq{DataStream: rt.Config.OpenSearchMessagesIndex})
 
 		// delete regular index if it exists (can happen if documents were indexed outside a data stream)
-		client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{"messages"}})
+		client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
 	}
 
 	return docs
