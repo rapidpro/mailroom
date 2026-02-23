@@ -254,7 +254,7 @@ func TestSessionFailedStart(t *testing.T) {
 		"current_session_uuid": nil, "current_flow_id": nil,
 	})
 
-	assert.Equal(t, []string{"failure"}, testsuite.GetHistoryEventTypes(t, rt, false)[testdb.Ann.UUID])
+	assert.Equal(t, []string{"failure"}, testsuite.GetHistoryEventTypes(t, rt, false, time.Time{})[testdb.Ann.UUID])
 }
 
 func TestFlowStats(t *testing.T) {
@@ -511,7 +511,7 @@ func TestBroadcastWithLock(t *testing.T) {
 			"PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
 			"SK": "evt#01969b47-096b-76f8-ae7f-f8b243c49ff5"
 		}
-	]`), jsonx.MustMarshal(testsuite.GetHistoryItems(t, rt, false)))
+	]`), jsonx.MustMarshal(testsuite.GetHistoryItems(t, rt, false, time.Time{})))
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE broadcast_id = $1 AND created_by_id = $2`, bcast.ID, bcast.CreatedByID).Returns(2)
 

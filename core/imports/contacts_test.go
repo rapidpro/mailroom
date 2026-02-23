@@ -122,7 +122,7 @@ func TestContactImports(t *testing.T) {
 		actual.NumErrored = results.NumErrored
 		actual.ExpectedErrors = results.Errors
 		actual.ExpectedContacts = specs
-		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true, test.MockStartTime)
 
 		if !test.UpdateSnapshots {
 			assert.Equal(t, tc.NumCreated, actual.NumCreated, "created contacts mismatch in '%s'", tc.Label)

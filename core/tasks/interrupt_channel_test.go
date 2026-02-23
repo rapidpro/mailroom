@@ -100,7 +100,7 @@ func TestInterruptChannel(t *testing.T) {
 	assert.Equal(t, map[flows.ContactUUID][]string{
 		testdb.Cat.UUID: {"run_ended"},
 		testdb.Dan.UUID: {"run_ended"},
-	}, testsuite.GetHistoryEventTypes(t, rt, false))
+	}, testsuite.GetHistoryEventTypes(t, rt, false, time.Time{}))
 
 	var catModifiedOn2 time.Time
 	require.NoError(t, rt.DB.Get(&catModifiedOn2, `SELECT modified_on FROM contacts_contact WHERE id = $1`, testdb.Cat.ID))

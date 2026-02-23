@@ -1,33 +1,12 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-mailroom
-dist
-.vscode
-.envrc
+.DS_Store
+.devcontainer
+.claude/
+CLAUDE.md
+coverage.text
+deploy
+fabfile.*
+
 /docs/*
 /docs
 /_test_spool
-
-.DS_Store
-
-# Test binary, build with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-deploy
-fabric
-fabfile.py
-fabfile.pyc
-fabconfig.py
-fabconfig.pyc
-
-# GoLand config folder
-.idea/
-
-.claude/
+/_spool
