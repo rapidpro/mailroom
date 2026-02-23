@@ -1,0 +1,111 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mi/msg/search",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "missing required fields",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'text' is required"
+        }
+    },
+    {
+        "label": "invalid org_id",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1234,
+            "text": "hello"
+        },
+        "status": 500,
+        "response": {
+            "error": "error loading org assets: error loading environment for org 1234: no org with id: 1234"
+        }
+    },
+    {
+        "label": "search matching two messages",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "hello"
+        },
+        "status": 200,
+        "response": {
+            "total": 2,
+            "results": [
+                {
+                    "contact": {
+                        "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
+                    },
+                    "event": {
+                        "uuid": "01968bee-b880-7000-8000-000000000002",
+                        "type": "msg_received",
+                        "text": "hello there friend",
+                        "created_on": "2025-05-01T13:00:00Z"
+                    }
+                },
+                {
+                    "contact": {
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"
+                    },
+                    "event": {
+                        "uuid": "01968bb7-ca00-7000-8000-000000000001",
+                        "type": "msg_received",
+                        "text": "hello world",
+                        "created_on": "2025-05-01T12:00:00Z"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "label": "search matching one message",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "goodbye"
+        },
+        "status": 200,
+        "response": {
+            "total": 1,
+            "results": [
+                {
+                    "contact": {
+                        "uuid": "cd024bcd-f473-4719-a00a-bd0bb1190135"
+                    },
+                    "event": {
+                        "uuid": "01968c25-a700-7000-8000-000000000003",
+                        "type": "msg_created",
+                        "text": "goodbye world",
+                        "created_on": "2025-05-01T14:00:00Z"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "label": "search matching no messages",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "xyznotfound"
+        },
+        "status": 200,
+        "response": {
+            "total": 0,
+            "results": []
+        }
+    }
+]
