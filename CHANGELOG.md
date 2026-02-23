@@ -1,3 +1,7 @@
+v26.1.39 (2026-02-23)
+-------------------------
+ * Add messages search endpoint
+
 v26.1.38 (2026-02-23)
 -------------------------
  * Make messages index name configurable
