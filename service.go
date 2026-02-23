@@ -13,6 +13,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/dynamo"
+	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/mailroom/core/crons"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -114,11 +115,8 @@ func (s *Service) Start() error {
 
 	// test OpenSearch
 	if s.rt.Search != nil {
-		resp, err := s.rt.Search.Messages.Client().Ping(s.ctx, nil)
-		if err != nil {
+		if err := osearch.Test(s.ctx, s.rt.Search.Messages.Client(), s.rt.Search.Messages.Index()); err != nil {
 			log.Error("opensearch messages not available", "error", err)
-		} else if resp.IsError() {
-			log.Error("opensearch messages not reachable", "status", resp.Status())
 		} else {
 			log.Info("opensearch messages ok")
 		}

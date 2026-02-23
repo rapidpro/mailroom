@@ -57,6 +57,7 @@ type Config struct {
 
 	// experimental - multiple indices so we can double write when switching indexes - we would query against the first in the list
 	OpenSearchMessagesEndpoint string `name:"opensearch_messages_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for messages"`
+	OpenSearchMessagesIndex    string `name:"opensearch_messages_index" help:"the name of index for messages"`
 
 	AWSAccessKeyID     string `help:"access key ID to use for AWS services"`
 	AWSSecretAccessKey string `help:"secret access key to use for AWS services"`
@@ -124,6 +125,7 @@ func NewDefaultConfig() *Config {
 
 		// not enabled by default.. still at experimental stage
 		OpenSearchMessagesEndpoint: "",
+		OpenSearchMessagesIndex:    "messages-tickets-v1",
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",

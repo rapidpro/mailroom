@@ -9,8 +9,8 @@ import (
 )
 
 type OpenSearch struct {
-	Messages *osearch.Writer
-	Spool    *osearch.Spool
+	Messages      *osearch.Writer
+	MessagesSpool *osearch.Spool
 }
 
 func newOpenSearch(cfg *Config) (*OpenSearch, error) {
@@ -19,11 +19,11 @@ func newOpenSearch(cfg *Config) (*OpenSearch, error) {
 		return nil, fmt.Errorf("error creating OpenSearch messages client: %w", err)
 	}
 
-	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch"), 30*time.Second)
+	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch-messages"), 30*time.Second)
 
 	return &OpenSearch{
-		Messages: osearch.NewWriter(client, "messages", osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
-		Spool:    spool,
+		Messages:      osearch.NewWriter(client, cfg.OpenSearchMessagesIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
+		MessagesSpool: spool,
 	}, nil
 }
 
@@ -33,7 +33,7 @@ func (s *OpenSearch) start() error {
 		return nil
 	}
 
-	if err := s.Spool.Start(); err != nil {
+	if err := s.MessagesSpool.Start(); err != nil {
 		return fmt.Errorf("error starting opensearch spool: %w", err)
 	}
 
@@ -48,5 +48,5 @@ func (s *OpenSearch) stop() {
 	}
 
 	s.Messages.Stop()
-	s.Spool.Stop()
+	s.MessagesSpool.Stop()
 }
