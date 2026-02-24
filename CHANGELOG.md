@@ -1,3 +1,7 @@
+v26.1.41 (2026-02-24)
+-------------------------
+ * Make OpenSearch config required and report spool size to Cloudwatch
+
 v26.1.40 (2026-02-24)
 -------------------------
  * Tweak OpenSearch env names and runtime struct
