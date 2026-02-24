@@ -39,10 +39,6 @@ type MessageResult struct {
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
 func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string) ([]MessageResult, int, error) {
-	if rt.OS == nil {
-		return nil, 0, fmt.Errorf("OpenSearch not configured")
-	}
-
 	src := map[string]any{
 		"query":            elastic.All(elastic.Term("org_id", orgID), elastic.Match("text", text)),
 		"sort":             []any{"_score", elastic.SortBy("@timestamp", false)},

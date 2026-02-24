@@ -80,11 +80,9 @@ func NewRuntime(cfg *Config) (*Runtime, error) {
 		return nil, fmt.Errorf("error creating Elasticsearch client: %w", err)
 	}
 
-	if cfg.OSSeriesEndpoint != "" {
-		rt.OS, err = newOpenSearch(cfg)
-		if err != nil {
-			return nil, err
-		}
+	rt.OS, err = newOpenSearch(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	rt.CW, err = cwatch.NewService(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.CloudwatchNamespace, cfg.DeploymentID)
