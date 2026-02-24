@@ -250,14 +250,14 @@ func createOpenSearchMessagesIndex(t *testing.T, rt *runtime.Runtime) {
 	client := rt.OS.Messages.Client()
 	body := ReadFile(t, absPath("./testsuite/testdata/os_messages.json"))
 
-	resp, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesIndex}})
+	resp, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
 	if err == nil {
 		resp.Body.Close()
 	}
 
 	if err != nil || resp.StatusCode == 404 {
 		createResp, err := client.Indices.Create(t.Context(), opensearchapi.IndicesCreateReq{
-			Index: rt.Config.OSMessagesIndex,
+			Index: rt.Config.OSMessagesTicketsIndex,
 			Body:  bytes.NewReader(body),
 		})
 		require.NoError(t, err)
@@ -272,18 +272,18 @@ func resetOpenSearch(t *testing.T, rt *runtime.Runtime) {
 	client := rt.OS.Messages.Client()
 
 	// delete all documents from the messages index
-	_, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesIndex}})
+	_, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
 	if err != nil {
 		return // doesn't exist, nothing to reset
 	}
 
 	_, err = client.Document.DeleteByQuery(t.Context(), opensearchapi.DocumentDeleteByQueryReq{
-		Indices: []string{rt.Config.OSMessagesIndex},
+		Indices: []string{rt.Config.OSMessagesTicketsIndex},
 		Body:    bytes.NewReader([]byte(`{"query": {"match_all": {}}}`)),
 	})
 	require.NoError(t, err)
 
-	_, err = client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex}})
+	_, err = client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
 	require.NoError(t, err)
 }
 

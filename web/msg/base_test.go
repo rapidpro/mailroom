@@ -111,7 +111,7 @@ func TestSearch(t *testing.T) {
 	rt.OS.Messages.Flush()
 
 	// refresh the index to make documents searchable
-	_, err := rt.OS.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex}})
+	_, err := rt.OS.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
 	require.NoError(t, err)
 
 	// write corresponding events to DynamoDB

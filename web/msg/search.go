@@ -27,6 +27,10 @@ type searchRequest struct {
 }
 
 func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
+	if rt.OS == nil {
+		return nil, 0, fmt.Errorf("OpenSearch not configured")
+	}
+
 	_, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error loading org assets: %w", err)

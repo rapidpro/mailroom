@@ -22,12 +22,17 @@ func newOpenSearch(cfg *Config) (*OpenSearch, error) {
 	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch-messages"), 30*time.Second)
 
 	return &OpenSearch{
-		Messages:      osearch.NewWriter(client, cfg.OSMessagesIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
+		Messages:      osearch.NewWriter(client, cfg.OSMessagesTicketsIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
 		MessagesSpool: spool,
 	}, nil
 }
 
 func (s *OpenSearch) start() error {
+	// TEMP until search is required in config
+	if s == nil {
+		return nil
+	}
+
 	if err := s.MessagesSpool.Start(); err != nil {
 		return fmt.Errorf("error starting opensearch spool: %w", err)
 	}
@@ -37,6 +42,11 @@ func (s *OpenSearch) start() error {
 }
 
 func (s *OpenSearch) stop() {
+	// TEMP until search is required in config
+	if s == nil {
+		return
+	}
+
 	s.Messages.Stop()
 	s.MessagesSpool.Stop()
 }
