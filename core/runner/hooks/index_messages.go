@@ -3,8 +3,10 @@ package hooks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
+	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
@@ -35,7 +37,12 @@ func (h *indexMessages) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 
 			slog.Debug("indexing message to opensearch", "uuid", msg.UUID, "contact", msg.ContactUUID)
 
-			rt.OS.Messages.Queue(doc)
+			rt.OS.Writer.Queue(&osearch.Document{
+				Index:   msg.IndexName(rt.Config.OSMessagesIndex),
+				ID:      string(msg.UUID),
+				Routing: fmt.Sprintf("%d", msg.OrgID),
+				Body:    doc,
+			})
 		}
 	}
 

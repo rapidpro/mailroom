@@ -206,9 +206,8 @@
         ],
         "indexed_messages": [
             {
-                "@timestamp": "2025-05-04T12:30:46.123456789Z",
-                "org_id": 1,
-                "uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "_id": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "_routing": "1",
                 "contact_uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "text": "start"
             }

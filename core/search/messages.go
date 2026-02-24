@@ -21,13 +21,20 @@ const (
 	MessageTextMinLength = 2
 )
 
-// MessageDoc represents a message document in the OpenSearch messages index
+// MessageDoc represents a message document in the OpenSearch messages index. UUID is used as the document _id
+// and OrgID as the routing value, so neither are stored in the document body.
 type MessageDoc struct {
-	Timestamp   time.Time         `json:"@timestamp"`
-	OrgID       models.OrgID      `json:"org_id"`
-	UUID        flows.EventUUID   `json:"uuid"`
+	CreatedOn   time.Time         `json:"-"` // used to determine monthly index
+	UUID        flows.EventUUID   `json:"-"` // used as _id
+	OrgID       models.OrgID      `json:"-"` // used as routing value
 	ContactUUID flows.ContactUUID `json:"contact_uuid"`
 	Text        string            `json:"text"`
+}
+
+// IndexName returns the monthly index name for this message, e.g. base "messages" with a message
+// from January 2026 gives "messages-2026-01".
+func (m *MessageDoc) IndexName(base string) string {
+	return fmt.Sprintf("%s-%s", base, m.CreatedOn.UTC().Format("2006-01"))
 }
 
 // MessageResult is a single result from a message search containing the contact UUID and event data.
@@ -39,34 +46,44 @@ type MessageResult struct {
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
 func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string) ([]MessageResult, int, error) {
+	routing := fmt.Sprintf("%d", orgID)
+
 	src := map[string]any{
-		"query":            elastic.All(elastic.Term("org_id", orgID), elastic.Match("text", text)),
-		"sort":             []any{"_score", elastic.SortBy("@timestamp", false)},
+		"query":            elastic.All(elastic.Term("_routing", routing), elastic.Match("text", text)),
+		"sort":             []any{"_score", map[string]string{"_id": "desc"}},
 		"size":             50,
 		"track_total_hits": true,
 	}
 
-	resp, err := rt.OS.Messages.Client().Search(ctx, &opensearchapi.SearchReq{
-		Indices: []string{rt.OS.Messages.Index()},
+	resp, err := rt.OS.Client.Search(ctx, &opensearchapi.SearchReq{
+		Indices: []string{rt.Config.OSMessagesIndex + "-*"},
 		Body:    bytes.NewReader(jsonx.MustMarshal(src)),
+		Params:  opensearchapi.SearchParams{Routing: []string{routing}},
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("error searching messages: %w", err)
 	}
 
-	docs := make([]MessageDoc, len(resp.Hits.Hits))
+	type hitResult struct {
+		uuid        flows.EventUUID
+		contactUUID flows.ContactUUID
+	}
+
+	hits := make([]hitResult, len(resp.Hits.Hits))
 	for i, hit := range resp.Hits.Hits {
-		if err := json.Unmarshal(hit.Source, &docs[i]); err != nil {
+		var doc MessageDoc
+		if err := json.Unmarshal(hit.Source, &doc); err != nil {
 			return nil, 0, fmt.Errorf("error unmarshalling message doc: %w", err)
 		}
+		hits[i] = hitResult{uuid: flows.EventUUID(hit.ID), contactUUID: doc.ContactUUID}
 	}
 
 	// build DynamoDB keys from OpenSearch results
-	keys := make([]dynamo.Key, len(docs))
-	for i, doc := range docs {
+	keys := make([]dynamo.Key, len(hits))
+	for i, hit := range hits {
 		keys[i] = dynamo.Key{
-			PK: fmt.Sprintf("con#%s", doc.ContactUUID),
-			SK: fmt.Sprintf("evt#%s", doc.UUID),
+			PK: fmt.Sprintf("con#%s", hit.contactUUID),
+			SK: fmt.Sprintf("evt#%s", hit.uuid),
 		}
 	}
 
@@ -83,9 +100,9 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	}
 
 	// build results in OpenSearch relevance order, skipping any not found in DynamoDB
-	results := make([]MessageResult, 0, len(docs))
-	for _, doc := range docs {
-		item := itemsBySK[fmt.Sprintf("evt#%s", doc.UUID)]
+	results := make([]MessageResult, 0, len(hits))
+	for _, hit := range hits {
+		item := itemsBySK[fmt.Sprintf("evt#%s", hit.uuid)]
 		if item == nil {
 			continue
 		}
@@ -95,10 +112,10 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 			return nil, 0, fmt.Errorf("error getting event data: %w", err)
 		}
 
-		data["uuid"] = string(doc.UUID) // re-add uuid (stripped on write)
+		data["uuid"] = string(hit.uuid) // re-add uuid (stripped on write)
 
 		results = append(results, MessageResult{
-			ContactUUID: doc.ContactUUID,
+			ContactUUID: hit.contactUUID,
 			Event:       data,
 		})
 	}

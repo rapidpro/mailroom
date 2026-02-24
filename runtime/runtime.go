@@ -80,7 +80,7 @@ func NewRuntime(cfg *Config) (*Runtime, error) {
 		return nil, fmt.Errorf("error creating Elasticsearch client: %w", err)
 	}
 
-	if cfg.OSSeriesEndpoint != "" {
+	if cfg.OSEndpoint != "" {
 		rt.OS, err = newOpenSearch(cfg)
 		if err != nil {
 			return nil, err

@@ -6,24 +6,27 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/aws/osearch"
+	"github.com/opensearch-project/opensearch-go/v4/opensearchapi"
 )
 
 type OpenSearch struct {
-	Messages      *osearch.Writer
-	MessagesSpool *osearch.Spool
+	Client *opensearchapi.Client
+	Writer *osearch.Writer
+	Spool  *osearch.Spool
 }
 
 func newOpenSearch(cfg *Config) (*OpenSearch, error) {
-	client, err := osearch.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.OSSeriesEndpoint)
+	client, err := osearch.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.OSEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("error creating OpenSearch messages client: %w", err)
+		return nil, fmt.Errorf("error creating OpenSearch client: %w", err)
 	}
 
-	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch-messages"), 30*time.Second)
+	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch"), 30*time.Second)
 
 	return &OpenSearch{
-		Messages:      osearch.NewWriter(client, cfg.OSMessagesTicketsIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
-		MessagesSpool: spool,
+		Client: client,
+		Writer: osearch.NewWriter(client, 500, 250*time.Millisecond, 1000, spool),
+		Spool:  spool,
 	}, nil
 }
 
@@ -33,11 +36,11 @@ func (s *OpenSearch) start() error {
 		return nil
 	}
 
-	if err := s.MessagesSpool.Start(); err != nil {
+	if err := s.Spool.Start(); err != nil {
 		return fmt.Errorf("error starting opensearch spool: %w", err)
 	}
 
-	s.Messages.Start()
+	s.Writer.Start()
 	return nil
 }
 
@@ -47,6 +50,6 @@ func (s *OpenSearch) stop() {
 		return
 	}
 
-	s.Messages.Stop()
-	s.MessagesSpool.Stop()
+	s.Writer.Stop()
+	s.Spool.Stop()
 }

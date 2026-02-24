@@ -13,7 +13,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/dynamo"
-	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/mailroom/core/crons"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -115,13 +114,13 @@ func (s *Service) Start() error {
 
 	// test OpenSearch
 	if s.rt.OS != nil {
-		if err := osearch.Test(s.ctx, s.rt.OS.Messages.Client(), s.rt.OS.Messages.Index()); err != nil {
-			log.Error("opensearch messages not available", "error", err)
+		if _, err := s.rt.OS.Client.Ping(s.ctx, nil); err != nil {
+			log.Error("opensearch not available", "error", err)
 		} else {
-			log.Info("opensearch messages ok")
+			log.Info("opensearch ok")
 		}
 	} else {
-		log.Warn("opensearch messages not configured")
+		log.Warn("opensearch not configured")
 	}
 
 	if c.AndroidCredentialsFile != "" {
@@ -255,7 +254,7 @@ func (s *Service) reportMetrics(ctx context.Context) (int, error) {
 
 	if s.rt.OS != nil {
 		metrics = append(metrics,
-			cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.MessagesSpool.Size()), types.StandardUnitCount, hostDim),
+			cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.Spool.Size()), types.StandardUnitCount, hostDim),
 		)
 	}
 

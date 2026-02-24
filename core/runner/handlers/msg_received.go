@@ -31,7 +31,7 @@ func handleMsgReceived(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	// index message to OpenSearch if it has text and an associated ticket
 	if event.TicketUUID != "" && len(event.Msg.Text()) >= search.MessageTextMinLength {
 		scene.AttachPostCommitHook(hooks.IndexMessages, &search.MessageDoc{
-			Timestamp:   event.CreatedOn(),
+			CreatedOn:   event.CreatedOn(),
 			OrgID:       oa.OrgID(),
 			UUID:        event.UUID(),
 			ContactUUID: scene.ContactUUID(),
