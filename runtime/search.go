@@ -14,7 +14,7 @@ type OpenSearch struct {
 }
 
 func newOpenSearch(cfg *Config) (*OpenSearch, error) {
-	client, err := osearch.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.OpenSearchMessagesEndpoint)
+	client, err := osearch.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.OSSeriesEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating OpenSearch messages client: %w", err)
 	}
@@ -22,7 +22,7 @@ func newOpenSearch(cfg *Config) (*OpenSearch, error) {
 	spool := osearch.NewSpool(client, filepath.Join(cfg.SpoolDir, "opensearch-messages"), 30*time.Second)
 
 	return &OpenSearch{
-		Messages:      osearch.NewWriter(client, cfg.OpenSearchMessagesIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
+		Messages:      osearch.NewWriter(client, cfg.OSMessagesIndex, osearch.ActionCreate, 500, 250*time.Millisecond, 1000, spool),
 		MessagesSpool: spool,
 	}, nil
 }

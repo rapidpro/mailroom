@@ -20,7 +20,7 @@ func (h *indexMessages) Order() int { return 10 }
 
 func (h *indexMessages) Execute(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	// TEMPORARY
-	if rt.Search == nil {
+	if rt.OS == nil {
 		return nil
 	}
 
@@ -35,7 +35,7 @@ func (h *indexMessages) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 
 			slog.Debug("indexing message to opensearch", "uuid", msg.UUID, "contact", msg.ContactUUID)
 
-			rt.Search.Messages.Queue(doc)
+			rt.OS.Messages.Queue(doc)
 		}
 	}
 

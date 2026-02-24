@@ -87,7 +87,7 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	cfg.S3PathStyle = true
 	cfg.DynamoEndpoint = "http://localstack:4566"
 	cfg.DynamoTablePrefix = "Test"
-	cfg.OpenSearchMessagesEndpoint = "http://opensearch:9200"
+	cfg.OSSeriesEndpoint = "http://opensearch:9200"
 	cfg.SpoolDir = absPath("./_test_spool")
 
 	err := cfg.Parse()
@@ -247,17 +247,17 @@ func resetElastic(t *testing.T, rt *runtime.Runtime) {
 func createOpenSearchMessagesIndex(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	client := rt.Search.Messages.Client()
+	client := rt.OS.Messages.Client()
 	body := ReadFile(t, absPath("./testsuite/testdata/os_messages.json"))
 
-	resp, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
+	resp, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesIndex}})
 	if err == nil {
 		resp.Body.Close()
 	}
 
 	if err != nil || resp.StatusCode == 404 {
 		createResp, err := client.Indices.Create(t.Context(), opensearchapi.IndicesCreateReq{
-			Index: rt.Config.OpenSearchMessagesIndex,
+			Index: rt.Config.OSMessagesIndex,
 			Body:  bytes.NewReader(body),
 		})
 		require.NoError(t, err)
@@ -269,21 +269,21 @@ func createOpenSearchMessagesIndex(t *testing.T, rt *runtime.Runtime) {
 func resetOpenSearch(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	client := rt.Search.Messages.Client()
+	client := rt.OS.Messages.Client()
 
 	// delete all documents from the messages index
-	_, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
+	_, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesIndex}})
 	if err != nil {
 		return // doesn't exist, nothing to reset
 	}
 
 	_, err = client.Document.DeleteByQuery(t.Context(), opensearchapi.DocumentDeleteByQueryReq{
-		Indices: []string{rt.Config.OpenSearchMessagesIndex},
+		Indices: []string{rt.Config.OSMessagesIndex},
 		Body:    bytes.NewReader([]byte(`{"query": {"match_all": {}}}`)),
 	})
 	require.NoError(t, err)
 
-	_, err = client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
+	_, err = client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex}})
 	require.NoError(t, err)
 }
 
