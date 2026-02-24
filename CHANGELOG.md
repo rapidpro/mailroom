@@ -1,3 +1,7 @@
+v26.1.40 (2026-02-24)
+-------------------------
+ * Tweak OpenSearch env names and runtime struct
+
 v26.1.39 (2026-02-23)
 -------------------------
  * Add messages search endpoint
