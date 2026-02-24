@@ -28,11 +28,6 @@ func newOpenSearch(cfg *Config) (*OpenSearch, error) {
 }
 
 func (s *OpenSearch) start() error {
-	// TEMP until search is required in config
-	if s == nil {
-		return nil
-	}
-
 	if err := s.MessagesSpool.Start(); err != nil {
 		return fmt.Errorf("error starting opensearch spool: %w", err)
 	}
@@ -42,11 +37,6 @@ func (s *OpenSearch) start() error {
 }
 
 func (s *OpenSearch) stop() {
-	// TEMP until search is required in config
-	if s == nil {
-		return
-	}
-
 	s.Messages.Stop()
 	s.MessagesSpool.Stop()
 }
