@@ -114,10 +114,14 @@ func (s *Service) Start() error {
 	}
 
 	// test OpenSearch
-	if err := osearch.Test(s.ctx, s.rt.OS.Messages.Client(), s.rt.OS.Messages.Index()); err != nil {
-		log.Error("opensearch messages not available", "error", err)
+	if s.rt.OS != nil {
+		if err := osearch.Test(s.ctx, s.rt.OS.Messages.Client(), s.rt.OS.Messages.Index()); err != nil {
+			log.Error("opensearch messages not available", "error", err)
+		} else {
+			log.Info("opensearch messages ok")
+		}
 	} else {
-		log.Info("opensearch messages ok")
+		log.Warn("opensearch messages not configured")
 	}
 
 	if c.AndroidCredentialsFile != "" {
@@ -247,8 +251,13 @@ func (s *Service) reportMetrics(ctx context.Context) (int, error) {
 		cwatch.Datum("QueuedTasks", float64(batchSize), types.StandardUnitCount, cwatch.Dimension("QueueName", "batch")),
 		cwatch.Datum("QueuedTasks", float64(throttledSize), types.StandardUnitCount, cwatch.Dimension("QueueName", "throttled")),
 		cwatch.Datum("DynamoSpooledItems", float64(s.rt.Dynamo.Spool.Size()), types.StandardUnitCount, hostDim),
-		cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.MessagesSpool.Size()), types.StandardUnitCount, hostDim),
 	)
+
+	if s.rt.OS != nil {
+		metrics = append(metrics,
+			cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.MessagesSpool.Size()), types.StandardUnitCount, hostDim),
+		)
+	}
 
 	if err := s.rt.CW.Send(ctx, metrics...); err != nil {
 		return 0, fmt.Errorf("error sending metrics: %w", err)
