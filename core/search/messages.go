@@ -39,7 +39,7 @@ type MessageResult struct {
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
 func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string) ([]MessageResult, int, error) {
-	if rt.Search == nil {
+	if rt.OS == nil {
 		return nil, 0, fmt.Errorf("OpenSearch not configured")
 	}
 
@@ -50,8 +50,8 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 		"track_total_hits": true,
 	}
 
-	resp, err := rt.Search.Messages.Client().Search(ctx, &opensearchapi.SearchReq{
-		Indices: []string{rt.Search.Messages.Index()},
+	resp, err := rt.OS.Messages.Client().Search(ctx, &opensearchapi.SearchReq{
+		Indices: []string{rt.OS.Messages.Index()},
 		Body:    bytes.NewReader(jsonx.MustMarshal(src)),
 	})
 	if err != nil {

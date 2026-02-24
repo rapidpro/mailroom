@@ -26,7 +26,7 @@ type Runtime struct {
 	S3         *s3x.Service
 	ES         *elasticsearch.TypedClient
 	Dynamo     *Dynamo
-	Search     *OpenSearch
+	OS         *OpenSearch
 	CW         *cwatch.Service
 	FCM        FCMClient
 
@@ -80,8 +80,8 @@ func NewRuntime(cfg *Config) (*Runtime, error) {
 		return nil, fmt.Errorf("error creating Elasticsearch client: %w", err)
 	}
 
-	if cfg.OpenSearchMessagesEndpoint != "" {
-		rt.Search, err = newOpenSearch(cfg)
+	if cfg.OSSeriesEndpoint != "" {
+		rt.OS, err = newOpenSearch(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +102,7 @@ func (r *Runtime) Start() error {
 	if err := r.Dynamo.start(); err != nil {
 		return err
 	}
-	if err := r.Search.start(); err != nil {
+	if err := r.OS.start(); err != nil {
 		return err
 	}
 	return nil
@@ -110,7 +110,7 @@ func (r *Runtime) Start() error {
 
 func (r *Runtime) Stop() {
 	r.Dynamo.stop()
-	r.Search.stop()
+	r.OS.stop()
 }
 
 func createPostgresPool(url string, maxOpenConns int) (*sqlx.DB, error) {

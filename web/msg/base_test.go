@@ -105,13 +105,13 @@ func TestSearch(t *testing.T) {
 		{Timestamp: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
 		{Timestamp: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
 	} {
-		rt.Search.Messages.Queue(jsonx.MustMarshal(msg))
+		rt.OS.Messages.Queue(jsonx.MustMarshal(msg))
 	}
 
-	rt.Search.Messages.Flush()
+	rt.OS.Messages.Flush()
 
 	// refresh the index to make documents searchable
-	_, err := rt.Search.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OpenSearchMessagesIndex}})
+	_, err := rt.OS.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex}})
 	require.NoError(t, err)
 
 	// write corresponding events to DynamoDB

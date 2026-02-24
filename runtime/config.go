@@ -55,9 +55,10 @@ type Config struct {
 	ElasticPassword      string `help:"the password for ElasticSearch if using basic auth"`
 	ElasticContactsIndex string `help:"the name of index alias for contacts"`
 
-	// experimental - multiple indices so we can double write when switching indexes - we would query against the first in the list
-	OpenSearchMessagesEndpoint string `name:"opensearch_messages_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for messages"`
-	OpenSearchMessagesIndex    string `name:"opensearch_messages_index" help:"the name of index for messages"`
+	// experimental
+	OSSearchEndpoint string `name:"os_search_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for search indexes"`
+	OSSeriesEndpoint string `name:"os_series_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for time series indexes"`
+	OSMessagesIndex  string `name:"os_messages_index"                           help:"the name of index for messages"`
 
 	AWSAccessKeyID     string `help:"access key ID to use for AWS services"`
 	AWSSecretAccessKey string `help:"secret access key to use for AWS services"`
@@ -124,8 +125,8 @@ func NewDefaultConfig() *Config {
 		ElasticContactsIndex: "contacts",
 
 		// not enabled by default.. still at experimental stage
-		OpenSearchMessagesEndpoint: "",
-		OpenSearchMessagesIndex:    "messages-tickets-v1",
+		OSSeriesEndpoint: "",
+		OSMessagesIndex:  "messages-tickets-v1",
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
