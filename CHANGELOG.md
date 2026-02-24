@@ -1,3 +1,7 @@
+v26.1.42 (2026-02-24)
+-------------------------
+ * Revert change to make OpenSearch required
+
 v26.1.41 (2026-02-24)
 -------------------------
  * Make OpenSearch config required and report spool size to Cloudwatch
