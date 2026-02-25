@@ -378,6 +378,14 @@
                     "type": "run_ended"
                 }
             }
+        ],
+        "indexed_messages": [
+            {
+                "_id": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "_routing": "1",
+                "contact_uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "text": "start"
+            }
         ]
     },
     {
@@ -540,6 +548,14 @@
                     },
                     "type": "msg_created"
                 }
+            }
+        ],
+        "indexed_messages": [
+            {
+                "_id": "01999b52-f8e5-75dd-b63f-5099a530d6c9",
+                "_routing": "1",
+                "contact_uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "text": "How are you?"
             }
         ]
     }
