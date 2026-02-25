@@ -1,3 +1,7 @@
+v26.1.43 (2026-02-25)
+-------------------------
+ * Rework OpenSearch experiment to work against a regular cluster
+
 v26.1.42 (2026-02-24)
 -------------------------
  * Revert change to make OpenSearch required
