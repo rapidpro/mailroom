@@ -1,5 +1,7 @@
 {
-    "index_patterns": ["messages-tickets-*"],
+    "index_patterns": [
+        "messages-tickets-*"
+    ],
     "template": {
         "settings": {
             "analysis": {
@@ -34,8 +36,7 @@
             },
             "properties": {
                 "contact_uuid": {
-                    "type": "keyword",
-                    "index": false
+                    "type": "keyword"
                 },
                 "text": {
                     "type": "text",
