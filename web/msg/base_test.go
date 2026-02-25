@@ -1,10 +1,12 @@
 package msg_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/aws/dynamo"
+	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -101,17 +103,22 @@ func TestSearch(t *testing.T) {
 
 	// index some test messages into OpenSearch
 	for _, msg := range []search.MessageDoc{
-		{Timestamp: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
-		{Timestamp: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
-		{Timestamp: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
+		{CreatedOn: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
+		{CreatedOn: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend"},
+		{CreatedOn: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
 	} {
-		rt.OS.Messages.Queue(jsonx.MustMarshal(msg))
+		rt.OS.Writer.Queue(&osearch.Document{
+			Index:   msg.IndexName(rt.Config.OSMessagesIndex),
+			ID:      string(msg.UUID),
+			Routing: fmt.Sprintf("%d", msg.OrgID),
+			Body:    jsonx.MustMarshal(msg),
+		})
 	}
 
-	rt.OS.Messages.Flush()
+	rt.OS.Writer.Flush()
 
-	// refresh the index to make documents searchable
-	_, err := rt.OS.Messages.Client().Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
+	// refresh the indexes to make documents searchable
+	_, err := rt.OS.Client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex + "-*"}})
 	require.NoError(t, err)
 
 	// write corresponding events to DynamoDB

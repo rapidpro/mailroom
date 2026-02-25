@@ -87,7 +87,8 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	cfg.S3PathStyle = true
 	cfg.DynamoEndpoint = "http://localstack:4566"
 	cfg.DynamoTablePrefix = "Test"
-	cfg.OSSeriesEndpoint = "http://opensearch:9200"
+	cfg.OSEndpoint = "http://opensearch:9200"
+	cfg.OSMessagesIndex = "messages-tickets"
 	cfg.SpoolDir = absPath("./_test_spool")
 
 	err := cfg.Parse()
@@ -97,7 +98,7 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	require.NoError(t, err)
 
 	createBucket(t, rt, rt.Config.S3AttachmentsBucket)
-	createOpenSearchMessagesIndex(t, rt)
+	createOpenSearchMessagesTemplate(t, rt)
 
 	// create Postgres tables if necessary
 	_, err = rt.DB.Exec("SELECT * from orgs_org")
@@ -244,47 +245,25 @@ func resetElastic(t *testing.T, rt *runtime.Runtime) {
 	ReindexElastic(t, rt)
 }
 
-func createOpenSearchMessagesIndex(t *testing.T, rt *runtime.Runtime) {
+func createOpenSearchMessagesTemplate(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	client := rt.OS.Messages.Client()
-	body := ReadFile(t, absPath("./testsuite/testdata/os_messages.json"))
+	client := rt.OS.Client
+	templateName := rt.Config.OSMessagesIndex
+	body := ReadFile(t, absPath("./testsuite/testdata/os_messages_template.json"))
 
-	resp, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
-	if err == nil {
-		resp.Body.Close()
-	}
-
-	if err != nil || resp.StatusCode == 404 {
-		createResp, err := client.Indices.Create(t.Context(), opensearchapi.IndicesCreateReq{
-			Index: rt.Config.OSMessagesTicketsIndex,
-			Body:  bytes.NewReader(body),
-		})
-		require.NoError(t, err)
-		require.False(t, createResp.Inspect().Response.IsError())
-		createResp.Inspect().Response.Body.Close()
-	}
+	_, err := client.IndexTemplate.Create(t.Context(), opensearchapi.IndexTemplateCreateReq{
+		IndexTemplate: templateName,
+		Body:          bytes.NewReader(body),
+	})
+	require.NoError(t, err)
 }
 
 func resetOpenSearch(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	client := rt.OS.Messages.Client()
-
-	// delete all documents from the messages index
-	_, err := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
-	if err != nil {
-		return // doesn't exist, nothing to reset
-	}
-
-	_, err = client.Document.DeleteByQuery(t.Context(), opensearchapi.DocumentDeleteByQueryReq{
-		Indices: []string{rt.Config.OSMessagesTicketsIndex},
-		Body:    bytes.NewReader([]byte(`{"query": {"match_all": {}}}`)),
-	})
-	require.NoError(t, err)
-
-	_, err = client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
-	require.NoError(t, err)
+	// delete all indexes matching the messages pattern (ignore 404 if none exist)
+	rt.OS.Client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{rt.Config.OSMessagesIndex + "-*"}})
 }
 
 func resetDynamo(t *testing.T, rt *runtime.Runtime) {

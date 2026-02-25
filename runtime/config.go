@@ -55,9 +55,8 @@ type Config struct {
 	ElasticPassword      string `help:"the password for ElasticSearch if using basic auth"`
 	ElasticContactsIndex string `help:"the name of index alias for contacts"`
 
-	OSSearchEndpoint       string `name:"os_search_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for search indexes"`
-	OSSeriesEndpoint       string `name:"os_series_endpoint" validate:"omitempty,url" help:"the URL of your OpenSearch endpoint for time series indexes"`
-	OSMessagesTicketsIndex string `name:"os_messages_tickets_index"                   help:"the name of index for messages"`
+	OSEndpoint      string `name:"os_endpoint"       validate:"omitempty,url" help:"the URL of your OpenSearch endpoint"`
+	OSMessagesIndex string `name:"os_messages_index"                          help:"the base name for monthly message indexes (e.g. messages-tickets -> messages-tickets-2026-02)"`
 
 	AWSAccessKeyID     string `help:"access key ID to use for AWS services"`
 	AWSSecretAccessKey string `help:"secret access key to use for AWS services"`
@@ -123,8 +122,8 @@ func NewDefaultConfig() *Config {
 		ElasticPassword:      "",
 		ElasticContactsIndex: "contacts",
 
-		OSSeriesEndpoint:       "",
-		OSMessagesTicketsIndex: "messages-tickets-v1",
+		OSEndpoint:      "",
+		OSMessagesIndex: "messages-tickets",
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",

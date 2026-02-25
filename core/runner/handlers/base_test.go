@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdb"
@@ -85,7 +84,7 @@ type TestCase struct {
 	DBAssertions    []*assertdb.Assert              `json:"db_assertions,omitempty"`
 	ExpectedTasks   map[string][]testsuite.TaskInfo `json:"expected_tasks,omitempty"`
 	ExpectedHistory []*dynamo.Item                  `json:"expected_history,omitempty"`
-	IndexedMessages []search.MessageDoc             `json:"indexed_messages,omitempty"`
+	IndexedMessages []testsuite.IndexedMessage       `json:"indexed_messages,omitempty"`
 }
 
 func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
@@ -197,10 +196,10 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.ExpectedHistory), jsonx.MustMarshal(actual.ExpectedHistory), "%s: event history mismatch", tc.Label)
 
 			if tc.IndexedMessages == nil {
-				tc.IndexedMessages = []search.MessageDoc{}
+				tc.IndexedMessages = []testsuite.IndexedMessage{}
 			}
 			if actual.IndexedMessages == nil {
-				actual.IndexedMessages = []search.MessageDoc{}
+				actual.IndexedMessages = []testsuite.IndexedMessage{}
 			}
 			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.IndexedMessages), jsonx.MustMarshal(actual.IndexedMessages), "%s: indexed messages mismatch", tc.Label)
 		} else {

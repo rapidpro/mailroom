@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/ctasks"
 	"github.com/nyaruka/mailroom/runtime"
@@ -168,41 +167,50 @@ func drainTasks(t *testing.T, rt *runtime.Runtime, perform bool, qnames ...strin
 	return counts
 }
 
-func GetIndexedMessages(t *testing.T, rt *runtime.Runtime, clear bool) []search.MessageDoc {
+// IndexedMessage represents an indexed OpenSearch message for test assertions, including metadata
+// fields (_id and _routing) that aren't part of the document body.
+type IndexedMessage struct {
+	ID          string `json:"_id"`
+	Routing     string `json:"_routing"`
+	ContactUUID string `json:"contact_uuid"`
+	Text        string `json:"text"`
+}
+
+func GetIndexedMessages(t *testing.T, rt *runtime.Runtime, clear bool) []IndexedMessage {
 	t.Helper()
 
-	rt.OS.Messages.Flush()
+	rt.OS.Writer.Flush()
 
-	client := rt.OS.Messages.Client()
+	client := rt.OS.Client
+	pattern := rt.Config.OSMessagesIndex + "-*"
 
-	// refresh the index to make documents searchable
-	refreshResp, err := client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
+	// refresh the indexes to make documents searchable
+	refreshResp, err := client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{pattern}})
 	if err != nil || refreshResp.Inspect().Response.IsError() {
-		return nil // data stream doesn't exist yet, no messages indexed
+		return nil // no matching indexes yet
 	}
 
-	// search all documents, sorted by timestamp for deterministic ordering
+	// search all documents, sorted by _id for deterministic ordering
 	resp, err := client.Search(t.Context(), &opensearchapi.SearchReq{
-		Indices: []string{rt.Config.OSMessagesTicketsIndex},
-		Body:    strings.NewReader(`{"query": {"match_all": {}}, "sort": [{"@timestamp": "asc"}]}`),
+		Indices: []string{pattern},
+		Body:    strings.NewReader(`{"query": {"match_all": {}}, "sort": ["_id"]}`),
 	})
 	require.NoError(t, err)
 
-	docs := make([]search.MessageDoc, len(resp.Hits.Hits))
+	msgs := make([]IndexedMessage, len(resp.Hits.Hits))
 	for i, hit := range resp.Hits.Hits {
-		err := json.Unmarshal(hit.Source, &docs[i])
+		err := json.Unmarshal(hit.Source, &msgs[i])
 		require.NoError(t, err)
+		msgs[i].ID = hit.ID
+		msgs[i].Routing = hit.Routing
 	}
 
 	if clear {
-		// delete data stream (and its backing indices) if it exists
-		client.DataStream.Delete(t.Context(), opensearchapi.DataStreamDeleteReq{DataStream: rt.Config.OSMessagesTicketsIndex})
-
-		// delete regular index if it exists (can happen if documents were indexed outside a data stream)
-		client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{rt.Config.OSMessagesTicketsIndex}})
+		// delete all matching monthly indexes
+		client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{pattern}})
 	}
 
-	return docs
+	return msgs
 }
 
 func GetHistoryItems(t *testing.T, rt *runtime.Runtime, clear bool, after time.Time) []*dynamo.Item {
