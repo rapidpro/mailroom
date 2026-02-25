@@ -40,7 +40,7 @@ func handleDelete(ctx context.Context, rt *runtime.Runtime, r *deleteRequest) (a
 	}
 
 	// get the messages that will be deleted
-	rows, err := rt.DB.QueryContext(ctx, `SELECT uuid, contact_id FROM msgs_msg WHERE org_id = $1 AND uuid = ANY($2) AND direction = 'I' AND visibility IN ('V', 'A')`, r.OrgID, pq.Array(r.MsgUUIDs))
+	rows, err := rt.DB.QueryContext(ctx, `SELECT uuid, contact_id FROM msgs_msg WHERE org_id = $1 AND uuid = ANY($2) AND direction = 'I' AND visibility IN ('V', 'A') ORDER BY id`, r.OrgID, pq.Array(r.MsgUUIDs))
 	if err != nil {
 		return nil, 0, fmt.Errorf("error loading messages: %w", err)
 	}
