@@ -88,7 +88,6 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	cfg.DynamoEndpoint = "http://localstack:4566"
 	cfg.DynamoTablePrefix = "Test"
 	cfg.OSEndpoint = "http://opensearch:9200"
-	cfg.OSMessagesIndex = "messages-tickets"
 	cfg.SpoolDir = absPath("./_test_spool")
 
 	err := cfg.Parse()
