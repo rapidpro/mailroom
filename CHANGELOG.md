@@ -1,3 +1,7 @@
+v26.1.45 (2026-02-26)
+-------------------------
+ * Remove total from message search results
+
 v26.1.44 (2026-02-26)
 -------------------------
  * Exclude IVR messages from OpenSearch indexing
