@@ -59,8 +59,8 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAs
 
 	scene.OutgoingMsgs = append(scene.OutgoingMsgs, msg)
 
-	// index message to OpenSearch if it has an associated ticket
-	if event.TicketUUID != "" && len(event.Msg.Text()) >= search.MessageTextMinLength {
+	// index message to OpenSearch if it's not from a broadcast or flow
+	if event.BroadcastUUID == "" && userID != models.NilUserID && len(event.Msg.Text()) >= search.MessageTextMinLength {
 		scene.AttachPostCommitHook(hooks.IndexMessages, &search.MessageDoc{
 			CreatedOn:   event.CreatedOn(),
 			OrgID:       oa.OrgID(),

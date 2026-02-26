@@ -57,7 +57,7 @@
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "created_on": "2025-05-04T12:30:46.123456789Z",
-                    "msg_uuid": "0199bad9-9791-770d-a47d-8f4a6ea3ad13",
+                    "msg_uuid": "0199bad8-f98d-75a3-b641-2718a25ac3f5",
                     "type": "msg_deleted"
                 }
             },
@@ -72,7 +72,7 @@
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "created_on": "2025-05-04T12:30:48.123456789Z",
-                    "msg_uuid": "0199bad8-f98d-75a3-b641-2718a25ac3f5",
+                    "msg_uuid": "0199bad9-9791-770d-a47d-8f4a6ea3ad13",
                     "type": "msg_deleted"
                 }
             },
@@ -81,7 +81,7 @@
                 "SK": "evt#0199bad8-f98d-75a3-b641-2718a25ac3f5#del",
                 "OrgID": 1,
                 "Data": {
-                    "created_on": "2025-05-04T12:30:50.123456789Z",
+                    "created_on": "2025-05-04T12:30:49.123456789Z",
                     "user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
@@ -93,7 +93,7 @@
                 "SK": "evt#0199bad9-9791-770d-a47d-8f4a6ea3ad13#del",
                 "OrgID": 1,
                 "Data": {
-                    "created_on": "2025-05-04T12:30:49.123456789Z",
+                    "created_on": "2025-05-04T12:30:50.123456789Z",
                     "user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"

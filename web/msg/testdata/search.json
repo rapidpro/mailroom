@@ -41,17 +41,16 @@
         },
         "status": 200,
         "response": {
-            "total": 2,
             "results": [
                 {
                     "contact": {
                         "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
                     },
                     "event": {
-                        "uuid": "01968bee-b880-7000-8000-000000000002",
-                        "type": "msg_received",
+                        "created_on": "2025-05-01T13:00:00Z",
                         "text": "hello there friend",
-                        "created_on": "2025-05-01T13:00:00Z"
+                        "type": "msg_received",
+                        "uuid": "01968bee-b880-7000-8000-000000000002"
                     }
                 },
                 {
@@ -59,13 +58,14 @@
                         "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"
                     },
                     "event": {
-                        "uuid": "01968bb7-ca00-7000-8000-000000000001",
-                        "type": "msg_received",
+                        "created_on": "2025-05-01T12:00:00Z",
                         "text": "hello world",
-                        "created_on": "2025-05-01T12:00:00Z"
+                        "type": "msg_received",
+                        "uuid": "01968bb7-ca00-7000-8000-000000000001"
                     }
                 }
-            ]
+            ],
+            "total": 2
         }
     },
     {
@@ -78,20 +78,20 @@
         },
         "status": 200,
         "response": {
-            "total": 1,
             "results": [
                 {
                     "contact": {
                         "uuid": "cd024bcd-f473-4719-a00a-bd0bb1190135"
                     },
                     "event": {
-                        "uuid": "01968c25-a700-7000-8000-000000000003",
-                        "type": "msg_created",
+                        "created_on": "2025-05-01T14:00:00Z",
                         "text": "goodbye world",
-                        "created_on": "2025-05-01T14:00:00Z"
+                        "type": "msg_created",
+                        "uuid": "01968c25-a700-7000-8000-000000000003"
                     }
                 }
-            ]
+            ],
+            "total": 1
         }
     },
     {
@@ -104,8 +104,8 @@
         },
         "status": 200,
         "response": {
-            "total": 0,
-            "results": []
+            "results": [],
+            "total": 0
         }
     }
 ]
