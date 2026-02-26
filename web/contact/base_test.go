@@ -1,16 +1,20 @@
 package contact_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/gocommon/i18n"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner/clocks"
 	_ "github.com/nyaruka/mailroom/core/runner/handlers"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdb"
 	"github.com/nyaruka/mailroom/web/contact"
@@ -32,9 +36,31 @@ func TestCreate(t *testing.T) {
 func TestDeindex(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(t, rt, testsuite.ResetElastic)
+	defer testsuite.Reset(t, rt, testsuite.ResetElastic|testsuite.ResetOpenSearch)
+
+	// index some test messages into OpenSearch for Bob (10001) and Cat (10002)
+	for _, msg := range []search.MessageDoc{
+		{CreatedOn: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Bob.UUID, Text: "hello from bob"},
+		{CreatedOn: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Cat.UUID, Text: "hello from cat"},
+		{CreatedOn: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Ann.UUID, Text: "hello from ann"},
+	} {
+		rt.OS.Writer.Queue(&osearch.Document{
+			Index:   msg.IndexName(rt.Config.OSMessagesIndex),
+			ID:      string(msg.UUID),
+			Routing: fmt.Sprintf("%d", msg.OrgID),
+			Body:    jsonx.MustMarshal(msg),
+		})
+	}
+
+	msgs := testsuite.GetIndexedMessages(t, rt, false)
+	assert.Len(t, msgs, 3)
 
 	testsuite.RunWebTests(t, rt, "testdata/deindex.json")
+
+	// Bob and Cat's messages should have been removed, Ann's should remain
+	msgs = testsuite.GetIndexedMessages(t, rt, false)
+	assert.Len(t, msgs, 1)
+	assert.Equal(t, string(testdb.Ann.UUID), msgs[0].ContactUUID)
 }
 
 func TestExport(t *testing.T) {

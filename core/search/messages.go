@@ -122,3 +122,33 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 
 	return results, resp.Hits.Total.Value, nil
 }
+
+// DeindexMessagesByContact deletes all messages in the OpenSearch messages index for the given contact UUIDs.
+func DeindexMessagesByContact(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, contactUUIDs []flows.ContactUUID) (int, error) {
+	if rt.OS == nil {
+		return 0, nil
+	}
+
+	routing := fmt.Sprintf("%d", orgID)
+	uuids := make([]string, len(contactUUIDs))
+	for i, u := range contactUUIDs {
+		uuids[i] = string(u)
+	}
+
+	src := map[string]any{
+		"query": map[string]any{
+			"terms": map[string]any{"contact_uuid": uuids},
+		},
+	}
+
+	resp, err := rt.OS.Client.Document.DeleteByQuery(ctx, opensearchapi.DocumentDeleteByQueryReq{
+		Indices: []string{rt.Config.OSMessagesIndex + "-*"},
+		Body:    bytes.NewReader(jsonx.MustMarshal(src)),
+		Params:  opensearchapi.DocumentDeleteByQueryParams{Routing: []string{routing}},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("error deindexing messages for contacts in org #%d: %w", orgID, err)
+	}
+
+	return resp.Deleted, nil
+}
