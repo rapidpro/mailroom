@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
@@ -22,8 +23,9 @@ func init() {
 //	  "text": "hello"
 //	}
 type searchRequest struct {
-	OrgID models.OrgID `json:"org_id" validate:"required"`
-	Text  string       `json:"text"   validate:"required"`
+	OrgID       models.OrgID      `json:"org_id"        validate:"required"`
+	Text        string            `json:"text"          validate:"required"`
+	ContactUUID flows.ContactUUID `json:"contact_uuid"`
 }
 
 func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
@@ -36,7 +38,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	results, total, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text)
+	results, total, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text, r.ContactUUID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error searching messages: %w", err)
 	}
