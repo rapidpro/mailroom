@@ -1,3 +1,8 @@
+v26.1.46 (2026-02-26)
+-------------------------
+ * Add doc_values=false to messages index template
+ * Add in_ticket boolean field to message docs
+
 v26.1.45 (2026-02-26)
 -------------------------
  * Remove total from message search results
