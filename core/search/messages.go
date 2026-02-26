@@ -29,6 +29,7 @@ type MessageDoc struct {
 	OrgID       models.OrgID      `json:"-"` // used as routing value
 	ContactUUID flows.ContactUUID `json:"contact_uuid"`
 	Text        string            `json:"text"`
+	InTicket    bool              `json:"in_ticket"`
 }
 
 // IndexName returns the monthly index name for this message, e.g. base "messages" with a message
@@ -45,12 +46,15 @@ type MessageResult struct {
 
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
-func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID, limit int) ([]MessageResult, error) {
+func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID, inTicket bool, limit int) ([]MessageResult, error) {
 	routing := fmt.Sprintf("%d", orgID)
 
 	must := []elastic.Query{elastic.Term("_routing", routing), elastic.Match("text", text)}
 	if contactUUID != "" {
 		must = append(must, elastic.Term("contact_uuid", contactUUID))
+	}
+	if inTicket {
+		must = append(must, elastic.Term("in_ticket", true))
 	}
 
 	src := map[string]any{

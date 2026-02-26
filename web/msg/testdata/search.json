@@ -130,5 +130,68 @@
                 }
             ]
         }
+    },
+    {
+        "label": "search filtered by in_ticket true",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "hello",
+            "in_ticket": true
+        },
+        "status": 200,
+        "response": {
+            "results": [
+                {
+                    "contact": {
+                        "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
+                    },
+                    "event": {
+                        "created_on": "2025-05-01T13:00:00Z",
+                        "text": "hello there friend",
+                        "type": "msg_received",
+                        "uuid": "01968bee-b880-7000-8000-000000000002"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "label": "search with in_ticket false returns all messages",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "hello",
+            "in_ticket": false
+        },
+        "status": 200,
+        "response": {
+            "results": [
+                {
+                    "contact": {
+                        "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
+                    },
+                    "event": {
+                        "created_on": "2025-05-01T13:00:00Z",
+                        "text": "hello there friend",
+                        "type": "msg_received",
+                        "uuid": "01968bee-b880-7000-8000-000000000002"
+                    }
+                },
+                {
+                    "contact": {
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"
+                    },
+                    "event": {
+                        "created_on": "2025-05-01T12:00:00Z",
+                        "text": "hello world",
+                        "type": "msg_received",
+                        "uuid": "01968bb7-ca00-7000-8000-000000000001"
+                    }
+                }
+            ]
+        }
     }
 ]
