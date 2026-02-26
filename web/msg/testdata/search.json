@@ -107,5 +107,32 @@
             "results": [],
             "total": 0
         }
+    },
+    {
+        "label": "search filtered by contact uuid",
+        "method": "POST",
+        "path": "/mi/msg/search",
+        "body": {
+            "org_id": 1,
+            "text": "hello",
+            "contact_uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
+        },
+        "status": 200,
+        "response": {
+            "results": [
+                {
+                    "contact": {
+                        "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10"
+                    },
+                    "event": {
+                        "created_on": "2025-05-01T13:00:00Z",
+                        "text": "hello there friend",
+                        "type": "msg_received",
+                        "uuid": "01968bee-b880-7000-8000-000000000002"
+                    }
+                }
+            ],
+            "total": 1
+        }
     }
 ]

@@ -45,11 +45,16 @@ type MessageResult struct {
 
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
-func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string) ([]MessageResult, int, error) {
+func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID) ([]MessageResult, int, error) {
 	routing := fmt.Sprintf("%d", orgID)
 
+	must := []elastic.Query{elastic.Term("_routing", routing), elastic.Match("text", text)}
+	if contactUUID != "" {
+		must = append(must, elastic.Term("contact_uuid", contactUUID))
+	}
+
 	src := map[string]any{
-		"query":            elastic.All(elastic.Term("_routing", routing), elastic.Match("text", text)),
+		"query":            elastic.All(must...),
 		"sort":             []any{"_score", map[string]string{"_id": "desc"}},
 		"size":             50,
 		"track_total_hits": true,
