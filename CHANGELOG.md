@@ -1,3 +1,10 @@
+v26.1.44 (2026-02-26)
+-------------------------
+ * Exclude IVR messages from OpenSearch indexing
+ * Add optional contact_uuid filter to /msg/search endpoint
+ * Index all messages that are not from flows or broadcasts
+ * Deindex contact messages when deindexing a contact
+
 v26.1.43 (2026-02-25)
 -------------------------
  * Rework OpenSearch experiment to work against a regular cluster
