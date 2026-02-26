@@ -52,6 +52,7 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		DBAssertions    []*assertdb.Assert    `json:"db_assertions,omitempty"`
 		ExpectedTasks   map[string][]TaskInfo `json:"expected_tasks,omitempty"`
 		ExpectedHistory []*dynamo.Item        `json:"expected_history,omitempty"`
+		IndexedMessages []IndexedMessage      `json:"indexed_messages,omitempty"`
 
 		actualResponse  []byte
 		expectsJSONBody bool
@@ -63,6 +64,12 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 	var err error
 
 	test.MockUniverse()
+
+	// track which messages were already indexed before each test case so we only report new ones
+	prevIndexedIDs := make(map[string]bool)
+	for _, m := range GetIndexedMessages(t, rt, false) {
+		prevIndexedIDs[m.ID] = true
+	}
 
 	for i, tc := range tcs {
 		var clonedMocks *httpx.MockRequestor
@@ -112,6 +119,14 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		actual.actualResponse, err = io.ReadAll(resp.Body)
 		actual.ExpectedTasks = GetQueuedTasks(t, rt)
 		actual.ExpectedHistory = GetHistoryItems(t, rt, true, test.MockStartTime)
+		allIndexed := GetIndexedMessages(t, rt, false)
+		actual.IndexedMessages = make([]IndexedMessage, 0, len(allIndexed))
+		for _, m := range allIndexed {
+			if !prevIndexedIDs[m.ID] {
+				actual.IndexedMessages = append(actual.IndexedMessages, m)
+				prevIndexedIDs[m.ID] = true
+			}
+		}
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
 		for i, dba := range tc.DBAssertions {
@@ -172,6 +187,14 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 				tc.ExpectedHistory = []*dynamo.Item{}
 			}
 			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.ExpectedHistory), jsonx.MustMarshal(actual.ExpectedHistory), "%s: event history mismatch", tc.Label)
+
+			if tc.IndexedMessages == nil {
+				tc.IndexedMessages = []IndexedMessage{}
+			}
+			if actual.IndexedMessages == nil {
+				actual.IndexedMessages = []IndexedMessage{}
+			}
+			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.IndexedMessages), jsonx.MustMarshal(actual.IndexedMessages), "%s: indexed messages mismatch", tc.Label)
 
 		} else {
 			tcs[i] = actual
