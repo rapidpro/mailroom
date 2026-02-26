@@ -36,6 +36,7 @@ func handleMsgReceived(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 			UUID:        event.UUID(),
 			ContactUUID: scene.ContactUUID(),
 			Text:        event.Msg.Text(),
+			InTicket:    event.TicketUUID != "",
 		})
 	}
 
