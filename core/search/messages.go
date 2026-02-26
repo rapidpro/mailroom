@@ -45,7 +45,7 @@ type MessageResult struct {
 
 // SearchMessages searches the OpenSearch messages index for messages matching the given text in the given org,
 // then fetches the corresponding events from DynamoDB.
-func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID) ([]MessageResult, int, error) {
+func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID, limit int) ([]MessageResult, error) {
 	routing := fmt.Sprintf("%d", orgID)
 
 	must := []elastic.Query{elastic.Term("_routing", routing), elastic.Match("text", text)}
@@ -56,8 +56,8 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	src := map[string]any{
 		"query":            elastic.All(must...),
 		"sort":             []any{"_score", map[string]string{"_id": "desc"}},
-		"size":             50,
-		"track_total_hits": true,
+		"size":             limit,
+		"track_total_hits": false,
 	}
 
 	resp, err := rt.OS.Client.Search(ctx, &opensearchapi.SearchReq{
@@ -66,7 +66,7 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 		Params:  opensearchapi.SearchParams{Routing: []string{routing}},
 	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("error searching messages: %w", err)
+		return nil, fmt.Errorf("error searching messages: %w", err)
 	}
 
 	type hitResult struct {
@@ -78,7 +78,7 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	for i, hit := range resp.Hits.Hits {
 		var doc MessageDoc
 		if err := json.Unmarshal(hit.Source, &doc); err != nil {
-			return nil, 0, fmt.Errorf("error unmarshalling message doc: %w", err)
+			return nil, fmt.Errorf("error unmarshalling message doc: %w", err)
 		}
 		hits[i] = hitResult{uuid: flows.EventUUID(hit.ID), contactUUID: doc.ContactUUID}
 	}
@@ -95,7 +95,7 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	// batch fetch events from DynamoDB
 	items, _, err := dynamo.BatchGetItem(ctx, rt.Dynamo.History.Client(), rt.Dynamo.History.Table(), keys)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error fetching events from DynamoDB: %w", err)
+		return nil, fmt.Errorf("error fetching events from DynamoDB: %w", err)
 	}
 
 	// index items by SK for ordered lookup
@@ -114,18 +114,15 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 
 		data, err := item.GetData()
 		if err != nil {
-			return nil, 0, fmt.Errorf("error getting event data: %w", err)
+			return nil, fmt.Errorf("error getting event data: %w", err)
 		}
 
 		data["uuid"] = string(hit.uuid) // re-add uuid (stripped on write)
 
-		results = append(results, MessageResult{
-			ContactUUID: hit.contactUUID,
-			Event:       data,
-		})
+		results = append(results, MessageResult{ContactUUID: hit.contactUUID, Event: data})
 	}
 
-	return results, resp.Hits.Total.Value, nil
+	return results, nil
 }
 
 // DeindexMessagesByContact deletes all messages in the OpenSearch messages index for the given contact UUIDs.

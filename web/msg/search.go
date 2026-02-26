@@ -38,7 +38,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	results, total, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text, r.ContactUUID)
+	results, err := search.SearchMessages(ctx, rt, r.OrgID, r.Text, r.ContactUUID, 50)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error searching messages: %w", err)
 	}
@@ -51,5 +51,5 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (a
 		}
 	}
 
-	return map[string]any{"total": total, "results": wrapped}, http.StatusOK, nil
+	return map[string]any{"results": wrapped}, http.StatusOK, nil
 }
