@@ -4,6 +4,14 @@
     ],
     "template": {
         "settings": {
+            "index": {
+                "sort.field": [
+                    "@timestamp"
+                ],
+                "sort.order": [
+                    "desc"
+                ]
+            },
             "analysis": {
                 "filter": {
                     "stop_filter": {
@@ -35,17 +43,21 @@
                 "required": true
             },
             "properties": {
+                "@timestamp": {
+                    "type": "date"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
                 "contact_uuid": {
-                    "type": "keyword",
-                    "doc_values": false
+                    "type": "keyword"
                 },
                 "text": {
                     "type": "text",
                     "analyzer": "msg_text"
                 },
                 "in_ticket": {
-                    "type": "boolean",
-                    "doc_values": false
+                    "type": "boolean"
                 }
             }
         }

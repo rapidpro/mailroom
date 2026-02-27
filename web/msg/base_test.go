@@ -1,19 +1,14 @@
 package msg_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/aws/dynamo"
-	"github.com/nyaruka/gocommon/aws/osearch"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdb"
-	"github.com/opensearch-project/opensearch-go/v4/opensearchapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -97,39 +92,15 @@ func TestBroadcastPreview(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	ctx, rt := testsuite.Runtime(t)
+	_, rt := testsuite.Runtime(t)
 
 	defer testsuite.Reset(t, rt, testsuite.ResetOpenSearch|testsuite.ResetDynamo)
 
-	// index some test messages into OpenSearch
-	for _, msg := range []search.MessageDoc{
-		{CreatedOn: time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
-		{CreatedOn: time.Date(2025, 5, 1, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend", InTicket: true},
-		{CreatedOn: time.Date(2025, 5, 1, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
-	} {
-		rt.OS.Writer.Queue(&osearch.Document{
-			Index:   msg.IndexName(rt.Config.OSMessagesIndex),
-			ID:      string(msg.UUID),
-			Routing: fmt.Sprintf("%d", msg.OrgID),
-			Body:    jsonx.MustMarshal(msg),
-		})
-	}
-
-	rt.OS.Writer.Flush()
-
-	// refresh the indexes to make documents searchable
-	_, err := rt.OS.Client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex + "-*"}})
-	require.NoError(t, err)
-
-	// write corresponding events to DynamoDB
-	for _, item := range []*dynamo.Item{
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Ann.UUID), SK: "evt#01968bb7-ca00-7000-8000-000000000001"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello world", "created_on": "2025-05-01T12:00:00Z"}},
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Bob.UUID), SK: "evt#01968bee-b880-7000-8000-000000000002"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_received", "text": "hello there friend", "created_on": "2025-05-01T13:00:00Z"}},
-		{Key: dynamo.Key{PK: "con#" + string(testdb.Cat.UUID), SK: "evt#01968c25-a700-7000-8000-000000000003"}, OrgID: int(testdb.Org1.ID), Data: map[string]any{"type": "msg_created", "text": "goodbye world", "created_on": "2025-05-01T14:00:00Z"}},
-	} {
-		err := dynamo.PutItem(ctx, rt.Dynamo.History.Client(), rt.Dynamo.History.Table(), item)
-		require.NoError(t, err)
-	}
+	testsuite.IndexMessages(t, rt, []search.MessageDoc{
+		{CreatedOn: time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bb7-ca00-7000-8000-000000000001", ContactUUID: testdb.Ann.UUID, Text: "hello world"},
+		{CreatedOn: time.Date(2026, 1, 15, 13, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968bee-b880-7000-8000-000000000002", ContactUUID: testdb.Bob.UUID, Text: "hello there friend", InTicket: true},
+		{CreatedOn: time.Date(2026, 1, 15, 14, 0, 0, 0, time.UTC), OrgID: testdb.Org1.ID, UUID: "01968c25-a700-7000-8000-000000000003", ContactUUID: testdb.Cat.UUID, Text: "goodbye world"},
+	})
 
 	testsuite.RunWebTests(t, rt, "testdata/search.json")
 }
