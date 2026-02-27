@@ -17,9 +17,11 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
+	"github.com/nyaruka/gocommon/aws/osearch"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/ctasks"
 	"github.com/nyaruka/mailroom/runtime"
@@ -165,6 +167,43 @@ func drainTasks(t *testing.T, rt *runtime.Runtime, perform bool, qnames ...strin
 		require.NoError(t, err, "unexpected error marking task %s as done", task.Type)
 	}
 	return counts
+}
+
+// IndexMessages indexes the given messages into OpenSearch and writes the corresponding events to
+// DynamoDB, then refreshes the OpenSearch index so they're immediately searchable.
+func IndexMessages(t *testing.T, rt *runtime.Runtime, msgs []search.MessageDoc) {
+	t.Helper()
+
+	for _, msg := range msgs {
+		rt.OS.Writer.Queue(&osearch.Document{
+			Index:   msg.IndexName(rt.Config.OSMessagesIndex),
+			ID:      string(msg.UUID),
+			Routing: fmt.Sprintf("%d", msg.OrgID),
+			Body:    jsonx.MustMarshal(msg),
+		})
+	}
+
+	rt.OS.Writer.Flush()
+
+	_, err := rt.OS.Client.Indices.Refresh(t.Context(), &opensearchapi.IndicesRefreshReq{Indices: []string{rt.Config.OSMessagesIndex + "-*"}})
+	require.NoError(t, err)
+
+	for _, msg := range msgs {
+		item := &dynamo.Item{
+			Key: dynamo.Key{
+				PK: fmt.Sprintf("con#%s", msg.ContactUUID),
+				SK: fmt.Sprintf("evt#%s", msg.UUID),
+			},
+			OrgID: int(msg.OrgID),
+			Data: map[string]any{
+				"type":       "msg_received",
+				"text":       msg.Text,
+				"created_on": msg.CreatedOn.Format(time.RFC3339),
+			},
+		}
+		err := dynamo.PutItem(t.Context(), rt.Dynamo.History.Client(), rt.Dynamo.History.Table(), item)
+		require.NoError(t, err)
+	}
 }
 
 // IndexedMessage represents an indexed OpenSearch message for test assertions, including metadata

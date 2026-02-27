@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/aws/dynamo"
-	"github.com/nyaruka/gocommon/elastic"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -21,12 +20,11 @@ const (
 	MessageTextMinLength = 2
 )
 
-// MessageDoc represents a message document in the OpenSearch messages index. UUID is used as the document _id
-// and OrgID as the routing value, so neither are stored in the document body.
+// MessageDoc represents a message document in the OpenSearch messages index. UUID is used as the document _id.
 type MessageDoc struct {
-	CreatedOn   time.Time         `json:"-"` // used to determine monthly index
-	UUID        flows.EventUUID   `json:"-"` // used as _id
-	OrgID       models.OrgID      `json:"-"` // used as routing value
+	CreatedOn   time.Time         `json:"@timestamp"` // also used to determine monthly index
+	UUID        flows.EventUUID   `json:"-"`          // used as _id
+	OrgID       models.OrgID      `json:"org_id"`
 	ContactUUID flows.ContactUUID `json:"contact_uuid"`
 	Text        string            `json:"text"`
 	InTicket    bool              `json:"in_ticket"`
@@ -49,17 +47,33 @@ type MessageResult struct {
 func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, text string, contactUUID flows.ContactUUID, inTicket bool, limit int) ([]MessageResult, error) {
 	routing := fmt.Sprintf("%d", orgID)
 
-	must := []elastic.Query{elastic.Term("_routing", routing), elastic.Match("text", text)}
+	// orgwide search looks back 180 days, but if we're filtering by contact we can look back a full year
+	since := "now-180d/d"
 	if contactUUID != "" {
-		must = append(must, elastic.Term("contact_uuid", contactUUID))
+		since = "now-1y/d"
+	}
+
+	filter := []map[string]any{
+		{"term": map[string]any{"org_id": orgID}},
+		{"range": map[string]any{"@timestamp": map[string]string{"gte": since}}},
+	}
+	if contactUUID != "" {
+		filter = append(filter, map[string]any{"term": map[string]any{"contact_uuid": contactUUID}})
 	}
 	if inTicket {
-		must = append(must, elastic.Term("in_ticket", true))
+		filter = append(filter, map[string]any{"term": map[string]any{"in_ticket": true}})
 	}
 
 	src := map[string]any{
-		"query":            elastic.All(must...),
-		"sort":             []any{"_score", map[string]string{"_id": "desc"}},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": filter,
+				"must": []map[string]any{
+					{"match": map[string]any{"text": map[string]any{"query": text, "operator": "and", "fuzziness": "AUTO"}}},
+				},
+			},
+		},
+		"sort":             []any{"_score", map[string]string{"@timestamp": "desc"}},
 		"size":             limit,
 		"track_total_hits": false,
 	}
