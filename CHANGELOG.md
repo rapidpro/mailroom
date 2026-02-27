@@ -1,3 +1,7 @@
+v26.1.47 (2026-02-27)
+-------------------------
+ * Improve experimental message search
+
 v26.1.46 (2026-02-26)
 -------------------------
  * Add doc_values=false to messages index template
