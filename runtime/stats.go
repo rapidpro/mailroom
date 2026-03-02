@@ -180,10 +180,6 @@ return 1
 
 // records a contact task's latency in Valkey, keyed by org and task type (best effort).
 func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency time.Duration) {
-	if c.vk == nil {
-		return
-	}
-
 	vc := c.vk.Get()
 	defer vc.Close()
 
@@ -197,9 +193,9 @@ func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency 
 
 // OrgCTaskLatency holds latency statistics for all contact task types for a single org
 type OrgCTaskLatency struct {
-	OrgID   int            `json:"org_id"`
-	TotalMS int64          `json:"total_ms"`
-	Tasks   []TaskLatency  `json:"tasks"`
+	OrgID   int           `json:"org_id"`
+	TotalMS int64         `json:"total_ms"`
+	Tasks   []TaskLatency `json:"tasks"`
 }
 
 // TaskLatency holds latency statistics for a single contact task type
