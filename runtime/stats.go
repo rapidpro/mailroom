@@ -1,10 +1,16 @@
 package runtime
 
 import (
+	"fmt"
+	"log/slog"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 )
 
@@ -100,16 +106,17 @@ func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 
 // StatsCollector provides threadsafe stats collection
 type StatsCollector struct {
+	vk    *redis.Pool
 	mutex sync.Mutex
 	stats *Stats
 }
 
 // NewStatsCollector creates a new stats collector
-func NewStatsCollector() *StatsCollector {
-	return &StatsCollector{stats: newStats()}
+func NewStatsCollector(vk *redis.Pool) *StatsCollector {
+	return &StatsCollector{vk: vk, stats: newStats()}
 }
 
-func (c *StatsCollector) RecordContactTask(typ string, d, l time.Duration, errored bool) {
+func (c *StatsCollector) RecordContactTask(typ string, orgID int, d, l time.Duration, errored bool) {
 	c.mutex.Lock()
 	c.stats.ContactTaskCount[typ]++
 	c.stats.ContactTaskDuration[typ] += d
@@ -118,6 +125,8 @@ func (c *StatsCollector) RecordContactTask(typ string, d, l time.Duration, error
 		c.stats.ContactTaskErrors[typ]++
 	}
 	c.mutex.Unlock()
+
+	c.recordCTaskLatency(orgID, typ, l)
 }
 
 func (c *StatsCollector) RecordRealtimeLockFail() {
@@ -154,4 +163,102 @@ func (c *StatsCollector) Extract() *Stats {
 	s := c.stats
 	c.stats = newStats()
 	return s
+}
+
+// CTaskLatency holds per-org latency statistics for a contact task type
+type CTaskLatency struct {
+	OrgID   int
+	Count   int64
+	TotalMS int64
+	AvgMS   int64
+}
+
+var recordLatencyScript = redis.NewScript(1, `
+local key = KEYS[1]
+local org_field_n = ARGV[1]
+local org_field_t = ARGV[2]
+local latency_ms = tonumber(ARGV[3])
+
+redis.call("HINCRBY", key, org_field_n, 1)
+redis.call("HINCRBY", key, org_field_t, latency_ms)
+redis.call("EXPIRE", key, 90000)
+
+return 1
+`)
+
+// records a contact task's latency in Valkey, keyed by org and task type (best effort).
+func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency time.Duration) {
+	if c.vk == nil {
+		return
+	}
+
+	vc := c.vk.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s:%s", taskType, time.Now().UTC().Format("2006-01-02T15"))
+	orgStr := strconv.Itoa(orgID)
+
+	if _, err := recordLatencyScript.Do(vc, key, orgStr+":n", orgStr+":t", latency.Milliseconds()); err != nil {
+		slog.Error("error recording per-org latency", "error", err)
+	}
+}
+
+// GetLatencies returns per-org latency statistics for the given task type in the current
+// hourly bucket, sorted by average latency descending.
+func GetLatencies(rp *redis.Pool, taskType string) ([]CTaskLatency, error) {
+	vc := rp.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s:%s", taskType, time.Now().UTC().Format("2006-01-02T15"))
+
+	values, err := redis.Values(vc.Do("HGETALL", key))
+	if err != nil {
+		return nil, fmt.Errorf("error getting latency data: %w", err)
+	}
+
+	orgData := make(map[int]*CTaskLatency)
+
+	for i := 0; i < len(values); i += 2 {
+		field, _ := redis.String(values[i], nil)
+		val, _ := redis.Int64(values[i+1], nil)
+
+		idx := strings.LastIndex(field, ":")
+		if idx == -1 {
+			continue
+		}
+		orgIDStr := field[:idx]
+		suffix := field[idx+1:]
+
+		orgID, err := strconv.Atoi(orgIDStr)
+		if err != nil {
+			continue
+		}
+
+		entry, ok := orgData[orgID]
+		if !ok {
+			entry = &CTaskLatency{OrgID: orgID}
+			orgData[orgID] = entry
+		}
+
+		switch suffix {
+		case "n":
+			entry.Count = val
+		case "t":
+			entry.TotalMS = val
+		}
+	}
+
+	result := make([]CTaskLatency, 0, len(orgData))
+	for _, entry := range orgData {
+		if entry.Count > 0 {
+			entry.AvgMS = entry.TotalMS / entry.Count
+		}
+		result = append(result, *entry)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].AvgMS > result[j].AvgMS
+	})
+
+	return result, nil
 }

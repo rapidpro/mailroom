@@ -96,7 +96,7 @@ func (t *ProcessContactQueue) Perform(ctx context.Context, rt *runtime.Runtime, 
 		err = ctasks.Perform(ctx, rt, oa, t.ContactID, ctask)
 
 		// record metrics
-		rt.Stats.RecordContactTask(taskPayload.Type, time.Since(start), time.Since(taskPayload.QueuedOn), err != nil)
+		rt.Stats.RecordContactTask(taskPayload.Type, int(oa.OrgID()), time.Since(start), time.Since(taskPayload.QueuedOn), err != nil)
 
 		// if we get an error processing an event, requeue it for later and return our error
 		if err != nil {
