@@ -1,3 +1,8 @@
+v26.1.48 (2026-03-02)
+-------------------------
+ * Add system/latencies endpoint to expose this info to RapidPro
+ * Start recording org specific ctask latencies to Valkey
+
 v26.1.47 (2026-02-27)
 -------------------------
  * Improve experimental message search
