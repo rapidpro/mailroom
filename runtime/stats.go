@@ -1,10 +1,16 @@
 package runtime
 
 import (
+	"fmt"
+	"log/slog"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 )
 
@@ -100,16 +106,17 @@ func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 
 // StatsCollector provides threadsafe stats collection
 type StatsCollector struct {
+	vk    *redis.Pool
 	mutex sync.Mutex
 	stats *Stats
 }
 
 // NewStatsCollector creates a new stats collector
-func NewStatsCollector() *StatsCollector {
-	return &StatsCollector{stats: newStats()}
+func NewStatsCollector(vk *redis.Pool) *StatsCollector {
+	return &StatsCollector{vk: vk, stats: newStats()}
 }
 
-func (c *StatsCollector) RecordContactTask(typ string, d, l time.Duration, errored bool) {
+func (c *StatsCollector) RecordContactTask(typ string, orgID int, d, l time.Duration, errored bool) {
 	c.mutex.Lock()
 	c.stats.ContactTaskCount[typ]++
 	c.stats.ContactTaskDuration[typ] += d
@@ -118,6 +125,8 @@ func (c *StatsCollector) RecordContactTask(typ string, d, l time.Duration, error
 		c.stats.ContactTaskErrors[typ]++
 	}
 	c.mutex.Unlock()
+
+	c.recordCTaskLatency(orgID, typ, l)
 }
 
 func (c *StatsCollector) RecordRealtimeLockFail() {
@@ -154,4 +163,115 @@ func (c *StatsCollector) Extract() *Stats {
 	s := c.stats
 	c.stats = newStats()
 	return s
+}
+
+var recordLatencyScript = redis.NewScript(1, `
+local key = KEYS[1]
+local field_n = ARGV[1]
+local field_t = ARGV[2]
+local latency_ms = tonumber(ARGV[3])
+
+redis.call("HINCRBY", key, field_n, 1)
+redis.call("HINCRBY", key, field_t, latency_ms)
+redis.call("EXPIRE", key, 90000)
+
+return 1
+`)
+
+// records a contact task's latency in Valkey, keyed by org and task type (best effort).
+func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency time.Duration) {
+	if c.vk == nil {
+		return
+	}
+
+	vc := c.vk.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
+	field := fmt.Sprintf("%d/%s", orgID, taskType)
+
+	if _, err := recordLatencyScript.Do(vc, key, field+":n", field+":t", latency.Milliseconds()); err != nil {
+		slog.Error("error recording per-org latency", "error", err)
+	}
+}
+
+// CTaskLatency holds per-org latency statistics for a contact task type
+type CTaskLatency struct {
+	OrgID    int    `json:"org_id"`
+	TaskType string `json:"task_type"`
+	Count    int64  `json:"count"`
+	TotalMS  int64  `json:"total_ms"`
+	AvgMS    int64  `json:"avg_ms"`
+}
+
+// GetCTaskLatencies returns per-org/task-type latency statistics for the current hourly bucket,
+// sorted by total latency descending.
+func GetCTaskLatencies(rp *redis.Pool) ([]CTaskLatency, error) {
+	vc := rp.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
+
+	values, err := redis.Values(vc.Do("HGETALL", key))
+	if err != nil {
+		return nil, fmt.Errorf("error getting latency data: %w", err)
+	}
+
+	type entryKey struct {
+		orgID    int
+		taskType string
+	}
+	entries := make(map[entryKey]*CTaskLatency)
+
+	for i := 0; i < len(values); i += 2 {
+		field, _ := redis.String(values[i], nil)
+		val, _ := redis.Int64(values[i+1], nil)
+
+		// field format is "{orgID}/{taskType}:n" or "{orgID}/{taskType}:t"
+		suffixIdx := strings.LastIndex(field, ":")
+		if suffixIdx == -1 {
+			continue
+		}
+		prefix := field[:suffixIdx]
+		suffix := field[suffixIdx+1:]
+
+		before, after, ok := strings.Cut(prefix, "/")
+		if !ok {
+			continue
+		}
+
+		orgID, err := strconv.Atoi(before)
+		if err != nil {
+			continue
+		}
+		taskType := after
+
+		ek := entryKey{orgID, taskType}
+		entry, ok := entries[ek]
+		if !ok {
+			entry = &CTaskLatency{OrgID: orgID, TaskType: taskType}
+			entries[ek] = entry
+		}
+
+		switch suffix {
+		case "n":
+			entry.Count = val
+		case "t":
+			entry.TotalMS = val
+		}
+	}
+
+	result := make([]CTaskLatency, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Count > 0 {
+			entry.AvgMS = entry.TotalMS / entry.Count
+		}
+		result = append(result, *entry)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].TotalMS > result[j].TotalMS
+	})
+
+	return result, nil
 }

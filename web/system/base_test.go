@@ -12,6 +12,12 @@ func TestErrors(t *testing.T) {
 	testsuite.RunWebTests(t, rt, "testdata/errors.json")
 }
 
+func TestLatency(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
+
+	testsuite.RunWebTests(t, rt, "testdata/latency.json")
+}
+
 func TestQueues(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 

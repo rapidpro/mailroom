@@ -93,7 +93,7 @@ func NewRuntime(cfg *Config) (*Runtime, error) {
 	}
 
 	rt.Queues = newQueues(cfg)
-	rt.Stats = NewStatsCollector()
+	rt.Stats = NewStatsCollector(rt.VK)
 
 	return rt, nil
 }
