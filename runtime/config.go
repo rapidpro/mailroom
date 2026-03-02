@@ -57,6 +57,7 @@ type Config struct {
 
 	OSEndpoint      string `name:"os_endpoint"       validate:"url" help:"the URL of your OpenSearch endpoint"`
 	OSMessagesIndex string `name:"os_messages_index"                help:"the base name for monthly message indexes (e.g. messages-v1 -> messages-v1-2026-02)"`
+	OSContactsIndex string `name:"os_contacts_index"                help:"the name of the index for contacts (e.g. contacts-v1)"`
 
 	AWSAccessKeyID     string `help:"access key ID to use for AWS services"`
 	AWSSecretAccessKey string `help:"secret access key to use for AWS services"`
@@ -124,6 +125,7 @@ func NewDefaultConfig() *Config {
 
 		OSEndpoint:      "http://opensearch:9200",
 		OSMessagesIndex: "messages-v1",
+		// OSContactsIndex: "contacts-v1", only for tests for now
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
