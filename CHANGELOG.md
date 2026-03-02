@@ -1,3 +1,7 @@
+v26.1.49 (2026-03-02)
+-------------------------
+ * Tweak format of response from system/latency
+
 v26.1.48 (2026-03-02)
 -------------------------
  * Add system/latencies endpoint to expose this info to RapidPro
