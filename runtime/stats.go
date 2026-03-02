@@ -195,18 +195,25 @@ func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency 
 	}
 }
 
-// CTaskLatency holds per-org latency statistics for a contact task type
-type CTaskLatency struct {
-	OrgID    int    `json:"org_id"`
-	TaskType string `json:"task_type"`
-	Count    int64  `json:"count"`
-	TotalMS  int64  `json:"total_ms"`
-	AvgMS    int64  `json:"avg_ms"`
+// OrgCTaskLatency holds latency statistics for all contact task types for a single org
+type OrgCTaskLatency struct {
+	OrgID   int            `json:"org_id"`
+	TotalMS int64          `json:"total_ms"`
+	Tasks   []TaskLatency  `json:"tasks"`
 }
 
-// GetCTaskLatencies returns per-org/task-type latency statistics for the current hourly bucket,
-// sorted by total latency descending.
-func GetCTaskLatencies(rp *redis.Pool) ([]CTaskLatency, error) {
+// TaskLatency holds latency statistics for a single contact task type
+type TaskLatency struct {
+	Type    string `json:"type"`
+	Count   int64  `json:"count"`
+	TotalMS int64  `json:"total_ms"`
+	AvgMS   int64  `json:"avg_ms"`
+}
+
+// GetCTaskLatencies returns per-org latency statistics for the current hourly bucket, grouped by
+// org and sorted by org total latency descending. Tasks within each org are sorted by total latency
+// descending.
+func GetCTaskLatencies(rp *redis.Pool) ([]OrgCTaskLatency, error) {
 	vc := rp.Get()
 	defer vc.Close()
 
@@ -221,7 +228,11 @@ func GetCTaskLatencies(rp *redis.Pool) ([]CTaskLatency, error) {
 		orgID    int
 		taskType string
 	}
-	entries := make(map[entryKey]*CTaskLatency)
+	type entry struct {
+		count   int64
+		totalMS int64
+	}
+	entries := make(map[entryKey]*entry)
 
 	for i := 0; i < len(values); i += 2 {
 		field, _ := redis.String(values[i], nil)
@@ -244,29 +255,46 @@ func GetCTaskLatencies(rp *redis.Pool) ([]CTaskLatency, error) {
 		if err != nil {
 			continue
 		}
-		taskType := after
 
-		ek := entryKey{orgID, taskType}
-		entry, ok := entries[ek]
+		ek := entryKey{orgID, after}
+		e, ok := entries[ek]
 		if !ok {
-			entry = &CTaskLatency{OrgID: orgID, TaskType: taskType}
-			entries[ek] = entry
+			e = &entry{}
+			entries[ek] = e
 		}
 
 		switch suffix {
 		case "n":
-			entry.Count = val
+			e.count = val
 		case "t":
-			entry.TotalMS = val
+			e.totalMS = val
 		}
 	}
 
-	result := make([]CTaskLatency, 0, len(entries))
-	for _, entry := range entries {
-		if entry.Count > 0 {
-			entry.AvgMS = entry.TotalMS / entry.Count
+	// group by org
+	orgs := make(map[int]*OrgCTaskLatency)
+	for ek, e := range entries {
+		org, ok := orgs[ek.orgID]
+		if !ok {
+			org = &OrgCTaskLatency{OrgID: ek.orgID}
+			orgs[ek.orgID] = org
 		}
-		result = append(result, *entry)
+
+		var avgMS int64
+		if e.count > 0 {
+			avgMS = e.totalMS / e.count
+		}
+
+		org.TotalMS += e.totalMS
+		org.Tasks = append(org.Tasks, TaskLatency{Type: ek.taskType, Count: e.count, TotalMS: e.totalMS, AvgMS: avgMS})
+	}
+
+	result := make([]OrgCTaskLatency, 0, len(orgs))
+	for _, org := range orgs {
+		sort.Slice(org.Tasks, func(i, j int) bool {
+			return org.Tasks[i].TotalMS > org.Tasks[j].TotalMS
+		})
+		result = append(result, *org)
 	}
 
 	sort.Slice(result, func(i, j int) bool {

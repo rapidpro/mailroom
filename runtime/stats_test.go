@@ -59,12 +59,17 @@ func TestStats(t *testing.T) {
 		"2/event_received:n": "1", "2/event_received:t": "100",
 	})
 
-	// get latencies, should be sorted by total_ms descending
+	// get latencies grouped by org, sorted by org total descending
 	latencies, err = runtime.GetCTaskLatencies(rt.VK)
 	require.NoError(t, err)
 
-	assert.Len(t, latencies, 3)
-	assert.Equal(t, runtime.CTaskLatency{OrgID: 2, TaskType: "msg_received", Count: 1, TotalMS: 500, AvgMS: 500}, latencies[0])
-	assert.Equal(t, runtime.CTaskLatency{OrgID: 1, TaskType: "msg_received", Count: 2, TotalMS: 400, AvgMS: 200}, latencies[1])
-	assert.Equal(t, runtime.CTaskLatency{OrgID: 2, TaskType: "event_received", Count: 1, TotalMS: 100, AvgMS: 100}, latencies[2])
+	assert.Equal(t, []runtime.OrgCTaskLatency{
+		{OrgID: 2, TotalMS: 600, Tasks: []runtime.TaskLatency{
+			{Type: "msg_received", Count: 1, TotalMS: 500, AvgMS: 500},
+			{Type: "event_received", Count: 1, TotalMS: 100, AvgMS: 100},
+		}},
+		{OrgID: 1, TotalMS: 400, Tasks: []runtime.TaskLatency{
+			{Type: "msg_received", Count: 2, TotalMS: 400, AvgMS: 200},
+		}},
+	}, latencies)
 }
