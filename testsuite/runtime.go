@@ -88,6 +88,7 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	cfg.DynamoEndpoint = "http://localstack:4566"
 	cfg.DynamoTablePrefix = "Test"
 	cfg.OSEndpoint = "http://opensearch:9200"
+	cfg.OSContactsIndex = "contacts-v1"
 	cfg.SpoolDir = absPath("./_test_spool")
 
 	err := cfg.Parse()
@@ -97,7 +98,7 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	require.NoError(t, err)
 
 	createBucket(t, rt, rt.Config.S3AttachmentsBucket)
-	createOpenSearchMessagesTemplate(t, rt)
+	setupOpenSearch(t, rt)
 
 	// create Postgres tables if necessary
 	_, err = rt.DB.Exec("SELECT * from orgs_org")
@@ -244,18 +245,29 @@ func resetElastic(t *testing.T, rt *runtime.Runtime) {
 	ReindexElastic(t, rt)
 }
 
-func createOpenSearchMessagesTemplate(t *testing.T, rt *runtime.Runtime) {
+func setupOpenSearch(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
 	client := rt.OS.Client
-	templateName := rt.Config.OSMessagesIndex
-	body := ReadFile(t, absPath("./testsuite/testdata/os_messages_template.json"))
 
+	// create messages index template (idempotent)
+	messagesBody := ReadFile(t, absPath("./testsuite/testdata/os_messages.json"))
 	_, err := client.IndexTemplate.Create(t.Context(), opensearchapi.IndexTemplateCreateReq{
-		IndexTemplate: templateName,
-		Body:          bytes.NewReader(body),
+		IndexTemplate: rt.Config.OSMessagesIndex,
+		Body:          bytes.NewReader(messagesBody),
 	})
 	require.NoError(t, err)
+
+	// create contacts index if it doesn't already exist (client returns error for 404)
+	resp, _ := client.Indices.Exists(t.Context(), opensearchapi.IndicesExistsReq{Indices: []string{rt.Config.OSContactsIndex}})
+	if resp == nil || resp.StatusCode != 200 {
+		contactsBody := ReadFile(t, absPath("./testsuite/testdata/os_contacts.json"))
+		_, err = client.Indices.Create(t.Context(), opensearchapi.IndicesCreateReq{
+			Index: rt.Config.OSContactsIndex,
+			Body:  bytes.NewReader(contactsBody),
+		})
+		require.NoError(t, err)
+	}
 }
 
 func resetOpenSearch(t *testing.T, rt *runtime.Runtime) {
@@ -263,6 +275,9 @@ func resetOpenSearch(t *testing.T, rt *runtime.Runtime) {
 
 	// delete all indexes matching the messages pattern (ignore 404 if none exist)
 	rt.OS.Client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{rt.Config.OSMessagesIndex + "-*"}})
+
+	// delete contacts index (ignore 404 if it doesn't exist)
+	rt.OS.Client.Indices.Delete(t.Context(), opensearchapi.IndicesDeleteReq{Indices: []string{rt.Config.OSContactsIndex}})
 }
 
 func resetDynamo(t *testing.T, rt *runtime.Runtime) {
