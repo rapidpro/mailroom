@@ -113,14 +113,10 @@ func (s *Service) Start() error {
 	}
 
 	// test OpenSearch
-	if s.rt.OS != nil {
-		if _, err := s.rt.OS.Client.Ping(s.ctx, nil); err != nil {
-			log.Error("opensearch not available", "error", err)
-		} else {
-			log.Info("opensearch ok")
-		}
+	if _, err := s.rt.OS.Client.Ping(s.ctx, nil); err != nil {
+		log.Error("opensearch not available", "error", err)
 	} else {
-		log.Warn("opensearch not configured")
+		log.Info("opensearch ok")
 	}
 
 	if c.AndroidCredentialsFile != "" {
@@ -252,11 +248,9 @@ func (s *Service) reportMetrics(ctx context.Context) (int, error) {
 		cwatch.Datum("DynamoSpooledItems", float64(s.rt.Dynamo.Spool.Size()), types.StandardUnitCount, hostDim),
 	)
 
-	if s.rt.OS != nil {
-		metrics = append(metrics,
-			cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.Spool.Size()), types.StandardUnitCount, hostDim),
-		)
-	}
+	metrics = append(metrics,
+		cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.Spool.Size()), types.StandardUnitCount, hostDim),
+	)
 
 	if err := s.rt.CW.Send(ctx, metrics...); err != nil {
 		return 0, fmt.Errorf("error sending metrics: %w", err)

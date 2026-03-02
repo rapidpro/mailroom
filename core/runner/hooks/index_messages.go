@@ -21,11 +21,6 @@ type indexMessages struct{}
 func (h *indexMessages) Order() int { return 10 }
 
 func (h *indexMessages) Execute(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
-	// TEMPORARY
-	if rt.OS == nil {
-		return nil
-	}
-
 	for _, args := range scenes {
 		for _, a := range args {
 			msg := a.(*search.MessageDoc)

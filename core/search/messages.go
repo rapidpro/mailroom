@@ -145,10 +145,6 @@ func SearchMessages(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 
 // DeindexMessagesByContact deletes all messages in the OpenSearch messages index for the given contact UUIDs.
 func DeindexMessagesByContact(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, contactUUIDs []flows.ContactUUID) (int, error) {
-	if rt.OS == nil {
-		return 0, nil
-	}
-
 	routing := fmt.Sprintf("%d", orgID)
 	uuids := make([]string, len(contactUUIDs))
 	for i, u := range contactUUIDs {
