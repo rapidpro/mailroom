@@ -254,7 +254,7 @@ func (s *Service) reportMetrics(ctx context.Context) (int, error) {
 
 	if s.rt.OS != nil {
 		metrics = append(metrics,
-			cwatch.Datum("OSMessagesSpooledItems", float64(s.rt.OS.Spool.Size()), types.StandardUnitCount, hostDim),
+			cwatch.Datum("OpenSearchSpooledItems", float64(s.rt.OS.Spool.Size()), types.StandardUnitCount, hostDim),
 		)
 	}
 
