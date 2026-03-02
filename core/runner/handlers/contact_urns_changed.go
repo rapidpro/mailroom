@@ -27,6 +27,7 @@ func handleContactURNsChanged(ctx context.Context, rt *runtime.Runtime, oa *mode
 
 	scene.AttachPreCommitHook(hooks.UpdateContactURNs, change)
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }

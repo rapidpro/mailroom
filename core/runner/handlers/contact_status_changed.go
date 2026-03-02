@@ -24,6 +24,7 @@ func handleContactStatusChanged(ctx context.Context, rt *runtime.Runtime, oa *mo
 
 	scene.AttachPreCommitHook(hooks.UpdateContactStatus, event)
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }

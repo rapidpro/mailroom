@@ -94,10 +94,11 @@ func handleSprintEnded(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 		}
 	}
 
-	// if current flow has changed then we need to update modified_on, but also if this is a new session
+	// if current flow has changed then we need to re-index, but also if this is a new session
 	// then flow history may have changed too in a way that won't be captured by a flow_entered event
 	if currentFlowChanged || !event.Resumed {
 		scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+		scene.AttachPostCommitHook(hooks.IndexContacts, event)
 	}
 
 	if scene.DBCall != nil {

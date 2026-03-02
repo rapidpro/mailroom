@@ -24,6 +24,7 @@ func handleRunStarted(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAs
 	// we've potentially changed contact flow history.. only way to be sure would be loading contacts with their
 	// flow history, but not sure that is worth it given how likely we are to be updating modified_on anyway
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }
