@@ -165,22 +165,14 @@ func (c *StatsCollector) Extract() *Stats {
 	return s
 }
 
-// CTaskLatency holds per-org latency statistics for a contact task type
-type CTaskLatency struct {
-	OrgID   int
-	Count   int64
-	TotalMS int64
-	AvgMS   int64
-}
-
 var recordLatencyScript = redis.NewScript(1, `
 local key = KEYS[1]
-local org_field_n = ARGV[1]
-local org_field_t = ARGV[2]
+local field_n = ARGV[1]
+local field_t = ARGV[2]
 local latency_ms = tonumber(ARGV[3])
 
-redis.call("HINCRBY", key, org_field_n, 1)
-redis.call("HINCRBY", key, org_field_t, latency_ms)
+redis.call("HINCRBY", key, field_n, 1)
+redis.call("HINCRBY", key, field_t, latency_ms)
 redis.call("EXPIRE", key, 90000)
 
 return 1
@@ -195,49 +187,70 @@ func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency 
 	vc := c.vk.Get()
 	defer vc.Close()
 
-	key := fmt.Sprintf("ctask_latency:%s:%s", taskType, time.Now().UTC().Format("2006-01-02T15"))
-	orgStr := strconv.Itoa(orgID)
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
+	field := fmt.Sprintf("%d/%s", orgID, taskType)
 
-	if _, err := recordLatencyScript.Do(vc, key, orgStr+":n", orgStr+":t", latency.Milliseconds()); err != nil {
+	if _, err := recordLatencyScript.Do(vc, key, field+":n", field+":t", latency.Milliseconds()); err != nil {
 		slog.Error("error recording per-org latency", "error", err)
 	}
 }
 
-// GetLatencies returns per-org latency statistics for the given task type in the current
-// hourly bucket, sorted by average latency descending.
-func GetLatencies(rp *redis.Pool, taskType string) ([]CTaskLatency, error) {
+// CTaskLatency holds per-org latency statistics for a contact task type
+type CTaskLatency struct {
+	OrgID    int    `json:"org_id"`
+	TaskType string `json:"task_type"`
+	Count    int64  `json:"count"`
+	TotalMS  int64  `json:"total_ms"`
+	AvgMS    int64  `json:"avg_ms"`
+}
+
+// GetCTaskLatencies returns per-org/task-type latency statistics for the current hourly bucket,
+// sorted by total latency descending.
+func GetCTaskLatencies(rp *redis.Pool) ([]CTaskLatency, error) {
 	vc := rp.Get()
 	defer vc.Close()
 
-	key := fmt.Sprintf("ctask_latency:%s:%s", taskType, time.Now().UTC().Format("2006-01-02T15"))
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
 
 	values, err := redis.Values(vc.Do("HGETALL", key))
 	if err != nil {
 		return nil, fmt.Errorf("error getting latency data: %w", err)
 	}
 
-	orgData := make(map[int]*CTaskLatency)
+	type entryKey struct {
+		orgID    int
+		taskType string
+	}
+	entries := make(map[entryKey]*CTaskLatency)
 
 	for i := 0; i < len(values); i += 2 {
 		field, _ := redis.String(values[i], nil)
 		val, _ := redis.Int64(values[i+1], nil)
 
-		idx := strings.LastIndex(field, ":")
-		if idx == -1 {
+		// field format is "{orgID}/{taskType}:n" or "{orgID}/{taskType}:t"
+		suffixIdx := strings.LastIndex(field, ":")
+		if suffixIdx == -1 {
 			continue
 		}
-		orgIDStr := field[:idx]
-		suffix := field[idx+1:]
+		prefix := field[:suffixIdx]
+		suffix := field[suffixIdx+1:]
 
-		orgID, err := strconv.Atoi(orgIDStr)
+		before, after, ok := strings.Cut(prefix, "/")
+		if !ok {
+			continue
+		}
+
+		orgID, err := strconv.Atoi(before)
 		if err != nil {
 			continue
 		}
+		taskType := after
 
-		entry, ok := orgData[orgID]
+		ek := entryKey{orgID, taskType}
+		entry, ok := entries[ek]
 		if !ok {
-			entry = &CTaskLatency{OrgID: orgID}
-			orgData[orgID] = entry
+			entry = &CTaskLatency{OrgID: orgID, TaskType: taskType}
+			entries[ek] = entry
 		}
 
 		switch suffix {
@@ -248,8 +261,8 @@ func GetLatencies(rp *redis.Pool, taskType string) ([]CTaskLatency, error) {
 		}
 	}
 
-	result := make([]CTaskLatency, 0, len(orgData))
-	for _, entry := range orgData {
+	result := make([]CTaskLatency, 0, len(entries))
+	for _, entry := range entries {
 		if entry.Count > 0 {
 			entry.AvgMS = entry.TotalMS / entry.Count
 		}
@@ -257,7 +270,7 @@ func GetLatencies(rp *redis.Pool, taskType string) ([]CTaskLatency, error) {
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].AvgMS > result[j].AvgMS
+		return result[i].TotalMS > result[j].TotalMS
 	})
 
 	return result, nil

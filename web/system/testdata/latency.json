@@ -1,0 +1,19 @@
+[
+    {
+        "label": "illegal method",
+        "method": "POST",
+        "path": "/mi/system/latency",
+        "status": 405,
+        "response": {
+            "error": "illegal method: POST"
+        }
+    },
+    {
+        "label": "returns latency information",
+        "method": "GET",
+        "path": "/mi/system/latency",
+        "body": {},
+        "status": 200,
+        "response": []
+    }
+]
