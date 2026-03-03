@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/nyaruka/gocommon/aws/osearch"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
@@ -39,6 +40,7 @@ func (h *indexContacts) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 			Index:   rt.Config.OSContactsIndex,
 			ID:      string(doc.UUID),
 			Routing: fmt.Sprintf("%d", doc.OrgID),
+			Version: dates.Now().UnixNano(),
 			Body:    body,
 		})
 	}

@@ -154,23 +154,7 @@
         "expected_history": [
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-2c93-76f8-ba00-bd7f0d08e671",
-                "OrgID": 1,
-                "TTL": "2026-05-04T12:30:56Z",
-                "Data": {
-                    "_user": {
-                        "name": "Andy Admin",
-                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
-                    },
-                    "_via": "import",
-                    "created_on": "2025-05-04T12:30:56.123456789Z",
-                    "name": "Cat",
-                    "type": "contact_name_changed"
-                }
-            },
-            {
-                "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-3463-76f8-b86e-4b881f09a186",
+                "SK": "evt#01969b47-3463-76f8-ba00-bd7f0d08e671",
                 "OrgID": 1,
                 "TTL": "2026-05-04T12:30:58Z",
                 "Data": {
@@ -180,22 +164,38 @@
                     },
                     "_via": "import",
                     "created_on": "2025-05-04T12:30:58.123456789Z",
-                    "language": "spa",
-                    "type": "contact_language_changed"
+                    "name": "Cat",
+                    "type": "contact_name_changed"
                 }
             },
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-401b-76f8-a691-235cbe720980",
+                "SK": "evt#01969b47-3c33-76f8-b86e-4b881f09a186",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:01Z",
+                "TTL": "2026-05-04T12:31:00Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:01.123456789Z",
+                    "created_on": "2025-05-04T12:31:00.123456789Z",
+                    "language": "spa",
+                    "type": "contact_language_changed"
+                }
+            },
+            {
+                "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
+                "SK": "evt#01969b47-47eb-76f8-a691-235cbe720980",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:03Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "_via": "import",
+                    "created_on": "2025-05-04T12:31:03.123456789Z",
                     "field": {
                         "key": "age",
                         "name": "Age"
@@ -209,12 +209,12 @@
             },
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-47eb-76f8-bebe-b4a1f677cf4c",
+                "SK": "evt#01969b47-4fbb-76f8-bebe-b4a1f677cf4c",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:03Z",
+                "TTL": "2026-05-04T12:31:05Z",
                 "Data": {
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:03.123456789Z",
+                    "created_on": "2025-05-04T12:31:05.123456789Z",
                     "groups_added": [
                         {
                             "name": "Adults",
@@ -226,16 +226,16 @@
             },
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-4fbb-76f8-8dbf-00ecf5d03034",
+                "SK": "evt#01969b47-578b-76f8-8dbf-00ecf5d03034",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:05Z",
+                "TTL": "2026-05-04T12:31:07Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:05.123456789Z",
+                    "created_on": "2025-05-04T12:31:07.123456789Z",
                     "groups_added": [
                         {
                             "name": "Doctors",
@@ -330,16 +330,16 @@
         "expected_history": [
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-76cb-76f8-8e78-3bde7b3370ae",
+                "SK": "evt#01969b47-8283-76f8-8e78-3bde7b3370ae",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:15Z",
+                "TTL": "2026-05-04T12:31:18Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:15.123456789Z",
+                    "created_on": "2025-05-04T12:31:18.123456789Z",
                     "field": {
                         "key": "age",
                         "name": "Age"
@@ -353,12 +353,12 @@
             },
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-7e9b-76f8-b62c-3c781ca3b5da",
+                "SK": "evt#01969b47-8a53-76f8-b62c-3c781ca3b5da",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:17Z",
+                "TTL": "2026-05-04T12:31:20Z",
                 "Data": {
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:17.123456789Z",
+                    "created_on": "2025-05-04T12:31:20.123456789Z",
                     "groups_removed": [
                         {
                             "name": "Adults",
@@ -370,26 +370,7 @@
             },
             {
                 "PK": "con#8720f157-ca1c-432f-9c0b-2014ddc77094",
-                "SK": "evt#01969b47-5f5b-76f8-afcb-91a2073e5459",
-                "OrgID": 1,
-                "TTL": "2026-05-04T12:31:09Z",
-                "Data": {
-                    "_user": {
-                        "name": "Andy Admin",
-                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
-                    },
-                    "_via": "import",
-                    "created_on": "2025-05-04T12:31:09.123456789Z",
-                    "type": "contact_urns_changed",
-                    "urns": [
-                        "tel:+16055700002",
-                        "tel:+593979000002"
-                    ]
-                }
-            },
-            {
-                "PK": "con#8720f157-ca1c-432f-9c0b-2014ddc77094",
-                "SK": "evt#01969b47-6b13-76f8-9654-8a7258fbaae4",
+                "SK": "evt#01969b47-6b13-76f8-afcb-91a2073e5459",
                 "OrgID": 1,
                 "TTL": "2026-05-04T12:31:12Z",
                 "Data": {
@@ -399,6 +380,25 @@
                     },
                     "_via": "import",
                     "created_on": "2025-05-04T12:31:12.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+16055700002",
+                        "tel:+593979000002"
+                    ]
+                }
+            },
+            {
+                "PK": "con#8720f157-ca1c-432f-9c0b-2014ddc77094",
+                "SK": "evt#01969b47-76cb-76f8-9654-8a7258fbaae4",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:15Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "_via": "import",
+                    "created_on": "2025-05-04T12:31:15.123456789Z",
                     "field": {
                         "key": "age",
                         "name": "Age"
@@ -511,16 +511,16 @@
         "expected_history": [
             {
                 "PK": "con#5ecda5fc-951c-437b-a17e-f85e49829fb9",
-                "SK": "evt#01969b47-960b-76f8-bec9-e032f4f9af5f",
+                "SK": "evt#01969b47-a993-76f8-bec9-e032f4f9af5f",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:23Z",
+                "TTL": "2026-05-04T12:31:28Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:23.123456789Z",
+                    "created_on": "2025-05-04T12:31:28.123456789Z",
                     "field": {
                         "key": "joined",
                         "name": "Joined"
@@ -534,16 +534,16 @@
             },
             {
                 "PK": "con#8720f157-ca1c-432f-9c0b-2014ddc77094",
-                "SK": "evt#01969b47-8e3b-76f8-8d9f-e51d30290005",
+                "SK": "evt#01969b47-a1c3-76f8-8d9f-e51d30290005",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:21Z",
+                "TTL": "2026-05-04T12:31:26Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:21.123456789Z",
+                    "created_on": "2025-05-04T12:31:26.123456789Z",
                     "field": {
                         "key": "joined",
                         "name": "Joined"
@@ -641,32 +641,32 @@
         "expected_history": [
             {
                 "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
-                "SK": "evt#01969b47-a5ab-76f8-8ab7-4a517a86045c",
+                "SK": "evt#01969b47-c103-76f8-8ab7-4a517a86045c",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:27Z",
+                "TTL": "2026-05-04T12:31:34Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:27.123456789Z",
+                    "created_on": "2025-05-04T12:31:34.123456789Z",
                     "name": "Anne",
                     "type": "contact_name_changed"
                 }
             },
             {
                 "PK": "con#8720f157-ca1c-432f-9c0b-2014ddc77094",
-                "SK": "evt#01969b47-ad7b-76f8-97a3-ae27459a6be4",
+                "SK": "evt#01969b47-c8d3-76f8-97a3-ae27459a6be4",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:29Z",
+                "TTL": "2026-05-04T12:31:36Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:29.123456789Z",
+                    "created_on": "2025-05-04T12:31:36.123456789Z",
                     "language": "kin",
                     "type": "contact_language_changed"
                 }
@@ -897,16 +897,16 @@
         "expected_history": [
             {
                 "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
-                "SK": "evt#01969b47-d48b-76f8-9014-2c868db4022e",
+                "SK": "evt#01969b47-f7b3-76f8-9014-2c868db4022e",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:39Z",
+                "TTL": "2026-05-04T12:31:48Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:39.123456789Z",
+                    "created_on": "2025-05-04T12:31:48.123456789Z",
                     "type": "contact_urns_changed",
                     "urns": [
                         "tel:+16055700001",
@@ -1029,7 +1029,7 @@
         "expected_history": [
             {
                 "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
-                "SK": "evt#01969b47-ebfb-76f8-8768-7d0ba4d4f3e8",
+                "SK": "evt#01969b48-130b-76f8-8768-7d0ba4d4f3e8",
                 "OrgID": 1,
                 "Data": {
                     "_user": {
@@ -1037,30 +1037,30 @@
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:45.123456789Z",
+                    "created_on": "2025-05-04T12:31:55.123456789Z",
                     "status": "archived",
                     "type": "contact_status_changed"
                 }
             },
             {
                 "PK": "con#229bd432-dac7-4a3f-ba91-c48ad8c50e6b",
-                "SK": "evt#01969b47-f3cb-76f8-b63d-c8dcc2fa9de0",
+                "SK": "evt#01969b48-1adb-76f8-b63d-c8dcc2fa9de0",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:47Z",
+                "TTL": "2026-05-04T12:31:57Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:47.123456789Z",
+                    "created_on": "2025-05-04T12:31:57.123456789Z",
                     "name": "Blake",
                     "type": "contact_name_changed"
                 }
             },
             {
                 "PK": "con#229bd432-dac7-4a3f-ba91-c48ad8c50e6b",
-                "SK": "evt#01969b47-fb9b-76f8-8f9d-465efd6fbb5e",
+                "SK": "evt#01969b48-22ab-76f8-8f9d-465efd6fbb5e",
                 "OrgID": 1,
                 "Data": {
                     "_user": {
@@ -1068,23 +1068,23 @@
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:49.123456789Z",
+                    "created_on": "2025-05-04T12:31:59.123456789Z",
                     "status": "blocked",
                     "type": "contact_status_changed"
                 }
             },
             {
                 "PK": "con#d659b893-76c5-4e9c-be24-6164105d48f2",
-                "SK": "evt#01969b48-036b-76f8-9566-6fb2598c32d6",
+                "SK": "evt#01969b48-2a7b-76f8-9566-6fb2598c32d6",
                 "OrgID": 1,
-                "TTL": "2026-05-04T12:31:51Z",
+                "TTL": "2026-05-04T12:32:01Z",
                 "Data": {
                     "_user": {
                         "name": "Andy Admin",
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
                     },
                     "_via": "import",
-                    "created_on": "2025-05-04T12:31:51.123456789Z",
+                    "created_on": "2025-05-04T12:32:01.123456789Z",
                     "name": "Ivan",
                     "type": "contact_name_changed"
                 }
