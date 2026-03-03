@@ -25,6 +25,7 @@ func handleContactFieldChanged(ctx context.Context, rt *runtime.Runtime, oa *mod
 	scene.AttachPreCommitHook(hooks.UpdateContactFields, event)
 	scene.AttachPreCommitHook(hooks.UpdateCampaignFires, event)
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }

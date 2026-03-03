@@ -24,6 +24,7 @@ func handleContactNameChanged(ctx context.Context, rt *runtime.Runtime, oa *mode
 
 	scene.AttachPreCommitHook(hooks.UpdateContactName, event)
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }

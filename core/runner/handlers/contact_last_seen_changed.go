@@ -22,8 +22,9 @@ func handleContactLastSeenChanged(ctx context.Context, rt *runtime.Runtime, oa *
 	slog.Debug("contact last seen changed", "contact", scene.ContactUUID(), "session", scene.SessionUUID(), "seen", event.LastSeenOn)
 
 	scene.AttachPreCommitHook(hooks.UpdateContactLastSeenOn, event)
-	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
 	scene.AttachPreCommitHook(hooks.UpdateCampaignFires, event)
+	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }

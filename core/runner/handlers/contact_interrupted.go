@@ -22,6 +22,7 @@ func handleContactInterrupted(ctx context.Context, rt *runtime.Runtime, oa *mode
 
 	scene.AttachPreCommitHook(hooks.InterruptContacts, event)
 	scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+	scene.AttachPostCommitHook(hooks.IndexContacts, event)
 
 	return nil
 }
