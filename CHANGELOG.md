@@ -1,3 +1,10 @@
+v26.1.50 (2026-03-03)
+-------------------------
+ * Update to latest goflow
+ * Convert query group population to use event pipeline
+ * Start indexing contacts - skipping flow_history_ids for now
+ * Make OpenSearch required in config
+
 v26.1.49 (2026-03-02)
 -------------------------
  * Tweak format of response from system/latency
