@@ -65,4 +65,5 @@ func TestPopulateGroupTask(t *testing.T) {
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactgroup WHERE id = $1`, group2.ID).Returns("X")
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, group2.ID).Returns(0)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"time"
 
@@ -87,25 +88,34 @@ func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 		if errors.As(err, &qerr) {
 			matchedIDs = nil
 			endStatus = models.GroupStatusInvalid
+
+			// remove current members from the group since the query is invalid and can't be
+			// in session assets for re-evaluation to handle
+			if len(currentIDs) > 0 {
+				removals := make([]*models.GroupRemove, len(currentIDs))
+				for i, id := range currentIDs {
+					removals[i] = &models.GroupRemove{ContactID: id, GroupID: t.GroupID}
+				}
+				if err := models.RemoveContactsFromGroups(ctx, rt.DB, removals); err != nil {
+					return fmt.Errorf("error removing contacts from invalid group: %w", err)
+				}
+			}
 		} else {
 			return fmt.Errorf("error performing query: %s for group: %d: %w", t.Query, t.GroupID, err)
 		}
 	}
 
 	// build the union of current members and matched contacts as the set to re-check
-	recheckSet := make(map[models.ContactID]bool, len(currentIDs)+len(matchedIDs))
+	recheckSet := make(map[models.ContactID]struct{}, len(currentIDs)+len(matchedIDs))
 	for _, id := range currentIDs {
-		recheckSet[id] = true
+		recheckSet[id] = struct{}{}
 	}
 	for _, id := range matchedIDs {
-		recheckSet[id] = true
+		recheckSet[id] = struct{}{}
 	}
-	recheckIDs := make([]models.ContactID, 0, len(recheckSet))
-	for id := range recheckSet {
-		recheckIDs = append(recheckIDs, id)
-	}
+	recheckIDs := slices.Collect(maps.Keys(recheckSet))
 
-	// lock contacts in batches, re-evaluate membership, and handle events
+	// lock contacts in batches, re-evaluate group membership, and handle events
 	for batch := range slices.Chunk(recheckIDs, populateBatchSize) {
 		skipped, err := runner.ReevaluateGroupsWithLock(ctx, rt, oa, batch)
 		if err != nil {
