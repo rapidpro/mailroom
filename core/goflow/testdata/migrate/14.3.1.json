@@ -1,7 +1,7 @@
 {
     "uuid": "502c3ee4-3249-4dee-8e71-c62070667d52",
     "name": "New",
-    "spec_version": "14.4.0",
+    "spec_version": "14.3.1",
     "type": "messaging",
     "language": "und",
     "expire_after_minutes": 20160,
