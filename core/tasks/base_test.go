@@ -16,7 +16,7 @@ func TestReadTask(t *testing.T) {
 	}`))
 	require.NoError(t, err)
 
-	typedTask := task.(*tasks.PopulateQueryGroup)
+	typedTask := task.(*tasks.PopulateGroup)
 	assert.Equal(t, models.GroupID(23), typedTask.GroupID)
 	assert.Equal(t, "gender = F", typedTask.Query)
 }

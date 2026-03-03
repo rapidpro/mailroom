@@ -147,8 +147,8 @@ func (s *Scene) addSprint(ctx context.Context, rt *runtime.Runtime, oa *models.O
 	return nil
 }
 
-// NewContact handles the case where courier has created a new contact which won't be in the correct query groups
-func (s *Scene) NewContact(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
+// ReevaluateGroups re-evaluates query based group membership for this scene's contact and adds any resulting events.
+func (s *Scene) ReevaluateGroups(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
 	evts := make([]flows.Event, 0, 1)
 	log := func(e flows.Event) { evts = append(evts, e) }
 
@@ -156,7 +156,7 @@ func (s *Scene) NewContact(ctx context.Context, rt *runtime.Runtime, oa *models.
 
 	for _, e := range evts {
 		if err := s.AddEvent(ctx, rt, oa, e, models.NilUserID, ""); err != nil {
-			return fmt.Errorf("error adding new contact event to scene: %w", err)
+			return fmt.Errorf("error adding group event to scene: %w", err)
 		}
 	}
 	return nil
