@@ -10,7 +10,7 @@ import (
 )
 
 func TestReadTask(t *testing.T) {
-	task, err := tasks.ReadTask("populate_dynamic_group", []byte(`{
+	task, err := tasks.ReadTask("populate_group", []byte(`{
 		"group_id": 23,
 		"query": "gender = F"
 	}`))

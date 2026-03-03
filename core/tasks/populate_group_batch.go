@@ -22,9 +22,10 @@ func init() {
 
 // PopulateGroupBatch is our task to re-evaluate group membership for a batch of contacts
 type PopulateGroupBatch struct {
-	GroupID    models.GroupID     `json:"group_id"`
-	ContactIDs []models.ContactID `json:"contact_ids"`
-	LockValue  string             `json:"lock_value"`
+	GroupID      models.GroupID     `json:"group_id"`
+	ContactIDs   []models.ContactID `json:"contact_ids"`
+	LockValue    string             `json:"lock_value"`
+	PopulationID string             `json:"population_id"`
 }
 
 func (t *PopulateGroupBatch) Type() string {
@@ -55,14 +56,17 @@ func (t *PopulateGroupBatch) Perform(ctx context.Context, rt *runtime.Runtime, o
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	remaining, _ := redis.Int(redis.DoContext(vc, ctx, "DECR", fmt.Sprintf(populateGroupBatchesRemainingKey, t.GroupID)))
+	remaining, err := redis.Int(redis.DoContext(vc, ctx, "DECR", fmt.Sprintf(populateGroupBatchesRemainingKey, t.PopulationID)))
+	if err != nil {
+		return fmt.Errorf("error decrementing populate group batch counter: %w", err)
+	}
 	if remaining == 0 {
 		if err := models.UpdateGroupStatus(ctx, rt.DB, t.GroupID, models.GroupStatusReady); err != nil {
 			return fmt.Errorf("error updating query group status: %w", err)
 		}
 
 		// release the distributed lock now that all batches are complete
-		locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour)
+		locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Minute)
 		if err := locker.Release(ctx, rt.VK, t.LockValue); err != nil {
 			return fmt.Errorf("error releasing populate group lock: %w", err)
 		}

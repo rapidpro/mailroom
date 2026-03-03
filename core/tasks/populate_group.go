@@ -14,19 +14,20 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/vkutil"
 	"github.com/nyaruka/vkutil/locks"
 )
 
 // TypePopulateGroup is the type of the populate group task
-const TypePopulateGroup = "populate_dynamic_group"
+const TypePopulateGroup = "populate_group"
 
 const populateGroupLockKey = "lock:pop_dyn_group_%d"
-const populateGroupBatchesRemainingKey = "populate_group_batches_remaining:%d"
+const populateGroupBatchesRemainingKey = "populate_group_batches_remaining:%s"
 const populateBatchSize = 100
 
 func init() {
 	RegisterType(TypePopulateGroup, func() Task { return &PopulateGroup{} })
-	RegisterType("populate_group", func() Task { return &PopulateGroup{} }) // support new name, still queue with old
+	RegisterType("populate_dynamic_group", func() Task { return &PopulateGroup{} }) // support old name
 }
 
 // PopulateGroup is our task to populate the contacts for a dynamic group
@@ -41,7 +42,7 @@ func (t *PopulateGroup) Type() string {
 
 // Timeout is the maximum amount of time the task can run for
 func (t *PopulateGroup) Timeout() time.Duration {
-	return time.Minute
+	return time.Minute * 10
 }
 
 func (t *PopulateGroup) WithAssets() models.Refresh {
@@ -132,20 +133,24 @@ func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 	// chunk contacts into batches and queue a task for each
 	batches := slices.Collect(slices.Chunk(recheckIDs, populateBatchSize))
 
+	// generate a random ID for this population run so batch tasks can track completion
+	populationID := vkutil.RandomBase64(10)
+
 	// set valkey key which batch tasks can decrement to know when population has completed
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	_, err = redis.DoContext(vc, ctx, "SET", fmt.Sprintf(populateGroupBatchesRemainingKey, t.GroupID), len(batches), "EX", 60*60)
+	_, err = redis.DoContext(vc, ctx, "SET", fmt.Sprintf(populateGroupBatchesRemainingKey, populationID), len(batches), "EX", 60*60)
 	if err != nil {
 		return fmt.Errorf("error setting populate group batch counter key: %w", err)
 	}
 
 	for _, batch := range batches {
 		task := &PopulateGroupBatch{
-			GroupID:    t.GroupID,
-			LockValue:  lock,
-			ContactIDs: batch,
+			GroupID:      t.GroupID,
+			ContactIDs:   batch,
+			LockValue:    lock,
+			PopulationID: populationID,
 		}
 		if err := Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), task, false); err != nil {
 			return fmt.Errorf("error queuing populate group batch task: %w", err)
