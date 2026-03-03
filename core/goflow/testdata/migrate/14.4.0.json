@@ -1,0 +1,148 @@
+{
+    "uuid": "502c3ee4-3249-4dee-8e71-c62070667d52",
+    "name": "New",
+    "spec_version": "14.4.0",
+    "type": "messaging",
+    "language": "und",
+    "expire_after_minutes": 20160,
+    "localization": {
+        "spa": {
+            "82a1de5f-af1a-45ef-8511-4d60c160e486": {
+                "text": [
+                    "Hola @webhook.json"
+                ]
+            }
+        }
+    },
+    "nodes": [
+        {
+            "uuid": "d26486b1-193d-4512-85f0-c6db696f1e1c",
+            "actions": [
+                {
+                    "uuid": "82a1de5f-af1a-45ef-8511-4d60c160e486",
+                    "type": "send_msg",
+                    "text": "Hello @webhook.json from @results.this_is_a_reference_to_a_result_whose_name_will_have_been_trunca",
+                    "quick_replies": [
+                        "A",
+                        "B",
+                        "C",
+                        "D",
+                        "E",
+                        "F",
+                        "G",
+                        "H",
+                        "I",
+                        "J"
+                    ],
+                    "template": {
+                        "uuid": "641b8b05-082a-497e-bf63-38aa48b1f0c4",
+                        "name": "welcome"
+                    },
+                    "template_variables": [
+                        "@contact.name"
+                    ]
+                }
+            ],
+            "exits": [
+                {
+                    "uuid": "fdd370e0-ffa9-48b3-8148-b9241d74fc72",
+                    "destination_uuid": "4eab7a66-0b55-45f6-803f-129a6f49e723"
+                }
+            ]
+        },
+        {
+            "uuid": "4eab7a66-0b55-45f6-803f-129a6f49e723",
+            "actions": [
+                {
+                    "uuid": "c766e805-da3a-46f4-97c4-7ce54b16bf71",
+                    "headers": {},
+                    "type": "call_webhook",
+                    "url": "http://temba.io/",
+                    "method": "GET",
+                    "result_name": "Call 2"
+                }
+            ],
+            "router": {
+                "type": "switch",
+                "operand": "@webhook.status",
+                "cases": [
+                    {
+                        "uuid": "ff810df6-23c2-4dff-9be1-eebffae2bb9d",
+                        "type": "has_number_between",
+                        "arguments": [
+                            "200",
+                            "299"
+                        ],
+                        "category_uuid": "be4ad508-3afb-4c4a-80ba-86b61518411c"
+                    }
+                ],
+                "categories": [
+                    {
+                        "uuid": "be4ad508-3afb-4c4a-80ba-86b61518411c",
+                        "name": "Success",
+                        "exit_uuid": "24493dc0-687e-4d16-98e5-6e422624729b"
+                    },
+                    {
+                        "uuid": "501fc0c1-28a8-45b2-84f1-b6f9ea17d551",
+                        "name": "Failure",
+                        "exit_uuid": "09f2e979-e6d2-4d0c-b28d-88a836a41d2e"
+                    }
+                ],
+                "default_category_uuid": "501fc0c1-28a8-45b2-84f1-b6f9ea17d551"
+            },
+            "exits": [
+                {
+                    "uuid": "24493dc0-687e-4d16-98e5-6e422624729b",
+                    "destination_uuid": "18762b99-7b09-4f32-b864-b7c13667cbb4"
+                },
+                {
+                    "uuid": "09f2e979-e6d2-4d0c-b28d-88a836a41d2e"
+                }
+            ]
+        },
+        {
+            "uuid": "18762b99-7b09-4f32-b864-b7c13667cbb4",
+            "actions": [
+                {
+                    "uuid": "dad37f80-4661-45bc-bfe0-a60bfc24b257",
+                    "type": "open_ticket",
+                    "note": "Sounds important"
+                }
+            ],
+            "router": {
+                "type": "switch",
+                "categories": [
+                    {
+                        "uuid": "6103fa71-6ca9-4300-aec6-929f50fa1ae0",
+                        "name": "Success",
+                        "exit_uuid": "a7d8b8da-bdc2-4080-89a0-4c250f198755"
+                    },
+                    {
+                        "uuid": "e86a60b9-6e8e-4150-9ab9-19e6eb7003d9",
+                        "name": "Failure",
+                        "exit_uuid": "990fdd30-176a-4467-a5b7-b2c4e2033699"
+                    }
+                ],
+                "default_category_uuid": "e86a60b9-6e8e-4150-9ab9-19e6eb7003d9",
+                "operand": "@locals._new_ticket",
+                "cases": [
+                    {
+                        "uuid": "73bfb9dc-9bbb-4928-92fd-d8957edf4a92",
+                        "type": "has_text",
+                        "arguments": [],
+                        "category_uuid": "6103fa71-6ca9-4300-aec6-929f50fa1ae0"
+                    }
+                ],
+                "result_name": "Ticket"
+            },
+            "exits": [
+                {
+                    "uuid": "a7d8b8da-bdc2-4080-89a0-4c250f198755"
+                },
+                {
+                    "uuid": "990fdd30-176a-4467-a5b7-b2c4e2033699"
+                }
+            ]
+        }
+    ]
+}

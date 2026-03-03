@@ -16,7 +16,7 @@ import (
 )
 
 func TestSpecVersion(t *testing.T) {
-	assert.Equal(t, semver.MustParse("14.3.0"), goflow.SpecVersion())
+	assert.Equal(t, semver.MustParse("14.4.0"), goflow.SpecVersion())
 }
 
 func TestReadFlow(t *testing.T) {
@@ -58,7 +58,7 @@ func TestMigrateDefinition(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345, time.Now))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	versions := []string{"13.0.0", "13.1.0", "13.2.0", "13.3.0", "13.4.0", "13.5.0", "13.6.0", "13.6.1", "14.0.0", "14.1.0", "14.2.0", "14.3.0"}
+	versions := []string{"13.0.0", "13.1.0", "13.2.0", "13.3.0", "13.4.0", "13.5.0", "13.6.0", "13.6.1", "14.0.0", "14.1.0", "14.2.0", "14.3.0", "14.4.0"}
 	flowDefs := make(map[string][]byte, len(versions))
 	for _, version := range versions {
 		flowDefs[version] = testsuite.ReadFile(t, "testdata/migrate/"+version+".json")
