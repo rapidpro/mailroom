@@ -41,7 +41,7 @@ func (t *PopulateGroup) Type() string {
 
 // Timeout is the maximum amount of time the task can run for
 func (t *PopulateGroup) Timeout() time.Duration {
-	return time.Minute * 10
+	return time.Minute
 }
 
 func (t *PopulateGroup) WithAssets() models.Refresh {
@@ -50,7 +50,7 @@ func (t *PopulateGroup) WithAssets() models.Refresh {
 
 // Perform figures out the membership for a query based group then queues batch tasks to repopulate it
 func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
-	locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour*24)
+	locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour)
 	lock, err := locker.Grab(ctx, rt.VK, time.Minute*5)
 	if err != nil {
 		return fmt.Errorf("error grabbing lock to repopulate query group: %d: %w", t.GroupID, err)
@@ -136,7 +136,7 @@ func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	_, err = redis.DoContext(vc, ctx, "SET", fmt.Sprintf(populateGroupBatchesRemainingKey, t.GroupID), len(batches), "EX", 24*60*60)
+	_, err = redis.DoContext(vc, ctx, "SET", fmt.Sprintf(populateGroupBatchesRemainingKey, t.GroupID), len(batches), "EX", 60*60)
 	if err != nil {
 		return fmt.Errorf("error setting populate group batch counter key: %w", err)
 	}

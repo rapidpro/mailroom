@@ -33,7 +33,7 @@ func (t *PopulateGroupBatch) Type() string {
 
 // Timeout is the maximum amount of time the task can run for
 func (t *PopulateGroupBatch) Timeout() time.Duration {
-	return time.Minute * 10
+	return time.Minute
 }
 
 func (t *PopulateGroupBatch) WithAssets() models.Refresh {
@@ -62,7 +62,7 @@ func (t *PopulateGroupBatch) Perform(ctx context.Context, rt *runtime.Runtime, o
 		}
 
 		// release the distributed lock now that all batches are complete
-		locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour*24)
+		locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour)
 		if err := locker.Release(ctx, rt.VK, t.LockValue); err != nil {
 			return fmt.Errorf("error releasing populate group lock: %w", err)
 		}
