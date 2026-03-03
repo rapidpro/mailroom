@@ -65,3 +65,24 @@ func applyModifiers(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 
 	return evts, nil
 }
+
+// ReevaluateGroupsWithLock re-evaluates query-based group membership for the given contacts
+func ReevaluateGroupsWithLock(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contactIDs []models.ContactID) ([]models.ContactID, error) {
+	scenes, skipped, unlock, err := LockAndLoad(ctx, rt, oa, contactIDs, nil, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("error locking contacts: %w", err)
+	}
+	defer unlock()
+
+	for _, scene := range scenes {
+		if err := scene.ReevaluateGroups(ctx, rt, oa); err != nil {
+			return nil, fmt.Errorf("error re-evaluating groups: %w", err)
+		}
+	}
+
+	if err := BulkCommit(ctx, rt, oa, scenes); err != nil {
+		return nil, fmt.Errorf("error committing group population: %w", err)
+	}
+
+	return skipped, nil
+}

@@ -346,26 +346,6 @@ func LoadContactsByUUID(ctx context.Context, db Queryer, oa *OrgAssets, uuids []
 	return LoadContacts(ctx, db, oa, ids)
 }
 
-// GetNewestContactModifiedOn returns the newest modified_on for a contact in the passed in org
-func GetNewestContactModifiedOn(ctx context.Context, db Queryer, oa *OrgAssets) (*time.Time, error) {
-	rows, err := db.QueryContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", oa.OrgID())
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("error selecting most recently changed contact for org: %d: %w", oa.OrgID(), err)
-	}
-	defer rows.Close()
-	if err != sql.ErrNoRows {
-		rows.Next()
-		var newest time.Time
-		err = rows.Scan(&newest)
-		if err != nil {
-			return nil, fmt.Errorf("error scanning most recent contact modified_on for org: %d: %w", oa.OrgID(), err)
-		}
-
-		return &newest, nil
-	}
-
-	return nil, nil
-}
 
 // GetContactIDsFromReferences gets the contact ids for the given org and set of references. Note that the order of the returned contacts
 // won't necessarily match the order of the references.

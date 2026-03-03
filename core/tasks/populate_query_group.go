@@ -2,11 +2,15 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/vkutil/locks"
@@ -16,6 +20,7 @@ import (
 const TypePopulateQueryGroup = "populate_dynamic_group"
 
 const populateGroupLockKey string = "lock:pop_dyn_group_%d"
+const populateBatchSize = 100
 
 func init() {
 	RegisterType(TypePopulateQueryGroup, func() Task { return &PopulateQueryGroup{} })
@@ -56,11 +61,67 @@ func (t *PopulateQueryGroup) Perform(ctx context.Context, rt *runtime.Runtime, o
 
 	slog.Info("starting population of query group", "group_id", t.GroupID, "org_id", oa.OrgID(), "query", t.Query)
 
-	count, err := search.PopulateGroup(ctx, rt, oa, t.GroupID, t.Query)
-	if err != nil {
-		return fmt.Errorf("error populating query group: %d: %w", t.GroupID, err)
+	if err := models.UpdateGroupStatus(ctx, rt.DB, t.GroupID, models.GroupStatusEvaluating); err != nil {
+		return fmt.Errorf("error marking query group as evaluating: %w", err)
 	}
-	slog.Info("completed populating query group", "elapsed", time.Since(start), "count", count)
+
+	// reload org assets so group is included (groups with status 'X' are excluded from assets)
+	oa, err = models.GetOrgAssetsWithRefresh(ctx, rt, oa.OrgID(), models.RefreshGroups)
+	if err != nil {
+		return fmt.Errorf("error reloading org assets: %w", err)
+	}
+
+	// get current members of the group
+	currentIDs, err := models.GetGroupContactIDs(ctx, rt.DB, t.GroupID)
+	if err != nil {
+		return fmt.Errorf("unable to look up contact ids for group: %d: %w", t.GroupID, err)
+	}
+
+	// get contacts that match the query from search
+	matchedIDs, err := search.GetContactIDsForQuery(ctx, rt, oa, nil, models.ContactStatusActive, t.Query, -1)
+	endStatus := models.GroupStatusReady
+
+	if err != nil {
+		var qerr *contactql.QueryError
+		if errors.As(err, &qerr) {
+			matchedIDs = nil
+			endStatus = models.GroupStatusInvalid
+		} else {
+			return fmt.Errorf("error performing query: %s for group: %d: %w", t.Query, t.GroupID, err)
+		}
+	}
+
+	// build the union of current members and matched contacts as the set to re-check
+	recheckSet := make(map[models.ContactID]bool, len(currentIDs)+len(matchedIDs))
+	for _, id := range currentIDs {
+		recheckSet[id] = true
+	}
+	for _, id := range matchedIDs {
+		recheckSet[id] = true
+	}
+	recheckIDs := make([]models.ContactID, 0, len(recheckSet))
+	for id := range recheckSet {
+		recheckIDs = append(recheckIDs, id)
+	}
+
+	// lock contacts in batches, re-evaluate membership, and handle events
+	for batch := range slices.Chunk(recheckIDs, populateBatchSize) {
+		skipped, err := runner.ReevaluateGroupsWithLock(ctx, rt, oa, batch)
+		if err != nil {
+			return fmt.Errorf("error populating group membership: %w", err)
+		}
+
+		if len(skipped) > 0 {
+			slog.Warn("failed to acquire locks for contacts during group population", "skipped", len(skipped))
+		}
+	}
+
+	// mark our group as either ready or invalid
+	if err := models.UpdateGroupStatus(ctx, rt.DB, t.GroupID, endStatus); err != nil {
+		return fmt.Errorf("error updating query group status: %w", err)
+	}
+
+	slog.Info("completed populating query group", "elapsed", time.Since(start), "count", len(matchedIDs))
 
 	return nil
 }

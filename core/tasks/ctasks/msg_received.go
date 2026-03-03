@@ -103,7 +103,7 @@ func (t *MsgReceived) perform(ctx context.Context, rt *runtime.Runtime, oa *mode
 	}
 
 	if t.NewContact {
-		if err := scene.NewContact(ctx, rt, oa); err != nil {
+		if err := scene.ReevaluateGroups(ctx, rt, oa); err != nil {
 			return fmt.Errorf("error calculating groups for new contact: %w", err)
 		}
 	} else if contact.Status() == flows.ContactStatusStopped {
