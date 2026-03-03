@@ -16,37 +16,38 @@ import (
 	"github.com/nyaruka/vkutil/locks"
 )
 
-// TypePopulateQueryGroup is the type of the populate group task
-const TypePopulateQueryGroup = "populate_dynamic_group"
+// TypePopulateGroup is the type of the populate group task
+const TypePopulateGroup = "populate_dynamic_group"
 
 const populateGroupLockKey string = "lock:pop_dyn_group_%d"
 const populateBatchSize = 100
 
 func init() {
-	RegisterType(TypePopulateQueryGroup, func() Task { return &PopulateQueryGroup{} })
+	RegisterType(TypePopulateGroup, func() Task { return &PopulateGroup{} })
+	RegisterType("populate_group", func() Task { return &PopulateGroup{} }) // support new name, still queue with old
 }
 
-// PopulateQueryGroup is our task to populate the contacts for a dynamic group
-type PopulateQueryGroup struct {
+// PopulateGroup is our task to populate the contacts for a dynamic group
+type PopulateGroup struct {
 	GroupID models.GroupID `json:"group_id"`
 	Query   string         `json:"query"`
 }
 
-func (t *PopulateQueryGroup) Type() string {
-	return TypePopulateQueryGroup
+func (t *PopulateGroup) Type() string {
+	return TypePopulateGroup
 }
 
 // Timeout is the maximum amount of time the task can run for
-func (t *PopulateQueryGroup) Timeout() time.Duration {
+func (t *PopulateGroup) Timeout() time.Duration {
 	return time.Hour
 }
 
-func (t *PopulateQueryGroup) WithAssets() models.Refresh {
+func (t *PopulateGroup) WithAssets() models.Refresh {
 	return models.RefreshGroups
 }
 
 // Perform figures out the membership for a query based group then repopulates it
-func (t *PopulateQueryGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
+func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
 	locker := locks.NewLocker(fmt.Sprintf(populateGroupLockKey, t.GroupID), time.Hour)
 	lock, err := locker.Grab(ctx, rt.VK, time.Minute*5)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPopulateQueryGroupTask(t *testing.T) {
+func TestPopulateGroupTask(t *testing.T) {
 	ctx, rt := testsuite.Runtime(t)
 
 	defer testsuite.Reset(t, rt, testsuite.ResetAll)
@@ -40,7 +40,7 @@ func TestPopulateQueryGroupTask(t *testing.T) {
 	start := dates.Now()
 
 	// test 1: valid query populates group and creates campaign fires
-	task1 := &tasks.PopulateQueryGroup{
+	task1 := &tasks.PopulateGroup{
 		GroupID: group1.ID,
 		Query:   "gender = F",
 	}
@@ -57,7 +57,7 @@ func TestPopulateQueryGroupTask(t *testing.T) {
 		fmt.Sprintf("%d:1", point.ID), testdb.Ann.ID).Returns(1)
 
 	// test 2: invalid query marks group as invalid
-	task2 := &tasks.PopulateQueryGroup{
+	task2 := &tasks.PopulateGroup{
 		GroupID: group2.ID,
 		Query:   "!!!",
 	}

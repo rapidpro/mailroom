@@ -39,7 +39,7 @@ func handlePopulateGroup(ctx context.Context, rt *runtime.Runtime, r *populateGr
 		return errors.New("no such query based group"), http.StatusBadRequest, nil
 	}
 
-	task := &tasks.PopulateQueryGroup{
+	task := &tasks.PopulateGroup{
 		GroupID: group.ID(),
 		Query:   group.Query(),
 	}
