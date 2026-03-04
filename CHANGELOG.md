@@ -1,3 +1,8 @@
+v26.1.53 (2026-03-04)
+-------------------------
+ * Add new Counter util for tracking progress of batch tasks
+ * Rework populate_group task to use batch sub-tasks
+
 v26.1.52 (2026-03-03)
 -------------------------
  * Flow spec v14.3.1
