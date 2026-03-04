@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -52,15 +51,13 @@ func (t *PopulateGroupBatch) Perform(ctx context.Context, rt *runtime.Runtime, o
 		slog.Warn("failed to acquire locks for contacts during group population", "group_id", t.GroupID, "skipped", len(skipped))
 	}
 
-	// decrement the key that holds remaining batches to see if the overall population is now finished
-	vc := rt.VK.Get()
-	defer vc.Close()
-
-	remaining, err := redis.Int(redis.DoContext(vc, ctx, "DECR", fmt.Sprintf(populateGroupBatchesRemainingKey, t.PopulationID)))
+	// decrement the counter to see if the overall population is now finished
+	counter := NewCounter(fmt.Sprintf(populateGroupBatchesRemainingKey, t.PopulationID), time.Hour)
+	done, err := counter.Done(ctx, rt.VK)
 	if err != nil {
 		return fmt.Errorf("error decrementing populate group batch counter: %w", err)
 	}
-	if remaining == 0 {
+	if done {
 		if err := models.UpdateGroupStatus(ctx, rt.DB, t.GroupID, models.GroupStatusReady); err != nil {
 			return fmt.Errorf("error updating query group status: %w", err)
 		}

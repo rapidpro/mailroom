@@ -40,7 +40,7 @@ func TestInterruptFlow(t *testing.T) {
 		string(s5UUID): models.SessionStatusExpired,
 	})
 
-	// check that the sessions remaining counter has been decremented to zero
+	// check that the batches remaining counter has been decremented to zero
 	remaining, err := redis.Int(vc.Do("GET", fmt.Sprintf("interrupt_flow_progress:%d", testdb.Favorites.ID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 0, remaining)

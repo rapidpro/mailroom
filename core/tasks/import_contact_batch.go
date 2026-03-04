@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/imports"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -56,11 +55,13 @@ func (t *ImportContactBatch) Perform(ctx context.Context, rt *runtime.Runtime, o
 		batch.SetFailed(ctx, rt.DB)
 	}
 
-	// decrement the key that holds remaining batches to see if the overall import is now finished
-	vc := rt.VK.Get()
-	defer vc.Close()
-	remaining, _ := redis.Int(vc.Do("decr", fmt.Sprintf("contact_import_batches_remaining:%d", batch.ImportID)))
-	if remaining == 0 {
+	// decrement the counter to see if the overall import is now finished
+	counter := NewCounter(fmt.Sprintf("contact_import_batches_remaining:%d", batch.ImportID), 24*time.Hour)
+	done, err := counter.Done(ctx, rt.VK)
+	if err != nil {
+		return fmt.Errorf("error decrementing import batch counter: %w", err)
+	}
+	if done {
 		// if any batch failed, then import is considered failed
 		success := !slices.Contains(imp.BatchStatuses, models.ImportStatusFailed)
 

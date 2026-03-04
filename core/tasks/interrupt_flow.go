@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -15,8 +14,9 @@ import (
 const (
 	TypeInterruptFlow = "interrupt_flow"
 
-	// valkey key prefix used to track the number of sessions remaining to be interrupted for a flow
+	// valkey key prefix used to track the number of batches remaining to be interrupted for a flow
 	interruptFlowProgressKey = "interrupt_flow_progress"
+	interruptFlowProgressTTL = 15 * time.Minute
 )
 
 func init() {
@@ -48,17 +48,22 @@ func (t *InterruptFlow) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 		return fmt.Errorf("error getting waiting sessions for flow: %w", err)
 	}
 
-	if len(sessionRefs) > 0 {
-		if err := SetFlowInterruptProgress(ctx, rt, t.FlowID, len(sessionRefs)); err != nil {
-			return fmt.Errorf("error setting flow interrupt sessions remaining key: %w", err)
-		}
-	} else {
-		if err := ClearFlowInterruptProgress(ctx, rt, t.FlowID); err != nil {
+	counter := FlowInterruptCounter(t.FlowID)
+
+	if len(sessionRefs) == 0 {
+		if err := counter.Clear(ctx, rt.VK); err != nil {
 			return fmt.Errorf("error clearing flow interrupt progress key: %w", err)
 		}
+		return nil
 	}
 
-	for batch := range slices.Chunk(sessionRefs, interruptSessionBatchSize) {
+	batches := slices.Collect(slices.Chunk(sessionRefs, interruptSessionBatchSize))
+
+	if err := counter.Init(ctx, rt.VK, len(batches)); err != nil {
+		return fmt.Errorf("error setting flow interrupt batches remaining key: %w", err)
+	}
+
+	for _, batch := range batches {
 		task := &InterruptSessionBatch{Sessions: batch, Status: flows.SessionStatusInterrupted, FlowID: t.FlowID}
 
 		if err := Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), task, false); err != nil {
@@ -69,27 +74,7 @@ func (t *InterruptFlow) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 	return nil
 }
 
-func SetFlowInterruptProgress(ctx context.Context, rt *runtime.Runtime, flowID models.FlowID, val int) error {
-	vc := rt.VK.Get()
-	_, err := redis.DoContext(vc, ctx, "SET", fmt.Sprintf("%s:%d", interruptFlowProgressKey, flowID), val, "EX", 15*60)
-	vc.Close()
-	return err
-}
-
-func GetFlowInterruptProgress(ctx context.Context, rt *runtime.Runtime, flowID models.FlowID) (int, error) {
-	vc := rt.VK.Get()
-	defer vc.Close()
-
-	remaining, err := redis.Int(redis.DoContext(vc, ctx, "GET", fmt.Sprintf("%s:%d", interruptFlowProgressKey, flowID)))
-	if err != nil && err != redis.ErrNil {
-		return 0, err
-	}
-	return remaining, nil
-}
-
-func ClearFlowInterruptProgress(ctx context.Context, rt *runtime.Runtime, flowID models.FlowID) error {
-	vc := rt.VK.Get()
-	_, err := redis.DoContext(vc, ctx, "DEL", fmt.Sprintf("%s:%d", interruptFlowProgressKey, flowID))
-	vc.Close()
-	return err
+// FlowInterruptCounter returns a counter for tracking flow interruption progress for the given flow.
+func FlowInterruptCounter(flowID models.FlowID) *Counter {
+	return NewCounter(fmt.Sprintf("%s:%d", interruptFlowProgressKey, flowID), interruptFlowProgressTTL)
 }
