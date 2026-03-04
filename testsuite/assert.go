@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
@@ -25,17 +25,17 @@ func AssertCourierQueues(t *testing.T, rt *runtime.Runtime, expected map[string]
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	queueKeys, err := redis.Strings(vc.Do("KEYS", "msgs:????????-*"))
+	queueKeys, err := valkey.Strings(vc.Do("KEYS", "msgs:????????-*"))
 	require.NoError(t, err)
 
 	actual := make(map[string][]int, len(queueKeys))
 	for _, queueKey := range queueKeys {
-		size, err := redis.Int64(vc.Do("ZCARD", queueKey))
+		size, err := valkey.Int64(vc.Do("ZCARD", queueKey))
 		require.NoError(t, err)
 		actual[queueKey] = make([]int, size)
 
 		if size > 0 {
-			results, err := redis.Values(vc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
+			results, err := valkey.Values(vc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
 			require.NoError(t, err)
 			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
 
@@ -59,7 +59,7 @@ func AssertContactTasks(t *testing.T, rt *runtime.Runtime, org *testdb.Org, cont
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	tasks, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("c:%d:%d", org.ID, contact.ID), 0, -1))
+	tasks, err := valkey.Strings(vc.Do("LRANGE", fmt.Sprintf("c:%d:%d", org.ID, contact.ID), 0, -1))
 	require.NoError(t, err)
 
 	expectedJSON := jsonx.MustMarshal(expected)
@@ -73,10 +73,10 @@ func AssertBatchTasks(t *testing.T, rt *runtime.Runtime, orgID models.OrgID, exp
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	tasks0, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/0", orgID), 0, -1))
+	tasks0, err := valkey.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/0", orgID), 0, -1))
 	require.NoError(t, err)
 
-	tasks1, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/1", orgID), 0, -1))
+	tasks1, err := valkey.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/1", orgID), 0, -1))
 	require.NoError(t, err)
 
 	actual := make(map[string]int, 5)

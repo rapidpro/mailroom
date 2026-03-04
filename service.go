@@ -10,7 +10,7 @@ import (
 
 	"github.com/appleboy/go-fcm"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/mailroom/core/crons"
@@ -161,7 +161,7 @@ func (s *Service) checkLastShutdown(ctx context.Context) error {
 	vc := s.rt.VK.Get()
 	defer vc.Close()
 
-	exists, err := redis.Bool(redis.DoContext(vc, ctx, "HEXISTS", appNodesRunningKey, nodeID))
+	exists, err := valkey.Bool(valkey.DoContext(vc, ctx, "HEXISTS", appNodesRunningKey, nodeID))
 	if err != nil {
 		return fmt.Errorf("error checking last shutdown: %w", err)
 	}
@@ -169,7 +169,7 @@ func (s *Service) checkLastShutdown(ctx context.Context) error {
 	if exists {
 		slog.Error("node did not shutdown cleanly last time")
 	} else {
-		if _, err := redis.DoContext(vc, ctx, "HSET", appNodesRunningKey, nodeID, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		if _, err := valkey.DoContext(vc, ctx, "HSET", appNodesRunningKey, nodeID, time.Now().UTC().Format(time.RFC3339)); err != nil {
 			return fmt.Errorf("error setting app node state: %w", err)
 		}
 	}
@@ -181,7 +181,7 @@ func (s *Service) recordShutdown(ctx context.Context) error {
 	vc := s.rt.VK.Get()
 	defer vc.Close()
 
-	if _, err := redis.DoContext(vc, ctx, "HDEL", appNodesRunningKey, nodeID); err != nil {
+	if _, err := valkey.DoContext(vc, ctx, "HDEL", appNodesRunningKey, nodeID); err != nil {
 		return fmt.Errorf("error recording shutdown: %w", err)
 	}
 	return nil

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/vkutil/queues"
 )
 
@@ -21,13 +21,13 @@ type Task struct {
 
 // Fair is a queue that supports fair distribution of tasks between owners
 type Fair interface {
-	Push(ctx context.Context, vc redis.Conn, taskType string, ownerID int, task any, priority bool) (queues.TaskID, error)
-	Pop(ctx context.Context, vc redis.Conn) (*Task, error)
-	Done(ctx context.Context, vc redis.Conn, ownerID int) error
-	Pause(ctx context.Context, vc redis.Conn, ownerID int) error
-	Resume(ctx context.Context, vc redis.Conn, ownerID int) error
-	Queued(ctx context.Context, vc redis.Conn) ([]int, error)
-	Paused(ctx context.Context, vc redis.Conn) ([]int, error)
-	Size(ctx context.Context, vc redis.Conn) (int, error)
-	Dump(ctx context.Context, vc redis.Conn) ([]byte, error)
+	Push(ctx context.Context, vc valkey.Conn, taskType string, ownerID int, task any, priority bool) (queues.TaskID, error)
+	Pop(ctx context.Context, vc valkey.Conn) (*Task, error)
+	Done(ctx context.Context, vc valkey.Conn, ownerID int) error
+	Pause(ctx context.Context, vc valkey.Conn, ownerID int) error
+	Resume(ctx context.Context, vc valkey.Conn, ownerID int) error
+	Queued(ctx context.Context, vc valkey.Conn) ([]int, error)
+	Paused(ctx context.Context, vc valkey.Conn) ([]int, error)
+	Size(ctx context.Context, vc valkey.Conn) (int, error)
+	Dump(ctx context.Context, vc valkey.Conn) ([]byte, error)
 }

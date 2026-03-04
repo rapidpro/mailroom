@@ -28,7 +28,7 @@ func TestImportContactBatch(t *testing.T) {
 		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
 	]`))
 
-	vc.Do("setex", fmt.Sprintf("contact_import_batches_remaining:%d", importID), 10, 2)
+	vc.Do("SETEX", fmt.Sprintf("contact_import_batches_remaining:%d", importID), 10, 2)
 
 	// perform first batch task...
 	testsuite.QueueBatchTask(t, rt, testdb.Org1, &tasks.ImportContactBatch{ContactImportBatchID: batch1ID})

@@ -8,7 +8,7 @@ import (
 
 	"firebase.google.com/go/v4/messaging"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/s3x"
 	"github.com/nyaruka/vkutil"
@@ -22,7 +22,7 @@ type Runtime struct {
 
 	DB         *sqlx.DB
 	ReadonlyDB *sql.DB
-	VK         *redis.Pool
+	VK         *valkey.Pool
 	S3         *s3x.Service
 	ES         *elasticsearch.TypedClient
 	Dynamo     *Dynamo

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/i18n"
@@ -186,7 +186,7 @@ func NewCourierMsg(oa *models.OrgAssets, mo *models.MsgOut, ch *models.Channel) 
 	return msg, nil
 }
 
-var queuePushScript = redis.NewScript(6, `
+var queuePushScript = valkey.NewScript(6, `
 -- KEYS: [QueueType, QueueName, TPS, Priority, Items, EpochSecs]
 local queueType, queueName, tps, priority, items, epochSecs = KEYS[1], KEYS[2], tonumber(KEYS[3]), KEYS[4], KEYS[5], KEYS[6]
 
@@ -216,7 +216,7 @@ end
 `)
 
 // PushCourierBatch pushes a batch of messages for a single contact and channel onto the appropriate courier queue
-func PushCourierBatch(vc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
+func PushCourierBatch(vc valkey.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
 	priority := bulkPriority
 	if msgs[0].HighPriority() {
 		priority = highPriority
@@ -238,7 +238,7 @@ func PushCourierBatch(vc redis.Conn, oa *models.OrgAssets, ch *models.Channel, m
 }
 
 // QueueCourierMessages queues messages for a single contact to Courier
-func QueueCourierMessages(vc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
+func QueueCourierMessages(vc valkey.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -288,7 +288,7 @@ func QueueCourierMessages(vc redis.Conn, oa *models.OrgAssets, contactID models.
 	return commitBatch()
 }
 
-var queueClearScript = redis.NewScript(3, `
+var queueClearScript = valkey.NewScript(3, `
 -- KEYS: [QueueType, QueueName, TPS]
 local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
 
@@ -304,7 +304,7 @@ redis.call("ZADD", queueType .. ":active", 0, queueKey)
 `)
 
 // ClearCourierQueues clears the courier queues (priority and bulk) for the given channel
-func ClearCourierQueues(vc redis.Conn, ch *models.Channel) error {
+func ClearCourierQueues(vc valkey.Conn, ch *models.Channel) error {
 	_, err := queueClearScript.Do(vc, "msgs", ch.UUID(), ch.TPS())
 	return err
 }

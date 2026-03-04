@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
@@ -35,7 +35,7 @@ func (c *DeindexDeletedOrgsCron) Run(ctx context.Context, rt *runtime.Runtime) (
 	defer vc.Close()
 
 	// get org ids that still have contacts to de-index
-	orgIDs, err := redis.Ints(vc.Do("SMEMBERS", deindexContactsSetKey))
+	orgIDs, err := valkey.Ints(vc.Do("SMEMBERS", deindexContactsSetKey))
 	if err != nil {
 		return nil, err
 	}

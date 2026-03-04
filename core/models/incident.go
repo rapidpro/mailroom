@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/flows"
@@ -57,7 +57,7 @@ func (i *Incident) End(ctx context.Context, db DBorTx) error {
 }
 
 // IncidentWebhooksUnhealthy ensures there is an open unhealthy webhooks incident for the given org
-func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTx, rp *redis.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
+func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTx, rp *valkey.Pool, oa *OrgAssets, nodes []flows.NodeUUID) (IncidentID, error) {
 	id, err := getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
 		Type:      IncidentTypeWebhooksUnhealthy,
@@ -74,7 +74,7 @@ func IncidentWebhooksUnhealthy(ctx context.Context, db DBorTx, rp *redis.Pool, o
 
 		nodesKey := fmt.Sprintf("incident:%d:nodes", id)
 		vc.Send("MULTI")
-		vc.Send("SADD", redis.Args{}.Add(nodesKey).AddFlat(nodes)...)
+		vc.Send("SADD", valkey.Args{}.Add(nodesKey).AddFlat(nodes)...)
 		vc.Send("EXPIRE", nodesKey, 60*30) // 30 minutes
 		_, err = vc.Do("EXEC")
 		if err != nil {

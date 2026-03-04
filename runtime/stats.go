@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 )
 
@@ -106,13 +106,13 @@ func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 
 // StatsCollector provides threadsafe stats collection
 type StatsCollector struct {
-	vk    *redis.Pool
+	vk    *valkey.Pool
 	mutex sync.Mutex
 	stats *Stats
 }
 
 // NewStatsCollector creates a new stats collector
-func NewStatsCollector(vk *redis.Pool) *StatsCollector {
+func NewStatsCollector(vk *valkey.Pool) *StatsCollector {
 	return &StatsCollector{vk: vk, stats: newStats()}
 }
 
@@ -165,7 +165,7 @@ func (c *StatsCollector) Extract() *Stats {
 	return s
 }
 
-var recordLatencyScript = redis.NewScript(1, `
+var recordLatencyScript = valkey.NewScript(1, `
 local key = KEYS[1]
 local field_n = ARGV[1]
 local field_t = ARGV[2]
@@ -209,13 +209,13 @@ type TaskLatency struct {
 // GetCTaskLatencies returns per-org latency statistics for the current hourly bucket, grouped by
 // org and sorted by org total latency descending. Tasks within each org are sorted by total latency
 // descending.
-func GetCTaskLatencies(rp *redis.Pool) ([]OrgCTaskLatency, error) {
+func GetCTaskLatencies(rp *valkey.Pool) ([]OrgCTaskLatency, error) {
 	vc := rp.Get()
 	defer vc.Close()
 
 	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
 
-	values, err := redis.Values(vc.Do("HGETALL", key))
+	values, err := valkey.Values(vc.Do("HGETALL", key))
 	if err != nil {
 		return nil, fmt.Errorf("error getting latency data: %w", err)
 	}
@@ -231,8 +231,8 @@ func GetCTaskLatencies(rp *redis.Pool) ([]OrgCTaskLatency, error) {
 	entries := make(map[entryKey]*entry)
 
 	for i := 0; i < len(values); i += 2 {
-		field, _ := redis.String(values[i], nil)
-		val, _ := redis.Int64(values[i+1], nil)
+		field, _ := valkey.String(values[i], nil)
+		val, _ := valkey.Int64(values[i+1], nil)
 
 		// field format is "{orgID}/{taskType}:n" or "{orgID}/{taskType}:t"
 		suffixIdx := strings.LastIndex(field, ":")
