@@ -31,22 +31,44 @@ func (c *Counter) Init(ctx context.Context, vk *valkey.Pool, val int) error {
 // Done decrements the counter by 1 and returns true if the counter has reached zero, i.e. all batches are done.
 // The TTL is always reset to prevent orphaned keys.
 func (c *Counter) Done(ctx context.Context, vk *valkey.Pool) (bool, error) {
-	vc := vk.Get()
-	defer vc.Close()
-
-	vc.Send("DECR", c.key)
-	vc.Send("EXPIRE", c.key, int(c.ttl.Seconds()))
-	if err := vc.Flush(); err != nil {
-		return false, err
-	}
-
-	val, err := valkey.Int(vc.Receive())
+	val, err := c.decrement(ctx, vk, -1)
 	if err != nil {
-		return false, err
-	}
-	if _, err := vc.Receive(); err != nil { // discard EXPIRE response
 		return false, err
 	}
 
 	return val <= 0, nil
 }
+
+// Value returns the current counter value, or 0 if the key doesn't exist.
+func (c *Counter) Value(ctx context.Context, vk *valkey.Pool) (int, error) {
+	vc := vk.Get()
+	defer vc.Close()
+
+	val, err := valkey.Int(valkey.DoContext(vc, ctx, "GET", c.key))
+	if err == valkey.ErrNil {
+		return 0, nil
+	}
+	return val, err
+}
+
+// Clear deletes the counter key.
+func (c *Counter) Clear(ctx context.Context, vk *valkey.Pool) error {
+	vc := vk.Get()
+	defer vc.Close()
+
+	_, err := valkey.DoContext(vc, ctx, "DEL", c.key)
+	return err
+}
+
+func (c *Counter) decrement(ctx context.Context, vk *valkey.Pool, by int) (int, error) {
+	vc := vk.Get()
+	defer vc.Close()
+
+	return valkey.Int(counterDecr.DoContext(ctx, vc, c.key, by, int(c.ttl.Seconds())))
+}
+
+var counterDecr = valkey.NewScript(1, `
+local val = redis.call('INCRBY', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return val
+`)

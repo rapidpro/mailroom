@@ -54,17 +54,11 @@ func (t *InterruptSessionBatch) Perform(ctx context.Context, rt *runtime.Runtime
 		return fmt.Errorf("error interrupting batch of sessions: %w", err)
 	}
 
-	// if this batch was created as part of a flow interruption, decrement the remaining sessions counter
+	// if this batch was created as part of a flow interruption, decrement the remaining batches counter
 	if t.FlowID != 0 {
-		key := fmt.Sprintf("%s:%d", interruptFlowProgressKey, t.FlowID)
-		vc := rt.VK.Get()
-		vc.Send("DECRBY", key, len(t.Sessions))
-		vc.Send("EXPIRE", key, 15*60)
-		if err := vc.Flush(); err != nil {
-			vc.Close()
+		if _, err := FlowInterruptCounter(t.FlowID).Done(ctx, rt.VK); err != nil {
 			return fmt.Errorf("error decrementing flow interrupt progress key: %w", err)
 		}
-		vc.Close()
 	}
 
 	return nil

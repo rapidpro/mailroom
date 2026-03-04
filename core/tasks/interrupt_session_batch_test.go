@@ -53,9 +53,9 @@ func TestInterruptSessionBatchDecrements(t *testing.T) {
 	s1UUID := testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Ann, models.FlowTypeMessaging, nil, testdb.Favorites)
 	s2UUID := testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Bob, models.FlowTypeMessaging, nil, testdb.Favorites)
 
-	// simulate the counter being set by InterruptFlow with a total of 4 sessions
+	// simulate the counter being set by InterruptFlow with a total of 3 batches
 	key := fmt.Sprintf("interrupt_flow_progress:%d", testdb.Favorites.ID)
-	vc.Do("SET", key, 4, "EX", 15*60)
+	vc.Do("SET", key, 3, "EX", 15*60)
 
 	// queue and perform a batch task with FlowID set (as InterruptFlow would create it)
 	tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &tasks.InterruptSessionBatch{
@@ -65,7 +65,7 @@ func TestInterruptSessionBatchDecrements(t *testing.T) {
 	}, false)
 	testsuite.FlushTasks(t, rt)
 
-	// counter should have been decremented by 2 (the batch size)
+	// counter should have been decremented by 1 (one batch completed)
 	remaining, err := redis.Int(vc.Do("GET", key))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, remaining)
