@@ -21,7 +21,7 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/golang-jwt/jwt"
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -204,10 +204,10 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	defer vc.Close()
 
 	legKey := fmt.Sprintf("dial_%s", legUUID)
-	dialContinue, err := redis.String(vc.Do("get", legKey))
+	dialContinue, err := valkey.String(vc.Do("get", legKey))
 
 	// no associated call, move on
-	if err == redis.ErrNil {
+	if err == valkey.ErrNil {
 		return nil, nil
 	}
 
@@ -224,8 +224,8 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	if nxStatus == "completed" {
 		slog.Debug("found completed call, trying to finish with call", "call_uuid", callUUID)
 		statusKey := fmt.Sprintf("dial_status_%s", callUUID)
-		status, err := redis.String(vc.Do("get", statusKey))
-		if err == redis.ErrNil {
+		status, err := valkey.String(vc.Do("get", statusKey))
+		if err == valkey.ErrNil {
 			return nil, fmt.Errorf("unable to find call status for: %s", callUUID)
 		}
 		if err != nil {
@@ -294,8 +294,8 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 		defer vc.Close()
 
 		recordingKey := fmt.Sprintf("recording_%s", recordingUUID)
-		recordingURL, err := redis.String(vc.Do("get", recordingKey))
-		if err != nil && err != redis.ErrNil {
+		recordingURL, err := valkey.String(vc.Do("get", recordingKey))
+		if err != nil && err != valkey.ErrNil {
 			return nil, fmt.Errorf("error getting recording url from valkey: %w", err)
 		}
 
@@ -717,7 +717,7 @@ func (s *service) generateToken() (string, error) {
 
 // NCCO building utilities
 
-func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *valkey.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
 	actions := make([]any, 0, 1)
 	waitActions := make([]any, 0, 1)
 

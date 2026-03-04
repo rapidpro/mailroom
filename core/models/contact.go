@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
@@ -1108,7 +1108,7 @@ func UpdateContactURNs(ctx context.Context, rt *runtime.Runtime, db DBorTx, oa *
 			// clear Valkey record of this claim
 			claimKey := fmt.Sprintf("urn-claim:%d:%s", oa.OrgID(), urn.Identity)
 
-			if _, err := redis.DoContext(vc, ctx, "DEL", claimKey); err != nil {
+			if _, err := valkey.DoContext(vc, ctx, "DEL", claimKey); err != nil {
 				return fmt.Errorf("error clearing URN claim in Valkey: %w", err)
 			}
 
@@ -1211,8 +1211,8 @@ func ContactClaimURN(ctx context.Context, rt *runtime.Runtime, org *Org, contact
 	identity := urn.Identity()
 	claimKey := fmt.Sprintf("urn-claim:%d:%s", org.ID(), identity)
 
-	owner, err := redis.Int64(redis.DoContext(vc, ctx, "GET", claimKey))
-	if err != nil && err != redis.ErrNil {
+	owner, err := valkey.Int64(valkey.DoContext(vc, ctx, "GET", claimKey))
+	if err != nil && err != valkey.ErrNil {
 		return false, fmt.Errorf("error checking URN claim in Valkey: %w", err)
 	}
 
@@ -1233,7 +1233,7 @@ func ContactClaimURN(ctx context.Context, rt *runtime.Runtime, org *Org, contact
 	// Record URN as claimed in Valkey - this will be cleared in UpdateContactURNs when the claim is committed to the
 	// database. There's potentially a problem here if session errors because we'll still have this claim lingering
 	// for 60 seconds... but that doesn't happen very often
-	if _, err := redis.DoContext(vc, ctx, "SET", claimKey, contact.ID(), "EX", 60); err != nil {
+	if _, err := valkey.DoContext(vc, ctx, "SET", claimKey, contact.ID(), "EX", 60); err != nil {
 		return false, fmt.Errorf("error recording URN claim in Valkey: %w", err)
 	}
 

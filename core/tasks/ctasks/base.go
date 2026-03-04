@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"
@@ -60,10 +60,10 @@ func Queue(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, contact
 	// first push the event on our contact queue
 	contactQ := fmt.Sprintf("c:%d:%d", orgID, contactID)
 	if front {
-		_, err = redis.Int64(redis.DoContext(vc, ctx, "LPUSH", contactQ, string(payloadJSON)))
+		_, err = valkey.Int64(valkey.DoContext(vc, ctx, "LPUSH", contactQ, string(payloadJSON)))
 
 	} else {
-		_, err = redis.Int64(redis.DoContext(vc, ctx, "RPUSH", contactQ, string(payloadJSON)))
+		_, err = valkey.Int64(valkey.DoContext(vc, ctx, "RPUSH", contactQ, string(payloadJSON)))
 	}
 	if err != nil {
 		return fmt.Errorf("error queuing contact task: %w", err)

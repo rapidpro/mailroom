@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
@@ -388,12 +388,12 @@ func TestPushCourierBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that channel has been added to active list
-	msgsActive, err := redis.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
+	msgsActive, err := valkey.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10"}, msgsActive)
 
 	// and that msgs were added as single batch to bulk priority (0) queue
-	queued, err := redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err := valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(queued))
 
@@ -414,7 +414,7 @@ func TestPushCourierBatch(t *testing.T) {
 	err = msgio.PushCourierBatch(vc, oa, channel, []*models.MsgOut{{Msg: msg3, URN: annURNs[0], Contact: ann}}, "1636557205.234567")
 	require.NoError(t, err)
 
-	queued, err = redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err = valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(queued))
 
@@ -428,12 +428,12 @@ func TestPushCourierBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that channel has *not* been added to active list
-	msgsActive, err = redis.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
+	msgsActive, err = valkey.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{}, msgsActive)
 
 	// but msg was still added to queue
-	queued, err = redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err = valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(queued))
 }

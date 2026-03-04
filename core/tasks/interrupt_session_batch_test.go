@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -66,7 +66,7 @@ func TestInterruptSessionBatchDecrements(t *testing.T) {
 	testsuite.FlushTasks(t, rt)
 
 	// counter should have been decremented by 1 (one batch completed)
-	remaining, err := redis.Int(vc.Do("GET", key))
+	remaining, err := valkey.Int(vc.Do("GET", key))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, remaining)
 }

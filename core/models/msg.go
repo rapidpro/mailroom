@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
@@ -447,7 +447,7 @@ func newMsgOut(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact
 	return &MsgOut{Msg: msg, URN: urn, Contact: contact, ReplyTo: replyTo}, nil
 }
 
-var msgRepetitionsScript = redis.NewScript(3, `
+var msgRepetitionsScript = valkey.NewScript(3, `
 local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
 
 local msg_key = string.format("%d|%s", contact_id, string.lower(string.sub(text, 1, 128)))
@@ -467,13 +467,13 @@ return count
 `)
 
 // GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
-func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgContent) (int, error) {
+func GetMsgRepetitions(rp *valkey.Pool, contactID ContactID, msg *flows.MsgContent) (int, error) {
 	vc := rp.Get()
 	defer vc.Close()
 
 	keyTime := dates.Now().UTC().Round(time.Minute * 5)
 	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
-	return redis.Int(msgRepetitionsScript.Do(vc, key, contactID, msg.Text))
+	return valkey.Int(msgRepetitionsScript.Do(vc, key, contactID, msg.Text))
 }
 
 var sqlSelectMessagesByUUID = `

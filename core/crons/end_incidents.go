@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -97,7 +97,7 @@ func (c *EndIncidentsCron) getWebhookIncidentNodes(rt *runtime.Runtime, incident
 	defer vc.Close()
 
 	nodesKey := fmt.Sprintf("incident:%d:nodes", incident.ID)
-	nodes, err := redis.Strings(vc.Do("SMEMBERS", nodesKey))
+	nodes, err := valkey.Strings(vc.Do("SMEMBERS", nodesKey))
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (c *EndIncidentsCron) removeWebhookIncidentNodes(rt *runtime.Runtime, incid
 	defer vc.Close()
 
 	nodesKey := fmt.Sprintf("incident:%d:nodes", incident.ID)
-	_, err := vc.Do("SREM", redis.Args{}.Add(nodesKey).AddFlat(nodes)...)
+	_, err := vc.Do("SREM", valkey.Args{}.Add(nodesKey).AddFlat(nodes)...)
 	if err != nil {
 		return err
 	}

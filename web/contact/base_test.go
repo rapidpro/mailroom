@@ -66,6 +66,8 @@ func TestDeindex(t *testing.T) {
 func TestReindex(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 
+	defer testsuite.Reset(t, rt, testsuite.ResetOpenSearch)
+
 	testsuite.RunWebTests(t, rt, "testdata/reindex.json")
 }
 

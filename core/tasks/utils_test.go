@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -23,11 +23,11 @@ func TestCounter(t *testing.T) {
 	err := counter.Init(ctx, rt.VK, 3)
 	assert.NoError(t, err)
 
-	val, err := redis.Int(vc.Do("GET", "test_counter"))
+	val, err := valkey.Int(vc.Do("GET", "test_counter"))
 	assert.NoError(t, err)
 	assert.Equal(t, 3, val)
 
-	ttl, err := redis.Int(vc.Do("TTL", "test_counter"))
+	ttl, err := valkey.Int(vc.Do("TTL", "test_counter"))
 	assert.NoError(t, err)
 	assert.Greater(t, ttl, 0)
 
@@ -46,7 +46,7 @@ func TestCounter(t *testing.T) {
 	assert.True(t, done)
 
 	// key should still exist with a TTL (not orphaned)
-	ttl, err = redis.Int(vc.Do("TTL", "test_counter"))
+	ttl, err = valkey.Int(vc.Do("TTL", "test_counter"))
 	assert.NoError(t, err)
 	assert.Greater(t, ttl, 0)
 }
@@ -61,7 +61,7 @@ func TestCounterDoneSetsExpiry(t *testing.T) {
 	// simulate a key that was created by DECR without a TTL (the fragility we're fixing)
 	vc.Do("SET", "test_counter_orphan", 1)
 
-	ttl, err := redis.Int(vc.Do("TTL", "test_counter_orphan"))
+	ttl, err := valkey.Int(vc.Do("TTL", "test_counter_orphan"))
 	assert.NoError(t, err)
 	assert.Equal(t, -1, ttl) // no expiry
 
@@ -72,7 +72,7 @@ func TestCounterDoneSetsExpiry(t *testing.T) {
 	assert.True(t, done)
 
 	// TTL should now be set
-	ttl, err = redis.Int(vc.Do("TTL", "test_counter_orphan"))
+	ttl, err = valkey.Int(vc.Do("TTL", "test_counter_orphan"))
 	assert.NoError(t, err)
 	assert.Greater(t, ttl, 0)
 }
