@@ -204,7 +204,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	defer vc.Close()
 
 	legKey := fmt.Sprintf("dial_%s", legUUID)
-	dialContinue, err := valkey.String(vc.Do("get", legKey))
+	dialContinue, err := valkey.String(vc.Do("GET", legKey))
 
 	// no associated call, move on
 	if err == valkey.ErrNil {
@@ -224,7 +224,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	if nxStatus == "completed" {
 		slog.Debug("found completed call, trying to finish with call", "call_uuid", callUUID)
 		statusKey := fmt.Sprintf("dial_status_%s", callUUID)
-		status, err := valkey.String(vc.Do("get", statusKey))
+		status, err := valkey.String(vc.Do("GET", statusKey))
 		if err == valkey.ErrNil {
 			return nil, fmt.Errorf("unable to find call status for: %s", callUUID)
 		}
@@ -266,7 +266,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	// only store away valid final states
 	if status != "" {
 		callKey := fmt.Sprintf("dial_status_%s", callUUID)
-		_, err = vc.Do("setex", callKey, 300, status)
+		_, err = vc.Do("SETEX", callKey, 300, status)
 		if err != nil {
 			return nil, fmt.Errorf("error inserting recording URL into valkey: %w", err)
 		}
@@ -294,7 +294,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 		defer vc.Close()
 
 		recordingKey := fmt.Sprintf("recording_%s", recordingUUID)
-		recordingURL, err := valkey.String(vc.Do("get", recordingKey))
+		recordingURL, err := valkey.String(vc.Do("GET", recordingKey))
 		if err != nil && err != valkey.ErrNil {
 			return nil, fmt.Errorf("error getting recording url from valkey: %w", err)
 		}
@@ -303,7 +303,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 		if recordingURL != "" {
 			r.URL.RawQuery = "&recording_url=" + url.QueryEscape(recordingURL)
 			slog.Info("found recording URL", "recording_url", recordingURL)
-			vc.Do("del", recordingKey)
+			vc.Do("DEL", recordingKey)
 			return nil, nil
 		}
 
@@ -349,7 +349,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 		defer vc.Close()
 
 		recordingKey := fmt.Sprintf("recording_%s", recordingUUID)
-		_, err = vc.Do("setex", recordingKey, 300, recordingURL)
+		_, err = vc.Do("SETEX", recordingKey, 300, recordingURL)
 		if err != nil {
 			return nil, fmt.Errorf("error inserting recording URL into valkey: %w", err)
 		}
@@ -838,7 +838,7 @@ func (s *service) responseForSprint(ctx context.Context, rp *valkey.Pool, channe
 			eventURL := resumeURL + "&wait_type=dial"
 			vkKey := fmt.Sprintf("dial_%s", transferUUID)
 			vkValue := fmt.Sprintf("%s:%s", call.ExternalID(), eventURL)
-			_, err = vc.Do("setex", vkKey, 3600, vkValue)
+			_, err = vc.Do("SETEX", vkKey, 3600, vkValue)
 			if err != nil {
 				return "", fmt.Errorf("error inserting transfer ID into valkey: %w", err)
 			}
