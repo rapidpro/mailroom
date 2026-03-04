@@ -2,12 +2,9 @@ package hooks
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 
-	"github.com/nyaruka/gocommon/aws/osearch"
-	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
@@ -27,22 +24,11 @@ func (h *indexContacts) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 	}
 
 	for scene := range scenes {
-		doc := search.NewContactDoc(oa, scene.Contact)
+		slog.Debug("indexing contact to opensearch", "uuid", scene.Contact.UUID(), "contact_id", scene.Contact.ID())
 
-		body, err := json.Marshal(doc)
-		if err != nil {
-			return fmt.Errorf("error marshalling contact doc: %w", err)
+		if err := search.IndexContact(rt, oa, scene.Contact); err != nil {
+			return fmt.Errorf("error indexing contact: %w", err)
 		}
-
-		slog.Debug("indexing contact to opensearch", "uuid", doc.UUID, "contact_id", doc.LegacyID)
-
-		rt.OS.Writer.Queue(&osearch.Document{
-			Index:   rt.Config.OSContactsIndex,
-			ID:      string(doc.UUID),
-			Routing: fmt.Sprintf("%d", doc.OrgID),
-			Version: dates.Now().UnixNano(),
-			Body:    body,
-		})
 	}
 
 	return nil
