@@ -9,7 +9,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
@@ -136,12 +135,9 @@ func (t *PopulateGroup) Perform(ctx context.Context, rt *runtime.Runtime, oa *mo
 	// generate a random ID for this population run so batch tasks can track completion
 	populationID := vkutil.RandomBase64(10)
 
-	// set valkey key which batch tasks can decrement to know when population has completed
-	vc := rt.VK.Get()
-	defer vc.Close()
-
-	_, err = redis.DoContext(vc, ctx, "SET", fmt.Sprintf(populateGroupBatchesRemainingKey, populationID), len(batches), "EX", 60*60)
-	if err != nil {
+	// set valkey counter which batch tasks can decrement to know when population has completed
+	counter := NewCounter(fmt.Sprintf(populateGroupBatchesRemainingKey, populationID), time.Hour)
+	if err := counter.Init(ctx, rt.VK, len(batches)); err != nil {
 		return fmt.Errorf("error setting populate group batch counter key: %w", err)
 	}
 
