@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
+	_ "github.com/nyaruka/mailroom/core/runner/handlers"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdb"
@@ -39,13 +40,19 @@ func TestPopulateGroupTask(t *testing.T) {
 
 	start := dates.Now()
 
-	// test 1: valid query populates group and creates campaign fires
+	// test 1: valid query queues batch tasks which populate group and create campaign fires
 	task1 := &tasks.PopulateGroup{
 		GroupID: group1.ID,
 		Query:   "gender = F",
 	}
 	err = task1.Perform(ctx, rt, oa)
 	require.NoError(t, err)
+
+	// group should be evaluating after parent task completes
+	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactgroup WHERE id = $1`, group1.ID).Returns("V")
+
+	// flush queued batch tasks
+	testsuite.FlushTasks(t, rt)
 
 	assertdb.Query(t, rt.DB, `SELECT status FROM contacts_contactgroup WHERE id = $1`, group1.ID).Returns("R")
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, group1.ID).Returns(1)
@@ -56,7 +63,7 @@ func TestPopulateGroupTask(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contactfire WHERE fire_type = 'C' AND scope = $1 AND contact_id = $2`,
 		fmt.Sprintf("%d:1", point.ID), testdb.Ann.ID).Returns(1)
 
-	// test 2: invalid query marks group as invalid
+	// test 2: invalid query marks group as invalid directly (no batch tasks)
 	task2 := &tasks.PopulateGroup{
 		GroupID: group2.ID,
 		Query:   "!!!",

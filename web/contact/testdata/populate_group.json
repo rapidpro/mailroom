@@ -34,7 +34,7 @@
         "expected_tasks": {
             "batch/1": [
                 {
-                    "type": "populate_dynamic_group",
+                    "type": "populate_group",
                     "payload": {
                         "group_id": 30000,
                         "query": "age > 18"
