@@ -24,11 +24,13 @@ func (h *indexContacts) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 	}
 
 	contacts := make([]*flows.Contact, 0, len(scenes))
+	currentFlows := make(map[models.ContactID]models.FlowID, len(scenes))
 	for scene := range scenes {
 		contacts = append(contacts, scene.Contact)
+		currentFlows[scene.ContactID()] = scene.DBContact.CurrentFlowID()
 	}
 
-	if err := search.IndexContacts(ctx, rt, oa, contacts); err != nil {
+	if err := search.IndexContacts(ctx, rt, oa, contacts, currentFlows); err != nil {
 		return fmt.Errorf("error indexing contacts: %w", err)
 	}
 

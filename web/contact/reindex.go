@@ -43,15 +43,17 @@ func handleReindex(ctx context.Context, rt *runtime.Runtime, r *reindexRequest) 
 	}
 
 	flowContacts := make([]*flows.Contact, 0, len(contacts))
+	currentFlows := make(map[models.ContactID]models.FlowID, len(contacts))
 	for _, c := range contacts {
 		fc, err := c.EngineContact(oa)
 		if err != nil {
 			return nil, 0, fmt.Errorf("error creating flow contact: %w", err)
 		}
 		flowContacts = append(flowContacts, fc)
+		currentFlows[c.ID()] = c.CurrentFlowID()
 	}
 
-	if err := search.IndexContacts(ctx, rt, oa, flowContacts); err != nil {
+	if err := search.IndexContacts(ctx, rt, oa, flowContacts, currentFlows); err != nil {
 		return nil, 0, fmt.Errorf("error indexing contacts: %w", err)
 	}
 

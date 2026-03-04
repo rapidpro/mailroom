@@ -164,11 +164,14 @@ func GetContactIDsAtNode(ctx context.Context, rt *runtime.Runtime, orgID OrgID, 
 }
 
 const sqlSelectContactFlowHistory = `
-SELECT contact_id, ARRAY_AGG(DISTINCT flow_id) FROM flows_flowrun WHERE contact_id = ANY($1) GROUP BY contact_id`
+SELECT contact_id, ARRAY_AGG(DISTINCT flow_id ORDER BY flow_id) FROM flows_flowrun WHERE contact_id = ANY($1) GROUP BY contact_id`
 
 // GetContactFlowHistory returns the distinct flow IDs that each contact has run, keyed by contact ID.
 func GetContactFlowHistory(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) (map[ContactID][]FlowID, error) {
 	result := make(map[ContactID][]FlowID, len(contactIDs))
+	if len(contactIDs) == 0 {
+		return result, nil
+	}
 
 	rows, err := db.QueryContext(ctx, sqlSelectContactFlowHistory, pq.Array(contactIDs))
 	if err != nil {
