@@ -3,14 +3,38 @@ package search
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/operationtype"
+	"github.com/nyaruka/gocommon/aws/osearch"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/elastic"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 )
+
+// IndexContact builds a contact document and queues it for indexing in OpenSearch.
+func IndexContact(rt *runtime.Runtime, oa *models.OrgAssets, flowContact *flows.Contact) error {
+	doc := NewContactDoc(oa, flowContact)
+
+	body, err := json.Marshal(doc)
+	if err != nil {
+		return fmt.Errorf("error marshalling contact doc: %w", err)
+	}
+
+	rt.OS.Writer.Queue(&osearch.Document{
+		Index:   rt.Config.OSContactsIndex,
+		ID:      string(doc.UUID),
+		Routing: fmt.Sprintf("%d", doc.OrgID),
+		Version: dates.Now().UnixNano(),
+		Body:    body,
+	})
+
+	return nil
+}
 
 // DeindexContactsByID de-indexes the contacts with the given IDs from Elastic
 func DeindexContactsByID(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, contactIDs []models.ContactID) (int, error) {
