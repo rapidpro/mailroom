@@ -63,6 +63,12 @@ func TestDeindex(t *testing.T) {
 	assert.Equal(t, string(testdb.Ann.UUID), msgs[0].ContactUUID)
 }
 
+func TestReindex(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
+
+	testsuite.RunWebTests(t, rt, "testdata/reindex.json")
+}
+
 func TestExport(t *testing.T) {
 	_, rt := testsuite.Runtime(t)
 

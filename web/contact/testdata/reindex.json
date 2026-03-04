@@ -1,0 +1,24 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mi/contact/reindex",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "reindex contacts",
+        "method": "POST",
+        "path": "/mi/contact/reindex",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [10001, 10002]
+        },
+        "status": 200,
+        "response": {
+            "indexed": 2
+        }
+    }
+]
