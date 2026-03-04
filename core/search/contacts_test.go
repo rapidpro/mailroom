@@ -37,7 +37,7 @@ func TestNewContactDoc(t *testing.T) {
 	annFC := flowContacts[testdb.Ann.ID]
 	require.NotNil(t, annFC)
 
-	doc := search.NewContactDoc(oa, annFC)
+	doc := search.NewContactDoc(oa, annFC, nil)
 
 	assert.Equal(t, testdb.Ann.ID, doc.LegacyID)
 	assert.Equal(t, testdb.Org1.ID, doc.OrgID)
@@ -81,7 +81,7 @@ func TestNewContactDoc(t *testing.T) {
 	catFC := flowContacts[testdb.Cat.ID]
 	require.NotNil(t, catFC)
 
-	doc = search.NewContactDoc(oa, catFC)
+	doc = search.NewContactDoc(oa, catFC, nil)
 
 	assert.Equal(t, testdb.Cat.ID, doc.LegacyID)
 	assert.Equal(t, testdb.Cat.UUID, doc.UUID)

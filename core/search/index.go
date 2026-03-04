@@ -16,22 +16,35 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 )
 
-// IndexContact builds a contact document and queues it for indexing in OpenSearch.
-func IndexContact(rt *runtime.Runtime, oa *models.OrgAssets, flowContact *flows.Contact) error {
-	doc := NewContactDoc(oa, flowContact)
-
-	body, err := json.Marshal(doc)
-	if err != nil {
-		return fmt.Errorf("error marshalling contact doc: %w", err)
+// IndexContacts builds contact documents and queues them for indexing in OpenSearch.
+func IndexContacts(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, flowContacts []*flows.Contact) error {
+	contactIDs := make([]models.ContactID, len(flowContacts))
+	for i, c := range flowContacts {
+		contactIDs[i] = models.ContactID(c.ID())
 	}
 
-	rt.OS.Writer.Queue(&osearch.Document{
-		Index:   rt.Config.OSContactsIndex,
-		ID:      string(doc.UUID),
-		Routing: fmt.Sprintf("%d", doc.OrgID),
-		Version: dates.Now().UnixNano(),
-		Body:    body,
-	})
+	flowHistoryByContact, err := models.GetContactFlowHistory(ctx, rt.DB, contactIDs)
+	if err != nil {
+		return fmt.Errorf("error loading flow history IDs: %w", err)
+	}
+
+	for _, c := range flowContacts {
+		contactID := models.ContactID(c.ID())
+		doc := NewContactDoc(oa, c, flowHistoryByContact[contactID])
+
+		body, err := json.Marshal(doc)
+		if err != nil {
+			return fmt.Errorf("error marshalling contact doc: %w", err)
+		}
+
+		rt.OS.Writer.Queue(&osearch.Document{
+			Index:   rt.Config.OSContactsIndex,
+			ID:      string(doc.UUID),
+			Routing: fmt.Sprintf("%d", doc.OrgID),
+			Version: dates.Now().UnixNano(),
+			Body:    body,
+		})
+	}
 
 	return nil
 }

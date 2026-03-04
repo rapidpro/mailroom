@@ -41,7 +41,7 @@ type ContactDoc struct {
 	URNs           []*ContactURNDoc     `json:"urns,omitempty"`
 	GroupIDs       []models.GroupID     `json:"group_ids,omitempty"`
 	FlowID         models.FlowID        `json:"flow_id,omitempty"`
-	FlowHistoryIDs []models.FlowID      `json:"flow_history_ids,omitempty"` // TODO
+	FlowHistoryIDs []models.FlowID      `json:"flow_history_ids,omitempty"`
 	Tickets        int                  `json:"tickets"`
 	CreatedOn      time.Time            `json:"created_on"`
 	LastSeenOn     *time.Time           `json:"last_seen_on,omitempty"`
@@ -50,17 +50,18 @@ type ContactDoc struct {
 
 // NewContactDoc builds a ContactDoc from a flow contact and its org assets. We use the flow contact
 // rather than the DB contact because it is kept up-to-date in memory as events are applied.
-func NewContactDoc(oa *models.OrgAssets, c *flows.Contact) *ContactDoc {
+func NewContactDoc(oa *models.OrgAssets, c *flows.Contact, flowHistoryIDs []models.FlowID) *ContactDoc {
 	doc := &ContactDoc{
-		OrgID:      oa.OrgID(),
-		UUID:       c.UUID(),
-		Name:       c.Name(),
-		Status:     models.ContactToModelStatus[c.Status()],
-		Language:   c.Language(),
-		CreatedOn:  c.CreatedOn(),
-		LastSeenOn: c.LastSeenOn(),
-		Tickets:    c.Tickets().Open().Count(),
-		LegacyID:   models.ContactID(c.ID()),
+		OrgID:          oa.OrgID(),
+		UUID:           c.UUID(),
+		Name:           c.Name(),
+		Status:         models.ContactToModelStatus[c.Status()],
+		Language:       c.Language(),
+		CreatedOn:      c.CreatedOn(),
+		LastSeenOn:     c.LastSeenOn(),
+		Tickets:        c.Tickets().Open().Count(),
+		FlowHistoryIDs: flowHistoryIDs,
+		LegacyID:       models.ContactID(c.ID()),
 	}
 
 	// build field docs from the flow contact's field values

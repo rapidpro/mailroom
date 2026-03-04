@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
@@ -41,15 +42,17 @@ func handleReindex(ctx context.Context, rt *runtime.Runtime, r *reindexRequest) 
 		return nil, 0, fmt.Errorf("error loading contacts: %w", err)
 	}
 
+	flowContacts := make([]*flows.Contact, 0, len(contacts))
 	for _, c := range contacts {
-		flowContact, err := c.EngineContact(oa)
+		fc, err := c.EngineContact(oa)
 		if err != nil {
 			return nil, 0, fmt.Errorf("error creating flow contact: %w", err)
 		}
+		flowContacts = append(flowContacts, fc)
+	}
 
-		if err := search.IndexContact(rt, oa, flowContact); err != nil {
-			return nil, 0, fmt.Errorf("error indexing contact: %w", err)
-		}
+	if err := search.IndexContacts(ctx, rt, oa, flowContacts); err != nil {
+		return nil, 0, fmt.Errorf("error indexing contacts: %w", err)
 	}
 
 	return map[string]any{"indexed": len(contacts)}, http.StatusOK, nil
