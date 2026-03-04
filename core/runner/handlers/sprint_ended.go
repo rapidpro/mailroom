@@ -67,29 +67,30 @@ func handleSprintEnded(ctx context.Context, rt *runtime.Runtime, oa *models.OrgA
 	sessionIsWaiting := scene.Session.Status() == flows.SessionStatusWaiting
 	currentFlowChanged := false
 
-	// get flow that contact is now waiting in ()
-	currentFlowID := models.NilFlowID
+	// get flow that contact is now waiting in
+	waitingFlowID := models.NilFlowID
 	for _, run := range scene.Session.Runs() {
 		if run.Status() == flows.RunStatusWaiting {
-			currentFlowID = run.Flow().Asset().(*models.Flow).ID()
+			waitingFlowID = run.Flow().Asset().(*models.Flow).ID()
 			break
 		}
 	}
 
-	// if we're in a flow type that can wait then contact current flow has potentially changed
+	// if we're in a flow type that can wait, then contact current flow has potentially changed
 	if scene.Session.Type() != flows.FlowTypeMessagingBackground {
 		var waitingSessionUUID flows.SessionUUID
 		if sessionIsWaiting {
 			waitingSessionUUID = scene.Session.UUID()
 		}
 
-		currentFlowChanged = event.Contact.CurrentFlowID() != currentFlowID
+		currentFlowChanged = event.Contact.CurrentFlowID() != waitingFlowID
+		scene.DBContact.SetCurrentFlowID(waitingFlowID)
 
 		if event.Contact.CurrentSessionUUID() != waitingSessionUUID || currentFlowChanged {
 			scene.AttachPreCommitHook(hooks.UpdateContactSession, hooks.CurrentSessionUpdate{
 				ID:                 scene.ContactID(),
 				CurrentSessionUUID: null.String(waitingSessionUUID),
-				CurrentFlowID:      currentFlowID,
+				CurrentFlowID:      waitingFlowID,
 			})
 		}
 	}

@@ -129,6 +129,7 @@ func (c *Contact) CreatedOn() time.Time                  { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time                 { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time                { return c.lastSeenOn }
 func (c *Contact) CurrentFlowID() FlowID                 { return c.currentFlowID }
+func (c *Contact) SetCurrentFlowID(id FlowID)            { c.currentFlowID = id }
 func (c *Contact) CurrentSessionUUID() flows.SessionUUID { return c.currentSessionUUID }
 func (c *Contact) Tickets() []*Ticket                    { return c.tickets }
 

@@ -3,8 +3,8 @@ package hooks
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
@@ -23,12 +23,15 @@ func (h *indexContacts) Execute(ctx context.Context, rt *runtime.Runtime, oa *mo
 		return nil
 	}
 
+	contacts := make([]*flows.Contact, 0, len(scenes))
+	currentFlows := make(map[models.ContactID]models.FlowID, len(scenes))
 	for scene := range scenes {
-		slog.Debug("indexing contact to opensearch", "uuid", scene.Contact.UUID(), "contact_id", scene.Contact.ID())
+		contacts = append(contacts, scene.Contact)
+		currentFlows[scene.ContactID()] = scene.DBContact.CurrentFlowID()
+	}
 
-		if err := search.IndexContact(rt, oa, scene.Contact); err != nil {
-			return fmt.Errorf("error indexing contact: %w", err)
-		}
+	if err := search.IndexContacts(ctx, rt, oa, contacts, currentFlows); err != nil {
+		return fmt.Errorf("error indexing contacts: %w", err)
 	}
 
 	return nil
