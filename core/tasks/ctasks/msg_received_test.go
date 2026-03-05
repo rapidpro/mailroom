@@ -434,6 +434,65 @@ func TestMsgReceivedTask(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdb.Org2Contact.ID, previous).Returns(0)
 }
 
+func TestMsgReceivedSecondaryURN(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
+
+	dbMsg := testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f6", testdb.TwilioChannel, testdb.Bob, "", models.MsgStatusPending)
+
+	secondaryURN := "tel:+16055749999"
+
+	// verify Bob doesn't have the secondary URN yet
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1 AND identity = $2`, testdb.Bob.ID, "tel:+16055749999").Returns(0)
+
+	err := tasks.QueueContact(ctx, rt, testdb.Org1.ID, testdb.Bob.ID, &ctasks.MsgReceived{
+		ChannelID:    testdb.TwilioChannel.ID,
+		MsgUUID:      dbMsg.UUID,
+		URN:          testdb.Bob.URN,
+		URNID:        testdb.Bob.URNID,
+		SecondaryURN: "tel:+16055749999",
+		Text:         "hello",
+	})
+	require.NoError(t, err)
+
+	vc := rt.VK.Get()
+	defer vc.Close()
+
+	task, err := rt.Queues.Realtime.Pop(ctx, vc)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+
+	err = tasks.Perform(ctx, rt, task)
+	assert.NoError(t, err)
+
+	// verify the secondary URN was added to Bob
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1 AND identity = $2`, testdb.Bob.ID, secondaryURN).Returns(1)
+
+	// now send another message with the same secondary URN - should still only have one
+	rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID)
+	models.FlushCache()
+
+	err = tasks.QueueContact(ctx, rt, testdb.Org1.ID, testdb.Bob.ID, &ctasks.MsgReceived{
+		ChannelID:    testdb.TwilioChannel.ID,
+		MsgUUID:      dbMsg.UUID,
+		URN:          testdb.Bob.URN,
+		URNID:        testdb.Bob.URNID,
+		SecondaryURN: "tel:+16055749999",
+		Text:         "hello again",
+	})
+	require.NoError(t, err)
+
+	task, err = rt.Queues.Realtime.Pop(ctx, vc)
+	require.NoError(t, err)
+
+	err = tasks.Perform(ctx, rt, task)
+	assert.NoError(t, err)
+
+	// still just one instance of the secondary URN
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1 AND identity = $2`, testdb.Bob.ID, secondaryURN).Returns(1)
+}
+
 func getLastSeenOn(t *testing.T, rt *runtime.Runtime, c *testdb.Contact) *time.Time {
 	var lastSeenOn *time.Time
 	err := rt.DB.Get(&lastSeenOn, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, c.ID)

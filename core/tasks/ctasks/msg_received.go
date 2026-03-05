@@ -32,6 +32,7 @@ type MsgReceived struct {
 	ChannelID     models.ChannelID `json:"channel_id"`
 	URN           urns.URN         `json:"urn"`
 	URNID         models.URNID     `json:"urn_id"`
+	SecondaryURN  urns.URN         `json:"secondary_urn,omitempty"`
 	Text          string           `json:"text"`
 	Attachments   []string         `json:"attachments,omitempty"`
 	NewContact    bool             `json:"new_contact"`
@@ -119,6 +120,13 @@ func (t *MsgReceived) perform(ctx context.Context, rt *runtime.Runtime, oa *mode
 			if err := scene.ApplyModifier(ctx, rt, oa, modifiers.NewAffinity(t.URN, ch), models.NilUserID, ""); err != nil {
 				return fmt.Errorf("error applying affinity modifier: %w", err)
 			}
+		}
+	}
+
+	// if we have a secondary URN, add it to the contact if not already present
+	if t.SecondaryURN != urns.NilURN {
+		if err := scene.ApplyModifier(ctx, rt, oa, modifiers.NewURNs([]urns.URN{t.SecondaryURN}, modifiers.URNsAppend), models.NilUserID, ""); err != nil {
+			return fmt.Errorf("error applying secondary URN modifier: %w", err)
 		}
 	}
 
