@@ -3,44 +3,56 @@ package incidents
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.RegisterCron("end_incidents", time.Minute*3, false, EndIncidents)
+	tasks.RegisterCron("end_incidents", false, &EndIncidentsCron{})
+}
+
+type EndIncidentsCron struct{}
+
+func (c *EndIncidentsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute*3)
 }
 
 // EndIncidents checks open incidents and end any that no longer apply
-func EndIncidents(ctx context.Context, rt *runtime.Runtime) error {
+func (c *EndIncidentsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	incidents, err := models.GetOpenIncidents(ctx, rt.DB, []models.IncidentType{models.IncidentTypeWebhooksUnhealthy})
 	if err != nil {
-		return errors.Wrap(err, "error fetching open incidents")
+		return nil, errors.Wrap(err, "error fetching open incidents")
 	}
+
+	numEnded := 0
 
 	for _, incident := range incidents {
 		if incident.Type == models.IncidentTypeWebhooksUnhealthy {
-			if err := checkWebhookIncident(ctx, rt, incident); err != nil {
-				return errors.Wrapf(err, "error checking webhook incident #%d", incident.ID)
+			ended, err := checkWebhookIncident(ctx, rt, incident)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error checking webhook incident #%d", incident.ID)
+			}
+			if ended {
+				numEnded++
 			}
 		}
 	}
 
-	return nil
+	return map[string]any{"ended": numEnded}, nil
 }
 
-func checkWebhookIncident(ctx context.Context, rt *runtime.Runtime, incident *models.Incident) error {
+func checkWebhookIncident(ctx context.Context, rt *runtime.Runtime, incident *models.Incident) (bool, error) {
 	nodeUUIDs, err := getWebhookIncidentNodes(rt, incident)
 
 	if err != nil {
-		return errors.Wrap(err, "error getting webhook nodes")
+		return false, errors.Wrap(err, "error getting webhook nodes")
 	}
 
 	healthyNodeUUIDs := make([]flows.NodeUUID, 0, len(nodeUUIDs))
@@ -49,7 +61,7 @@ func checkWebhookIncident(ctx context.Context, rt *runtime.Runtime, incident *mo
 		node := models.WebhookNode{UUID: flows.NodeUUID(nodeUUID)}
 		healthy, err := node.Healthy(rt)
 		if err != nil {
-			return errors.Wrap(err, "error getting health of webhook nodes")
+			return false, errors.Wrap(err, "error getting health of webhook nodes")
 		}
 
 		if healthy {
@@ -59,23 +71,23 @@ func checkWebhookIncident(ctx context.Context, rt *runtime.Runtime, incident *mo
 
 	if len(healthyNodeUUIDs) > 0 {
 		if err := removeWebhookIncidentNodes(rt, incident, healthyNodeUUIDs); err != nil {
-			return errors.Wrap(err, "error removing nodes from webhook incident")
+			return false, errors.Wrap(err, "error removing nodes from webhook incident")
 		}
 	}
 
-	log := logrus.WithFields(logrus.Fields{"incident_id": incident.ID, "unhealthy": len(nodeUUIDs) - len(healthyNodeUUIDs), "healthy": len(healthyNodeUUIDs)})
+	log := slog.With("incident_id", incident.ID, "unhealthy", len(nodeUUIDs)-len(healthyNodeUUIDs), "healthy", len(healthyNodeUUIDs))
 
 	// if all of the nodes are now healthy the incident has ended
 	if len(healthyNodeUUIDs) == len(nodeUUIDs) {
 		if err := incident.End(ctx, rt.DB); err != nil {
-			return errors.Wrap(err, "error ending incident")
+			return false, errors.Wrap(err, "error ending incident")
 		}
 		log.Info("ended webhook incident")
-	} else {
-		log.Debug("checked webhook incident")
+		return true, nil
 	}
 
-	return nil
+	log.Debug("checked webhook incident")
+	return false, nil
 }
 
 func getWebhookIncidentNodes(rt *runtime.Runtime, incident *models.Incident) ([]flows.NodeUUID, error) {

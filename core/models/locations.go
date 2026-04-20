@@ -2,16 +2,16 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // Location is our mailroom type for administrative locations
@@ -45,12 +45,12 @@ func (l *Location) Aliases() []string { return l.Aliases_ }
 func (l *Location) Children() []*Location { return l.Children_ }
 
 // loadLocations loads all the locations for this org returning the root node
-func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.LocationHierarchy, error) {
+func loadLocations(ctx context.Context, db *sql.DB, oa *OrgAssets) ([]assets.LocationHierarchy, error) {
 	start := time.Now()
 
-	rows, err := db.Query(loadLocationsSQL, orgID)
+	rows, err := db.QueryContext(ctx, loadLocationsSQL, oa.orgID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying locations for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying locations for org: %d", oa.orgID)
 	}
 	defer rows.Close()
 
@@ -103,12 +103,12 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	}
 
 	// then read it in
-	hierarchy, err := envs.ReadLocationHierarchy(locationJSON)
+	hierarchy, err := envs.ReadLocationHierarchy(oa.Env(), locationJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded locations")
+	slog.Debug("loaded locations", "elapsed", time.Since(start), "org_id", oa.orgID)
 
 	return []assets.LocationHierarchy{hierarchy}, nil
 }

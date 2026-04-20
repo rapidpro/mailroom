@@ -2,24 +2,24 @@ package mailroom
 
 import (
 	"context"
+	"database/sql"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/pkg/errors"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/olivere/elastic/v7"
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 // InitFunction is a function that will be called when mailroom starts
@@ -32,9 +32,9 @@ func addInitFunction(initFunc InitFunction) {
 }
 
 // RegisterCron registers a new cron function to run every interval
-func RegisterCron(name string, interval time.Duration, allInstances bool, fn cron.Function) {
+func RegisterCron(name string, allInstances bool, fn cron.Function, next func(time.Time) time.Time) {
 	addInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, name, interval, allInstances, fn, time.Minute*5, quit)
+		cron.Start(rt, wg, name, allInstances, fn, next, time.Minute*5, quit)
 		return nil
 	})
 }
@@ -82,32 +82,32 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 func (mr *Mailroom) Start() error {
 	c := mr.rt.Config
 
-	log := logrus.WithFields(logrus.Fields{"state": "starting"})
+	log := slog.With("comp", "mailroom")
 
 	var err error
-	mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
+	_, mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
 	if err != nil {
-		log.WithError(err).Error("db not reachable")
+		log.Error("db not reachable", "error", err)
 	} else {
 		log.Info("db ok")
 	}
 
 	if c.ReadonlyDB != "" {
-		mr.rt.ReadonlyDB, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
+		mr.rt.ReadonlyDB, _, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
 		if err != nil {
-			log.WithError(err).Error("readonly db not reachable")
+			log.Error("readonly db not reachable", "error", err)
 		} else {
 			log.Info("readonly db ok")
 		}
 	} else {
 		// if readonly DB not specified, just use default DB again
-		mr.rt.ReadonlyDB = mr.rt.DB
+		mr.rt.ReadonlyDB = mr.rt.DB.DB
 		log.Warn("no distinct readonly db configured")
 	}
 
 	mr.rt.RP, err = openAndCheckRedisPool(c.Redis)
 	if err != nil {
-		log.WithError(err).Error("redis not reachable")
+		log.Error("redis not reachable", "error", err)
 	} else {
 		log.Info("redis ok")
 	}
@@ -140,17 +140,17 @@ func (mr *Mailroom) Start() error {
 
 	// check our storages
 	if err := checkStorage(mr.rt.AttachmentStorage); err != nil {
-		log.WithError(err).Error(mr.rt.AttachmentStorage.Name() + " attachment storage not available")
+		log.Error(mr.rt.AttachmentStorage.Name()+" attachment storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.AttachmentStorage.Name() + " attachment storage ok")
 	}
 	if err := checkStorage(mr.rt.SessionStorage); err != nil {
-		log.WithError(err).Error(mr.rt.SessionStorage.Name() + " session storage not available")
+		log.Error(mr.rt.SessionStorage.Name()+" session storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
 	}
 	if err := checkStorage(mr.rt.LogStorage); err != nil {
-		log.WithError(err).Error(mr.rt.LogStorage.Name() + " log storage not available")
+		log.Error(mr.rt.LogStorage.Name()+" log storage not available", "error", err)
 	} else {
 		log.Info(mr.rt.LogStorage.Name() + " log storage ok")
 	}
@@ -158,14 +158,14 @@ func (mr *Mailroom) Start() error {
 	// initialize our elastic client
 	mr.rt.ES, err = newElasticClient(c.Elastic, c.ElasticUsername, c.ElasticPassword)
 	if err != nil {
-		log.WithError(err).Error("elastic search not available")
+		log.Error("elastic search not available", "error", err)
 	} else {
 		log.Info("elastic ok")
 	}
 
 	// warn if we won't be doing FCM syncing
 	if c.FCMKey == "" {
-		logrus.Warn("fcm not configured, no syncing of android channels")
+		log.Warn("fcm not configured, no android syncing")
 	}
 
 	for _, initFunc := range initFunctions {
@@ -187,14 +187,16 @@ func (mr *Mailroom) Start() error {
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
 	mr.webserver.Start()
 
-	logrus.WithField("domain", c.Domain).Info("mailroom started")
+	log.Info("mailroom started", "domain", c.Domain)
 
 	return nil
 }
 
 // Stop stops the mailroom service
 func (mr *Mailroom) Stop() error {
-	logrus.Info("mailroom stopping")
+	log := slog.With("comp", "mailroom")
+	log.Info("mailroom stopping")
+
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
 	analytics.Stop()
@@ -211,14 +213,14 @@ func (mr *Mailroom) Stop() error {
 		mr.rt.ES.Stop()
 	}
 
-	logrus.Info("mailroom stopped")
+	log.Info("mailroom stopped")
 	return nil
 }
 
-func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
+func openAndCheckDBConnection(url string, maxOpenConns int) (*sql.DB, *sqlx.DB, error) {
 	db, err := sqlx.Open("postgres", url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to open database connection: '%s'", url)
+		return nil, nil, errors.Wrapf(err, "unable to open database connection: '%s'", url)
 	}
 
 	// configure our pool
@@ -231,7 +233,7 @@ func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
 	err = db.PingContext(ctx)
 	cancel()
 
-	return db, err
+	return db.DB, db, err
 }
 
 func openAndCheckRedisPool(redisUrl string) (*redis.Pool, error) {

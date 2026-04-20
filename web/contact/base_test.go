@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
-	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
@@ -53,7 +53,7 @@ func TestInspect(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	// give cathy an unsendable twitterid URN with a display value
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("twitterid:23145325#cathy"), 20000)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("twitterid:23145325#cathy"), 20000, nil)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/inspect.json", nil)
 }
@@ -277,7 +277,7 @@ func TestSpecToCreation(t *testing.T) {
 	c, err := contact.SpecToCreation(s, env, sa)
 	assert.NoError(t, err)
 	assert.Equal(t, "", c.Name)
-	assert.Equal(t, envs.NilLanguage, c.Language)
+	assert.Equal(t, i18n.NilLanguage, c.Language)
 	assert.Equal(t, 0, len(c.URNs))
 	assert.Equal(t, 0, len(c.Mods))
 

@@ -2,11 +2,14 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -22,27 +25,22 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
-	MOMissEventType          = string(models.MOMissEventType)
-	NewConversationEventType = "new_conversation"
-	WelcomeMessageEventType  = "welcome_message"
-	ReferralEventType        = "referral"
-	StopEventType            = "stop_event"
-	MsgEventType             = "msg_event"
-	ExpirationEventType      = "expiration_event"
-	TimeoutEventType         = "timeout_event"
-	TicketClosedEventType    = "ticket_closed"
+	MsgEventType          = "msg_event"
+	ExpirationEventType   = "expiration_event"
+	TimeoutEventType      = "timeout_event"
+	TicketClosedEventType = "ticket_closed"
+	MsgDeletedType        = "msg_deleted"
 )
 
 // handleTimedEvent is called for timeout events
 func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string, event *TimedEvent) error {
 	start := time.Now()
-	log := logrus.WithFields(logrus.Fields{"event_type": eventType, "contact_id": event.ContactID, "session_id": event.SessionID})
+	log := slog.With("event_type", eventType, "contact_id", event.ContactID, "session_id", event.SessionID)
 
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
@@ -50,12 +48,13 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
+	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, event.ContactID)
 	if err != nil {
+		if err == sql.ErrNoRows { // if contact no longer exists, ignore event
+			return nil
+		}
 		return errors.Wrapf(err, "error loading contact")
 	}
-
-	modelContact := contacts[0]
 
 	// build our flow contact
 	contact, err := modelContact.FlowContact(oa)
@@ -86,12 +85,12 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		}
 
 		if expiresOn == nil {
-			log.WithField("event_expiration", event.Time).Info("ignoring expiration, session no longer waiting")
+			log.Info("ignoring expiration, session no longer waiting", "event_expiration", event.Time)
 			return nil
 		}
 
 		if expiresOn != nil && !expiresOn.Equal(event.Time) {
-			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiresOn).Info("ignoring expiration, has been updated")
+			log.Info("ignoring expiration, has been updated", "event_expiration", event.Time, "run_expiration", expiresOn)
 			return nil
 		}
 
@@ -99,14 +98,14 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 	case TimeoutEventType:
 		if session.WaitTimeoutOn() == nil {
-			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
+			log.Info("ignoring session timeout, has no timeout set", "session_id", session.ID())
 			return nil
 		}
 
 		// check that the timeout is the same
 		timeout := *session.WaitTimeoutOn()
 		if !timeout.Equal(event.Time) {
-			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
+			log.Info("ignoring timeout, has been updated", "event_timeout", event.Time, "session_timeout", timeout)
 			return nil
 		}
 
@@ -122,14 +121,14 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		// on the session
 		var eerr *engine.Error
 		if errors.As(err, &eerr) && eerr.Code() == engine.ErrorResumeRejectedByWait && resume.Type() == resumes.TypeWaitTimeout {
-			log.WithField("session_id", session.ID()).Info("clearing session timeout which is no longer set in flow")
+			log.Info("clearing session timeout which is no longer set in flow", "session_id", session.ID())
 			return errors.Wrap(session.ClearWaitTimeout(ctx, rt.DB), "error clearing session timeout")
 		}
 
 		return errors.Wrap(err, "error resuming flow for timeout")
 	}
 
-	log.WithField("elapsed", time.Since(start)).Info("handled timed event")
+	log.Info("handled timed event", "elapsed", time.Since(start))
 	return nil
 }
 
@@ -143,25 +142,32 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	// load the channel for this event
 	channel := oa.ChannelByID(event.ChannelID())
 	if channel == nil {
-		logrus.WithField("channel_id", event.ChannelID).Info("ignoring event, couldn't find channel")
+		slog.Info("ignoring event, couldn't find channel", "channel_id", event.ChannelID)
 		return nil, nil
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID()})
+	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, event.ContactID())
 	if err != nil {
+		if err == sql.ErrNoRows { // if contact no longer exists, ignore event
+			return nil, nil
+		}
 		return nil, errors.Wrapf(err, "error loading contact")
 	}
 
-	// contact has been deleted or is blocked, ignore this event
-	if len(contacts) == 0 || contacts[0].Status() == models.ContactStatusBlocked {
+	// if contact is blocked, ignore event
+	if modelContact.Status() == models.ContactStatusBlocked {
 		return nil, nil
 	}
 
-	modelContact := contacts[0]
-
 	if models.ContactSeenEvents[eventType] {
-		err = modelContact.UpdateLastSeenOn(ctx, rt.DB, event.OccurredOn())
+		// in the case of an incoming call this event isn't in the db and doesn't have created on
+		lastSeenOn := event.CreatedOn()
+		if lastSeenOn.IsZero() {
+			lastSeenOn = dates.Now()
+		}
+
+		err = modelContact.UpdateLastSeenOn(ctx, rt.DB, lastSeenOn)
 		if err != nil {
 			return nil, errors.Wrap(err, "error updating contact last_seen_on")
 		}
@@ -183,22 +189,20 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	var trigger *models.Trigger
 
 	switch eventType {
-
-	case models.NewConversationEventType:
+	case models.EventTypeNewConversation:
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
-
-	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraValue("referrer_id"))
-
-	case models.MOMissEventType:
-		trigger = models.FindMatchingMissedCallTrigger(oa)
-
-	case models.MOCallEventType:
-		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
-
-	case models.WelcomeMessageEventType:
+	case models.EventTypeReferral:
+		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraString("referrer_id"))
+	case models.EventTypeMissedCall:
+		trigger = models.FindMatchingMissedCallTrigger(oa, channel)
+	case models.EventTypeIncomingCall:
+		trigger = models.FindMatchingIncomingCallTrigger(oa, channel, contact)
+	case models.EventTypeOptIn:
+		trigger = models.FindMatchingOptInTrigger(oa, channel)
+	case models.EventTypeOptOut:
+		trigger = models.FindMatchingOptOutTrigger(oa, channel)
+	case models.EventTypeWelcomeMessage:
 		trigger = nil
-
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -212,7 +216,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 
 	// no trigger, noop, move on
 	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).WithField("extra", event.Extra()).Info("ignoring channel event, no trigger found")
+		slog.Info("ignoring channel event, no trigger found", "channel_id", event.ChannelID(), "event_type", eventType, "extra", event.Extra())
 		return nil, nil
 	}
 
@@ -248,25 +252,27 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
+	var flowOptIn *flows.OptIn
+	if eventType == models.EventTypeOptIn || eventType == models.EventTypeOptOut {
+		optIn := oa.OptInByID(event.OptInID())
+		if optIn != nil {
+			flowOptIn = oa.SessionAssets().OptIns().Get(optIn.UUID())
+		}
+	}
+
 	// build our flow trigger
-	var flowTrigger flows.Trigger
-	switch eventType {
+	tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact)
+	var trig flows.Trigger
 
-	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
-			WithParams(params).
-			Build()
-
-	case models.MOCallEventType:
-		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
-			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
-			WithCall(urn).
-			Build()
-
-	default:
-		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	if eventType == models.EventTypeIncomingCall {
+		urn := modelContact.URNForID(event.URNID())
+		trig = tb.Channel(channel.Reference(), triggers.ChannelEventTypeIncomingCall).WithCall(urn).Build()
+	} else if eventType == models.EventTypeOptIn && flowOptIn != nil {
+		trig = tb.OptIn(flowOptIn, triggers.OptInEventTypeStarted).Build()
+	} else if eventType == models.EventTypeOptOut && flowOptIn != nil {
+		trig = tb.OptIn(flowOptIn, triggers.OptInEventTypeStopped).Build()
+	} else {
+		trig = tb.Channel(channel.Reference(), triggers.ChannelEventType(eventType)).WithParams(params).Build()
 	}
 
 	// if we have a channel connection we set the connection on the session before our event hooks fire
@@ -281,7 +287,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trig}, hook, flow.FlowType().Interrupts())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -304,7 +310,7 @@ func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent)
 		return err
 	}
 
-	err = models.UpdateContactLastSeenOn(ctx, tx, event.ContactID, event.OccurredOn)
+	err = models.UpdateContactLastSeenOn(ctx, tx, event.ContactID, event.CreatedOn)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -350,7 +356,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// load our contact
-	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, event.ContactID)
+	var db models.Queryer = rt.ReadonlyDB
+	if event.NewContact {
+		db = rt.DB // it might not be in the read replica yet
+	}
+	modelContact, err := models.LoadContact(ctx, db, oa, event.ContactID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -402,12 +412,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	if err != nil {
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
-	if ticket != nil {
-		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, attachments)
-	}
 
 	// find any matching triggers
-	trigger := models.FindMatchingMsgTrigger(oa, contact, event.Text)
+	trigger, keyword := models.FindMatchingMsgTrigger(oa, channel, contact, event.Text)
 
 	// look for a waiting session for this contact
 	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
@@ -439,7 +446,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 	}
 
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, availableAttachments)
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.Reference(), event.Text, availableAttachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(flows.MsgID(event.MsgID))
 
@@ -477,9 +484,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 				return nil
 			}
 
+			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Msg(msgIn)
+			if keyword != "" {
+				tb = tb.WithMatch(&triggers.KeywordMatch{Type: trigger.KeywordMatchType(), Keyword: keyword})
+			}
+
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, flowMsgHook, true)
+			trigger := tb.Build()
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, flowMsgHook, flow.FlowType().Interrupts())
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -524,17 +536,13 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	modelTicket := tickets[0]
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{modelTicket.ContactID()})
+	modelContact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, modelTicket.ContactID())
 	if err != nil {
+		if err == sql.ErrNoRows { // if contact no longer exists, ignore event
+			return nil
+		}
 		return errors.Wrapf(err, "error loading contact")
 	}
-
-	// contact has been deleted ignore this event
-	if len(contacts) == 0 {
-		return nil
-	}
-
-	modelContact := contacts[0]
 
 	// build our flow contact
 	contact, err := modelContact.FlowContact(oa)
@@ -554,7 +562,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	// no trigger, noop, move on
 	if trigger == nil {
-		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType()).Info("ignoring ticket event, no trigger found")
+		slog.Info("ignoring ticket event, no trigger found", "ticket_id", event.TicketID, "event_type", event.EventType())
 		return nil
 	}
 
@@ -577,10 +585,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	}
 
 	// build our flow ticket
-	ticket, err := tickets[0].FlowTicket(oa)
-	if err != nil {
-		return errors.Wrapf(err, "error creating flow contact")
-	}
+	ticket := tickets[0].FlowTicket(oa)
 
 	// build our flow trigger
 	var flowTrigger flows.Trigger
@@ -594,11 +599,16 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
 
-	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, nil, true)
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, nil, flow.FlowType().Interrupts())
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
 	}
 	return nil
+}
+
+func handleMsgDeletedEvent(ctx context.Context, rt *runtime.Runtime, event *MsgDeletedEvent) error {
+	err := models.UpdateMessageDeletedBySender(ctx, rt.DB.DB, event.OrgID, event.MsgID)
+	return errors.Wrap(err, "error deleting message")
 }
 
 // handles a message as an inbox message, i.e. no flow
@@ -618,7 +628,7 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, attachments []utils.Attachment, ticket *models.Ticket, logUUIDs []models.ChannelLogUUID) error {
+func markMsgHandled(ctx context.Context, db models.DBorTx, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, attachments []utils.Attachment, ticket *models.Ticket, logUUIDs []models.ChannelLogUUID) error {
 	flowID := models.NilFlowID
 	if flow != nil {
 		flowID = flow.ID()
@@ -668,6 +678,12 @@ type StopEvent struct {
 	ContactID  models.ContactID `json:"contact_id"`
 	OrgID      models.OrgID     `json:"org_id"`
 	OccurredOn time.Time        `json:"occurred_on"`
+	CreatedOn  time.Time        `json:"created_on"`
+}
+
+type MsgDeletedEvent struct {
+	OrgID models.OrgID `json:"org_id"`
+	MsgID models.MsgID `json:"message_id"`
 }
 
 // creates a new event task for the passed in timeout event
@@ -711,7 +727,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	tx, _ := rt.DB.BeginTxx(ctx, nil)
 
 	// create and insert our flow start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID).WithContactIDs(contactIDs)
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, flowID).WithContactIDs(contactIDs)
 	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
 	if err != nil {
 		tx.Rollback()
@@ -735,7 +751,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	}
 
 	// create our batch of all our contacts
-	task := &ivr.StartIVRFlowBatchTask{FlowStartBatch: start.CreateBatch(contactIDs, true, len(contactIDs))}
+	task := &ivr.StartIVRFlowBatchTask{FlowStartBatch: start.CreateBatch(contactIDs, models.FlowTypeVoice, true, len(contactIDs))}
 
 	// queue this to our ivr starter, it will take care of creating the calls then calling back in
 	rc := rt.RP.Get()

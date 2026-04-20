@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -29,24 +30,24 @@ func TestMsgEvents(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, []string{"start"}, models.MatchOnly, nil, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, []string{"ivr"}, models.MatchOnly, nil, nil, nil)
 
-	testdata.InsertKeywordTrigger(rt, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertCatchallTrigger(rt, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org2, testdata.Org2Favorites, []string{"start"}, models.MatchOnly, nil, nil, nil)
+	testdata.InsertCatchallTrigger(rt, testdata.Org2, testdata.Org2SingleMessage, nil, nil, nil)
 
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
+			testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.DefaultTopic, "Ok", time.Now(), nil),
 		},
 	}
 	closedTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil),
+			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.DefaultTopic, "", nil),
 		},
 		testdata.Bob: {
-			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
+			testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Bob, testdata.DefaultTopic, "Ok", nil),
 		},
 	}
 
@@ -72,7 +73,7 @@ func TestMsgEvents(t *testing.T) {
 		// 0:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "noop",
 			expectedReply: "",
@@ -81,7 +82,7 @@ func TestMsgEvents(t *testing.T) {
 		// 1:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "start other",
 			expectedReply: "",
@@ -90,7 +91,7 @@ func TestMsgEvents(t *testing.T) {
 		// 2:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
@@ -100,7 +101,7 @@ func TestMsgEvents(t *testing.T) {
 		// 3:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "purple",
 			expectedReply: "I don't know that color. Try again.",
@@ -110,7 +111,7 @@ func TestMsgEvents(t *testing.T) {
 		// 4:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "blue",
 			expectedReply: "Good choice, I like Blue too! What is your favorite beer?",
@@ -120,7 +121,7 @@ func TestMsgEvents(t *testing.T) {
 		// 5:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "MUTZIG",
 			expectedReply: "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?",
@@ -130,7 +131,7 @@ func TestMsgEvents(t *testing.T) {
 		// 6:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "Cathy",
 			expectedReply: "Thanks Cathy, we are all done!",
@@ -140,7 +141,7 @@ func TestMsgEvents(t *testing.T) {
 		// 7:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Cathy,
 			text:          "noop",
 			expectedReply: "",
@@ -209,7 +210,7 @@ func TestMsgEvents(t *testing.T) {
 		// 14:
 		{
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.Bob,
 			text:          "ivr",
 			expectedReply: "",
@@ -222,7 +223,7 @@ func TestMsgEvents(t *testing.T) {
 				rt.DB.MustExec(`UPDATE contacts_contact SET status = 'S' WHERE id = $1`, testdata.George.ID)
 			},
 			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
+			channel:       testdata.FacebookChannel,
 			contact:       testdata.George,
 			text:          "start",
 			expectedReply: "What is your favorite color?",
@@ -281,8 +282,8 @@ func TestMsgEvents(t *testing.T) {
 			ContactID: contact.ID,
 			OrgID:     org.ID,
 			ChannelID: channel.ID,
-			MsgID:     models.MsgID(dbMsg.ID()),
-			MsgUUID:   dbMsg.UUID(),
+			MsgID:     dbMsg.ID,
+			MsgUUID:   dbMsg.FlowMsg.UUID(),
 			URN:       contact.URN,
 			URNID:     contact.URNID,
 			Text:      text,
@@ -295,7 +296,7 @@ func TestMsgEvents(t *testing.T) {
 		models.FlushCache()
 
 		// reset our dummy db message into an unhandled state
-		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID())
+		rt.DB.MustExec(`UPDATE msgs_msg SET status = 'P', flow_id = NULL WHERE id = $1`, dbMsg.ID)
 
 		// run our setup hook if we have one
 		if tc.preHook != nil {
@@ -319,7 +320,7 @@ func TestMsgEvents(t *testing.T) {
 		}
 
 		// check that message is marked as handled
-		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		assertdb.Query(t, rt.DB, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID).
 			Columns(map[string]any{"status": "H", "msg_type": "T", "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
@@ -352,8 +353,8 @@ func TestMsgEvents(t *testing.T) {
 
 	// check messages queued to courier
 	testsuite.AssertCourierQueues(t, map[string][]int{
-		fmt.Sprintf("msgs:%s|10/1", testdata.TwitterChannel.UUID): {1, 1, 1, 1, 1, 1},
-		fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID):    {1, 1, 1, 1, 1, 1, 1, 1, 1},
+		fmt.Sprintf("msgs:%s|10/1", testdata.FacebookChannel.UUID): {1, 1, 1, 1, 1, 1},
+		fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID):     {1, 1, 1, 1, 1, 1, 1, 1, 1},
 	})
 
 	// Fred's sessions should not have a timeout because courier will set them
@@ -415,27 +416,103 @@ func TestChannelEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add some channel event triggers
-	testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
+	testdata.InsertNewConversationTrigger(rt, testdata.Org1, testdata.Favorites, testdata.FacebookChannel)
 	testdata.InsertReferralTrigger(rt, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
+	testdata.InsertOptInTrigger(rt, testdata.Org1, testdata.Favorites, testdata.VonageChannel)
+	testdata.InsertOptOutTrigger(rt, testdata.Org1, testdata.PickANumber, testdata.VonageChannel)
+
+	polls := testdata.InsertOptIn(rt, testdata.Org1, "Polls")
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10, nil)
 
 	tcs := []struct {
-		EventType      models.ChannelEventType
-		ContactID      models.ContactID
-		URNID          models.URNID
-		OrgID          models.OrgID
-		ChannelID      models.ChannelID
-		Extra          map[string]interface{}
-		Response       string
-		UpdateLastSeen bool
+		EventType           models.ChannelEventType
+		ContactID           models.ContactID
+		URNID               models.URNID
+		ChannelID           models.ChannelID
+		OptInID             models.OptInID
+		Extra               map[string]any
+		expectedTriggerType string
+		expectedResponse    string
+		updatesLastSeen     bool
 	}{
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
-		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
-		{handler.WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
-		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
+		{
+			models.EventTypeNewConversation,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.FacebookChannel.ID,
+			models.NilOptInID,
+			nil,
+			"channel",
+			"What is your favorite color?",
+			true,
+		},
+		{
+			models.EventTypeNewConversation,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			models.NilOptInID,
+			nil,
+			"",
+			"",
+			true,
+		},
+		{
+			models.EventTypeWelcomeMessage,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			models.NilOptInID,
+			nil,
+			"",
+			"",
+			false,
+		},
+		{
+			models.EventTypeReferral,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.FacebookChannel.ID,
+			models.NilOptInID,
+			nil,
+			"",
+			"",
+			true,
+		},
+		{
+			models.EventTypeReferral,
+			testdata.Cathy.ID, testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			models.NilOptInID,
+			nil,
+			"channel",
+			"Pick a number between 1-10.",
+			true,
+		},
+		{
+			models.EventTypeOptIn,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			polls.ID,
+			map[string]any{"title": "Polls", "payload": fmt.Sprint(polls.ID)},
+			"optin",
+			"What is your favorite color?",
+			true,
+		},
+		{
+			models.EventTypeOptOut,
+			testdata.Cathy.ID,
+			testdata.Cathy.URNID,
+			testdata.VonageChannel.ID,
+			polls.ID,
+			map[string]any{"title": "Polls", "payload": fmt.Sprint(polls.ID)},
+			"optin",
+			"Pick a number between 1-10.",
+			true,
+		},
 	}
 
 	models.FlushCache()
@@ -444,14 +521,14 @@ func TestChannelEvents(t *testing.T) {
 		start := time.Now()
 		time.Sleep(time.Millisecond * 5)
 
-		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
-		eventJSON, err := json.Marshal(event)
-		assert.NoError(t, err)
+		event := models.NewChannelEvent(tc.EventType, testdata.Org1.ID, tc.ChannelID, tc.ContactID, tc.URNID, tc.OptInID, tc.Extra, false)
+		err := event.Insert(ctx, rt.DB)
+		require.NoError(t, err)
 
 		task := &queue.Task{
 			Type:  string(tc.EventType),
-			OrgID: int(tc.OrgID),
-			Task:  eventJSON,
+			OrgID: int(testdata.Org1.ID),
+			Task:  jsonx.MustMarshal(event),
 		}
 
 		err = handler.QueueHandleTask(rc, tc.ContactID, task)
@@ -463,13 +540,23 @@ func TestChannelEvents(t *testing.T) {
 		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
-		// if we are meant to have a response
-		if tc.Response != "" {
+		// if we are meant to trigger a new session...
+		if tc.expectedTriggerType != "" {
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND created_on > $2`, tc.ContactID, start).Returns(1)
+
+			var output []byte
+			err = rt.DB.Get(&output, `SELECT output FROM flows_flowsession WHERE contact_id = $1 AND created_on > $2`, tc.ContactID, start)
+			require.NoError(t, err)
+
+			trigType, err := jsonparser.GetString(output, "trigger", "type")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedTriggerType, trigType)
+
 			assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
-				Returns(tc.Response, "%d: response mismatch", i)
+				Returns(tc.expectedResponse, "%d: response mismatch", i)
 		}
 
-		if tc.UpdateLastSeen {
+		if tc.updatesLastSeen {
 			var lastSeen time.Time
 			err = rt.DB.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
 			assert.NoError(t, err)
@@ -488,7 +575,7 @@ func TestTicketEvents(t *testing.T) {
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(rt, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
+	ticket := testdata.InsertClosedTicket(rt, testdata.Org1, testdata.Cathy, testdata.DefaultTopic, "Where are my shoes?", nil)
 	modelTicket := ticket.Load(rt)
 
 	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID)
@@ -523,7 +610,7 @@ func TestStopEvent(t *testing.T) {
 	eventJSON, err := json.Marshal(event)
 	require.NoError(t, err)
 	task := &queue.Task{
-		Type:  handler.StopEventType,
+		Type:  string(models.EventTypeStopContact),
 		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}
@@ -557,8 +644,8 @@ func TestTimedEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some keyword triggers
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.PickANumber, "pick", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.Favorites, []string{"start"}, models.MatchOnly, nil, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.PickANumber, []string{"pick"}, models.MatchOnly, nil, nil, nil)
 
 	tcs := []struct {
 		EventType string
@@ -569,43 +656,43 @@ func TestTimedEvents(t *testing.T) {
 		Org       *testdata.Org
 	}{
 		// 0: start the flow
-		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.FacebookChannel, testdata.Org1},
 
 		// 1: this expiration does nothing because the times don't match
-		{handler.ExpirationEventType, testdata.Cathy, "bad", "", testdata.TwitterChannel, testdata.Org1},
+		{handler.ExpirationEventType, testdata.Cathy, "bad", "", testdata.FacebookChannel, testdata.Org1},
 
 		// 2: this checks that the flow wasn't expired
-		{handler.MsgEventType, testdata.Cathy, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.FacebookChannel, testdata.Org1},
 
 		// 3: this expiration will actually take
-		{handler.ExpirationEventType, testdata.Cathy, "good", "", testdata.TwitterChannel, testdata.Org1},
+		{handler.ExpirationEventType, testdata.Cathy, "good", "", testdata.FacebookChannel, testdata.Org1},
 
 		// 4: we won't get a response as we will be out of the flow
-		{handler.MsgEventType, testdata.Cathy, "mutzig", "", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "mutzig", "", testdata.FacebookChannel, testdata.Org1},
 
 		// 5: start the parent expiration flow
-		{handler.MsgEventType, testdata.Cathy, "parent", "Child", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "parent", "Child", testdata.FacebookChannel, testdata.Org1},
 
 		// 6: respond, should bring us out
-		{handler.MsgEventType, testdata.Cathy, "hi", "Completed", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "hi", "Completed", testdata.FacebookChannel, testdata.Org1},
 
 		// 7: expiring our child should be a no op
-		{handler.ExpirationEventType, testdata.Cathy, "child", "", testdata.TwitterChannel, testdata.Org1},
+		{handler.ExpirationEventType, testdata.Cathy, "child", "", testdata.FacebookChannel, testdata.Org1},
 
 		// 8: respond one last time, should be done
-		{handler.MsgEventType, testdata.Cathy, "done", "Ended", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "done", "Ended", testdata.FacebookChannel, testdata.Org1},
 
 		// 9: start our favorite flow again
-		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.FacebookChannel, testdata.Org1},
 
 		// 10: timeout on the color question
-		{handler.TimeoutEventType, testdata.Cathy, "", "Sorry you can't participate right now, I'll try again later.", testdata.TwitterChannel, testdata.Org1},
+		{handler.TimeoutEventType, testdata.Cathy, "", "Sorry you can't participate right now, I'll try again later.", testdata.FacebookChannel, testdata.Org1},
 
 		// 11: start the pick a number flow
-		{handler.MsgEventType, testdata.Cathy, "pick", "Pick a number between 1-10.", testdata.TwitterChannel, testdata.Org1},
+		{handler.MsgEventType, testdata.Cathy, "pick", "Pick a number between 1-10.", testdata.FacebookChannel, testdata.Org1},
 
 		// 12: try to resume with timeout even tho flow doesn't have one set
-		{handler.TimeoutEventType, testdata.Cathy, "", "", testdata.TwitterChannel, testdata.Org1},
+		{handler.TimeoutEventType, testdata.Cathy, "", "", testdata.FacebookChannel, testdata.Org1},
 	}
 
 	last := time.Now()

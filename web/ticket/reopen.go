@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.MarshaledResponse(web.WithHTTPLogs(handleReopen))))
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.MarshaledResponse(handleReopen)))
 }
 
 // Reopens any closed tickets with the given ids
@@ -23,7 +23,7 @@ func init() {
 //	  "user_id": 234,
 //	  "ticket_ids": [1234, 2345]
 //	}
-func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error) {
+func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
 	request := &bulkTicketRequest{}
 	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrap(err, "request failed validation"), http.StatusBadRequest, nil
@@ -53,7 +53,7 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 	start := time.Now()
 
 	for len(remaining) > 0 && time.Since(start) < time.Second*10 {
-		evts, skipped, err := tryToLockAndReopen(ctx, rt, oa, remaining, request.UserID, l)
+		evts, skipped, err := tryToLockAndReopen(ctx, rt, oa, remaining, request.UserID)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -66,7 +66,7 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 	return newBulkResponse(results), http.StatusOK, nil
 }
 
-func tryToLockAndReopen(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, tickets map[models.ContactID]*models.Ticket, userID models.UserID, l *models.HTTPLogger) (map[*models.Ticket]*models.TicketEvent, map[models.ContactID]*models.Ticket, error) {
+func tryToLockAndReopen(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, tickets map[models.ContactID]*models.Ticket, userID models.UserID) (map[*models.Ticket]*models.TicketEvent, map[models.ContactID]*models.Ticket, error) {
 	locks, skipped, err := models.LockContacts(ctx, rt, oa.OrgID(), maps.Keys(tickets), time.Second)
 	if err != nil {
 		return nil, nil, err
@@ -90,7 +90,7 @@ func tryToLockAndReopen(ctx context.Context, rt *runtime.Runtime, oa *models.Org
 		}
 	}
 
-	evts, err := models.ReopenTickets(ctx, rt, oa, userID, reopenable, true, l)
+	evts, err := models.ReopenTickets(ctx, rt, oa, userID, reopenable)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error reopening tickets")
 	}

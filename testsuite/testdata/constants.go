@@ -2,6 +2,20 @@ package testdata
 
 // Constants used in tests, these are tied to the DB created by the RapidPro `mailroom_db` management command.
 
+var AuthGroupIDs = map[string]int{
+	"Alpha":            1,
+	"Beta":             2,
+	"Dashboard":        3,
+	"Surveyors":        4,
+	"Customer Support": 5,
+	"Granters":         6,
+	"Administrators":   7,
+	"Editors":          8,
+	"Viewers":          9,
+	"Agents":           10,
+	"Prometheus":       11,
+}
+
 var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
 var Admin = &User{3, "admin1@nyaruka.com"}
 var Editor = &User{4, "editor1@nyaruka.com"}
@@ -11,7 +25,7 @@ var Surveyor = &User{7, "surveyor1@nyaruka.com"}
 
 var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "T"}
 var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49", "NX"}
-var TwitterChannel = &Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91", "TT"}
+var FacebookChannel = &Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91", "FBA"}
 
 var Cathy = &Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
 var Bob = &Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
@@ -45,14 +59,9 @@ var TestersGroup = &Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
 var ReportingLabel = &Label{10000, "ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"}
 var TestingLabel = &Label{10001, "a6338cdc-7938-4437-8b05-2d5d785e3a08"}
 
-var DefaultTopic = &Topic{1, "5cc1848a-357c-4de9-9720-45770ec18d11"}
+var DefaultTopic = &Topic{1, "ffc903f7-8cbb-443f-9627-87106842d1aa"}
 var SalesTopic = &Topic{2, "9ef2ff21-064a-41f1-8560-ccc990b4f937"}
 var SupportTopic = &Topic{3, "0a8f2e00-fef6-402c-bd79-d789446ec0e0"}
-
-var Internal = &Ticketer{1, "ffc903f7-8cbb-443f-9627-87106842d1aa"}
-var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
-var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
-var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
 
 var Partners = &Team{1, "4321c30b-b596-46fa-adb4-4a46d37923f6"}
 var Office = &Team{2, "f14c1762-d38b-4072-ae63-2705332a3719"}

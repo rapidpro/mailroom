@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -19,42 +20,39 @@ import (
 func TestOrgs(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
+	defer testsuite.Reset(testsuite.ResetAll)
+
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 
-	tx, err := rt.DB.BeginTxx(ctx, nil)
-	assert.NoError(t, err)
-	defer tx.Rollback()
+	rt.DB.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.FacebookChannel.ID)
+	rt.DB.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
 
-	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.TwitterChannel.ID)
-	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
+	rt.DB.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdata.Org2.ID)
 
-	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
-	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
-	tx.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdata.Org2.ID)
-
-	org, err := models.LoadOrg(ctx, rt.Config, tx, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, models.OrgID(1), org.ID())
 	assert.False(t, org.Suspended())
-	assert.Equal(t, envs.DateFormatDayMonthYear, org.DateFormat())
-	assert.Equal(t, envs.TimeFormatHourMinute, org.TimeFormat())
-	assert.Equal(t, envs.RedactionPolicyNone, org.RedactionPolicy())
-	assert.Equal(t, 640, org.MaxValueLength())
-	assert.Equal(t, string(envs.Country("US")), string(org.DefaultCountry()))
-	assert.Equal(t, tz, org.Timezone())
-	assert.Equal(t, []envs.Language{"fra", "eng"}, org.AllowedLanguages())
-	assert.Equal(t, envs.Language("fra"), org.DefaultLanguage())
-	assert.Equal(t, "fr-US", org.DefaultLocale().ToBCP47())
+	assert.Equal(t, envs.DateFormatDayMonthYear, org.Environment().DateFormat())
+	assert.Equal(t, envs.TimeFormatHourMinute, org.Environment().TimeFormat())
+	assert.Equal(t, envs.RedactionPolicyNone, org.Environment().RedactionPolicy())
+	assert.Equal(t, "US", string(org.Environment().DefaultCountry()))
+	assert.Equal(t, tz, org.Environment().Timezone())
+	assert.Equal(t, []i18n.Language{"fra", "eng"}, org.Environment().AllowedLanguages())
+	assert.Equal(t, i18n.Language("fra"), org.Environment().DefaultLanguage())
+	assert.Equal(t, i18n.Locale("fra-US"), org.Environment().DefaultLocale())
 
-	org, err = models.LoadOrg(ctx, rt.Config, tx, testdata.Org2.ID)
+	org, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org2.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, envs.DateFormatMonthDayYear, org.DateFormat())
-	assert.Equal(t, []envs.Language{}, org.AllowedLanguages())
-	assert.Equal(t, envs.NilLanguage, org.DefaultLanguage())
-	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
+	assert.Equal(t, envs.DateFormatMonthDayYear, org.Environment().DateFormat())
+	assert.Equal(t, []i18n.Language{}, org.Environment().AllowedLanguages())
+	assert.Equal(t, i18n.NilLanguage, org.Environment().DefaultLanguage())
+	assert.Equal(t, i18n.NilLocale, org.Environment().DefaultLocale())
 
-	_, err = models.LoadOrg(ctx, rt.Config, tx, 99)
+	_, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, 99)
 	assert.Error(t, err)
 }
 
@@ -66,7 +64,7 @@ func TestStoreAttachment(t *testing.T) {
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := models.LoadOrg(ctx, rt.Config, rt.DB, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(context.Background(), rt, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)

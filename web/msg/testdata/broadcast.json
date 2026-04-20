@@ -1,0 +1,66 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/msg/broadcast",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "missing required fields",
+        "method": "POST",
+        "path": "/mr/msg/broadcast",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'user_id' is required, field 'translations' is required, field 'base_language' is required"
+        }
+    },
+    {
+        "label": "create broadcast and return id",
+        "method": "POST",
+        "path": "/mr/msg/broadcast",
+        "body": {
+            "org_id": 1,
+            "user_id": 4,
+            "translations": {
+                "eng": {
+                    "text": "Hello"
+                }
+            },
+            "base_language": "eng",
+            "group_ids": [
+                10000
+            ],
+            "contact_ids": [
+                10002,
+                10003
+            ],
+            "urns": [
+                "tel:+1234567890"
+            ],
+            "query": "age > 20",
+            "optin_id": $polls_id$
+        },
+        "status": 200,
+        "response": {
+            "id": 1
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_broadcast WHERE translations->'eng'->>'text' = 'Hello' AND base_language = 'eng' AND urns = '{\"tel:+1234567890\"}' AND query = 'age > 20' AND optin_id = $polls_id$",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM msgs_broadcast_contacts WHERE broadcast_id = 1",
+                "count": 2
+            },
+            {
+                "query": "SELECT count(*) FROM msgs_broadcast_groups WHERE broadcast_id = 1",
+                "count": 1
+            }
+        ]
+    }
+]

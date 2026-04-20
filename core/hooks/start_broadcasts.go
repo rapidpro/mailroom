@@ -19,7 +19,7 @@ var StartBroadcastsHook models.EventCommitHook = &startBroadcastsHook{}
 type startBroadcastsHook struct{}
 
 // Apply queues up our broadcasts for sending
-func (h *startBroadcastsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *startBroadcastsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 

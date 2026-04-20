@@ -28,7 +28,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 		status = models.MsgStatusFailed
 	}
 
-	flowMsg := testdata.InsertOutgoingMsg(rt, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
+	flowMsg := testdata.InsertOutgoingMsg(rt, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority).FlowMsg
 	msgs, err := models.GetMessagesByID(context.Background(), rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg.ID())})
 	require.NoError(t, err)
 
@@ -42,7 +42,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 	return msg
 }
 
-func TestSendMessages(t *testing.T) {
+func TestQueueMessages(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 	rc := rt.RP.Get()
 	defer rc.Close()
@@ -55,9 +55,9 @@ func TestSendMessages(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Andoid channels
-	androidChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
-	androidChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
-	testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
+	androidChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", "123", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID1"})
+	androidChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", "234", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID2"})
+	testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", "456", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID3"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -160,7 +160,7 @@ func TestSendMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, rt, rt.DB, fc, msgs)
+		msgio.QueueMessages(ctx, rt, rt.DB, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
@@ -170,7 +170,7 @@ func TestSendMessages(t *testing.T) {
 			actualTokens[i] = mockFCM.Messages[i].Token
 		}
 
-		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
+		assert.ElementsMatch(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
 		assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE status = 'I'`).Returns(tc.UnqueuedMsgs, `initializing messages mismatch in '%s'`, tc.Description)
 	}

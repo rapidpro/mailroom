@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -19,12 +18,8 @@ func init() {
 // goflow now sends email so this just logs the event
 func handleEmailSent(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.EmailSentEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"body":         event.Body,
-		"to":           event.To,
-	}).Debug("email sent")
+
+	slog.Debug("email sent", "contact", scene.ContactUUID(), "session", scene.SessionID(), "subject", event.Subject, "body", event.Body)
 
 	return nil
 }

@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -20,11 +19,8 @@ func init() {
 // handleContactURNsChanged is called for each contact urn changed event that is encountered
 func handleContactURNsChanged(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactURNsChangedEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"urns":         event.URNs,
-	}).Debug("contact urns changed")
+
+	slog.Debug("contact urns changed", "contact", scene.ContactUUID(), "session", scene.SessionID(), "urns", event.URNs)
 
 	// create our URN changed event
 	change := &models.ContactURNsChanged{

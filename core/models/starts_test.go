@@ -13,7 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +51,6 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, testdata.Org1.ID, start.OrgID)
 	assert.Equal(t, testdata.Admin.ID, start.CreatedByID)
 	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID)
-	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
 	assert.Equal(t, null.NullString, start.Query)
 	assert.False(t, start.Exclusions.StartedPreviously)
 	assert.False(t, start.Exclusions.InAFlow)
@@ -69,7 +68,7 @@ func TestStarts(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(2)
 
-	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 3)
+	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, models.FlowTypeMessaging, false, 3)
 	assert.Equal(t, startID, batch.StartID)
 	assert.Equal(t, models.StartTypeManual, batch.StartType)
 	assert.Equal(t, testdata.SingleMessage.ID, batch.FlowID)
@@ -99,7 +98,7 @@ func TestStartsBuilding(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, testdata.Favorites.ID).
 		WithGroupIDs([]models.GroupID{testdata.DoctorsGroup.ID}).
 		WithExcludeGroupIDs([]models.GroupID{testdata.TestersGroup.ID}).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}).
@@ -122,7 +121,6 @@ func TestStartsBuilding(t *testing.T) {
         	"started_previously": false
 		},
 		"flow_id": %d,
-		"flow_type": "M",
 		"group_ids": [%d],
 		"org_id": 1,
 		"params": {

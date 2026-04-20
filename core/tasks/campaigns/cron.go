@@ -6,17 +6,14 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
-
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slog"
 )
 
 const (
@@ -26,21 +23,24 @@ const (
 var campaignsMarker = redisx.NewIntervalSet("campaign_event", time.Hour*24, 2)
 
 func init() {
-	mailroom.RegisterCron("campaign_event", time.Second*60, false, QueueEventFires)
+	tasks.RegisterCron("campaign_event", false, &QueueEventsCron{})
+}
+
+type QueueEventsCron struct{}
+
+func (c *QueueEventsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
 }
 
 // QueueEventFires looks for all due campaign event fires and queues them to be started
-func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "campaign_events")
-	start := time.Now()
-
+func (c *QueueEventsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	// find all events that need to be fired
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
 	rows, err := rt.DB.QueryxContext(ctx, expiredEventsQuery)
 	if err != nil {
-		return errors.Wrapf(err, "error loading expired campaign events")
+		return nil, errors.Wrapf(err, "error loading expired campaign events")
 	}
 	defer rows.Close()
 
@@ -55,16 +55,16 @@ func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 		row := &eventFireRow{}
 		err := rows.StructScan(row)
 		if err != nil {
-			return errors.Wrapf(err, "error reading event fire row")
+			return nil, errors.Wrapf(err, "error reading event fire row")
 		}
 
 		numFires++
 
 		// check whether this event has already been queued to fire
 		taskID := fmt.Sprintf("%d", row.FireID)
-		dupe, err := campaignsMarker.Contains(rc, taskID)
+		dupe, err := campaignsMarker.IsMember(rc, taskID)
 		if err != nil {
-			return errors.Wrap(err, "error checking task lock")
+			return nil, errors.Wrap(err, "error checking task lock")
 		}
 
 		// this has already been queued, skip
@@ -81,9 +81,9 @@ func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 
 		// if not, queue up current task...
 		if task != nil {
-			err = queueFiresTask(rt.RP, orgID, task)
+			err = c.queueFiresTask(rt.RP, orgID, task)
 			if err != nil {
-				return errors.Wrapf(err, "error queueing task")
+				return nil, errors.Wrapf(err, "error queueing task")
 			}
 			numTasks++
 		}
@@ -102,24 +102,16 @@ func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 
 	// queue our last task if we have one
 	if task != nil {
-		if err := queueFiresTask(rt.RP, orgID, task); err != nil {
-			return errors.Wrapf(err, "error queueing task")
+		if err := c.queueFiresTask(rt.RP, orgID, task); err != nil {
+			return nil, errors.Wrapf(err, "error queueing task")
 		}
 		numTasks++
 	}
 
-	analytics.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start))/float64(time.Second))
-	analytics.Gauge("mr.campaign_event_cron_count", float64(numFires))
-	log.WithFields(logrus.Fields{
-		"elapsed": time.Since(start),
-		"fires":   numFires,
-		"dupes":   numDupes,
-		"tasks":   numTasks,
-	}).Info("campaign event fire queuing complete")
-	return nil
+	return map[string]any{"fires": numFires, "dupes": numDupes, "tasks": numTasks}, nil
 }
 
-func queueFiresTask(rp *redis.Pool, orgID models.OrgID, task *FireCampaignEventTask) error {
+func (c *QueueEventsCron) queueFiresTask(rp *redis.Pool, orgID models.OrgID, task *FireCampaignEventTask) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -136,7 +128,7 @@ func queueFiresTask(rp *redis.Pool, orgID models.OrgID, task *FireCampaignEventT
 		}
 	}
 
-	logrus.WithField("comp", "campaign_events").WithField("event", task.EventUUID).WithField("fires", len(task.FireIDs)).Debug("queued campaign event fire task")
+	slog.Debug("queued campaign event fire task", "comp", "campaign_events", "event", task.EventUUID, "fires", len(task.FireIDs))
 	return nil
 }
 

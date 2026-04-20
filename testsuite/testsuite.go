@@ -3,6 +3,7 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path"
@@ -14,7 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/rp-indexer/v8/indexers"
 	"github.com/olivere/elastic/v7"
-	"github.com/sirupsen/logrus"
 )
 
 var _db *sqlx.DB
@@ -72,10 +72,10 @@ func Runtime() (context.Context, *runtime.Runtime) {
 	cfg := runtime.NewDefaultConfig()
 	cfg.ElasticContactsIndex = elasticContactsIndex
 
-	db := getDB()
+	dbx := getDB()
 	rt := &runtime.Runtime{
-		DB:                db,
-		ReadonlyDB:        db,
+		DB:                dbx,
+		ReadonlyDB:        dbx.DB,
 		RP:                getRP(),
 		ES:                es,
 		AttachmentStorage: storage.NewFS(attachmentStorageDir, 0766),
@@ -84,7 +84,7 @@ func Runtime() (context.Context, *runtime.Runtime) {
 		Config:            cfg,
 	}
 
-	logrus.SetLevel(logrus.DebugLevel)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	return context.Background(), rt
 }
@@ -250,6 +250,7 @@ DELETE FROM tickets_ticketevent;
 DELETE FROM tickets_ticket;
 DELETE FROM triggers_trigger_contacts WHERE trigger_id >= 30000;
 DELETE FROM triggers_trigger_groups WHERE trigger_id >= 30000;
+DELETE FROM triggers_trigger_exclude_groups WHERE trigger_id >= 30000;
 DELETE FROM triggers_trigger WHERE id >= 30000;
 DELETE FROM channels_channelcount;
 DELETE FROM msgs_msg;
@@ -266,11 +267,13 @@ DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
 DELETE FROM flows_flow WHERE id >= 30000;
 DELETE FROM ivr_call;
 DELETE FROM campaigns_eventfire;
+DELETE FROM msgs_msg_labels;
 DELETE FROM msgs_msg;
 DELETE FROM msgs_broadcast_groups;
 DELETE FROM msgs_broadcast_contacts;
 DELETE FROM msgs_broadcastmsgcount;
 DELETE FROM msgs_broadcast;
+DELETE FROM msgs_optin;
 DELETE FROM schedules_schedule;
 DELETE FROM campaigns_campaignevent WHERE id >= 30000;
 DELETE FROM campaigns_campaign WHERE id >= 30000;

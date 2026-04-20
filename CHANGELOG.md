@@ -1,3 +1,274 @@
+v9.0.1 (2024-01-05)
+-------------------------
+ * Fix interrupting with background flows
+
+v9.0.0 (2024-01-05)
+-------------------------
+ * Update test database
+
+v8.3.55 (2024-01-02)
+-------------------------
+ * Fix last seen on for channel events
+ * Remove ticketers
+
+v8.3.54 (2023-12-12)
+-------------------------
+ * Update deps
+
+v8.3.53 (2023-12-08)
+-------------------------
+ * Fix recording cron times
+
+v8.3.52 (2023-12-06)
+-------------------------
+ * Don't include templating variables if empty
+
+v8.3.51 (2023-12-05)
+-------------------------
+ * Save msg templating metdata with original template language
+
+v8.3.50 (2023-12-05)
+-------------------------
+ * Always use created_on rather than occured_on when updating last_seen on based on a channel event
+
+v8.3.49 (2023-12-04)
+-------------------------
+ * Change ChannelEvent.created_on to be db time
+ * Refactor cron jobs to use an interface
+
+v8.3.48 (2023-11-28)
+-------------------------
+ * Use TemplateTranslation.locale instead of language and country
+ * Simplify loading of templates
+ * Update to latest goflow/gocommon/phonenumbers
+
+v8.3.47 (2023-11-20)
+-------------------------
+ * Update deps
+ * Write cron results to redis
+
+v8.3.46 (2023-11-13)
+-------------------------
+ * Update to latest goflow
+ * Remove no longer used endpoint alias
+
+v8.3.45 (2023-11-13)
+-------------------------
+ * Rework cron functions to return results and do consistent logging
+ * Add URNs to broadcast endpoint
+
+v8.3.44 (2023-11-10)
+-------------------------
+ * Rename preview_start to start_preview for consistency
+
+v8.3.43 (2023-11-10)
+-------------------------
+ * Rename preview_broadcast to broadcast_preview
+ * Add web endpoint to create and send a broadcast
+
+v8.3.42 (2023-11-10)
+-------------------------
+ * Tweak logging in schedules cron
+ * Support is_paused on schedules
+
+v8.3.41 (2023-11-08)
+-------------------------
+ * Stop reading from Schedule.is_active which is no longer used
+
+v8.3.40 (2023-11-07)
+-------------------------
+ * Add medium field to notifications and start writing
+ * Update test database
+
+v8.3.39 (2023-11-07)
+-------------------------
+ * Actually delete schedule objects instead of soft deletes
+
+v8.3.38 (2023-11-06)
+-------------------------
+ * Deactivate schedules along with their broadcast/trigger if they have no more firing to do
+
+v8.3.37 (2023-11-03)
+-------------------------
+ * Rework schedule firing so that we load the trigger
+
+v8.3.36 (2023-11-02)
+-------------------------
+ * Rework flow start tasks to not require flow_type
+
+v8.3.35 (2023-11-01)
+-------------------------
+ * Remove logrus usage and hook sentry to slog
+ * Update to latest gocommon
+
+v8.3.34 (2023-10-27)
+-------------------------
+ * Update to latest goflow
+ * Replace more logrus use by slog
+
+v8.3.33 (2023-10-13)
+-------------------------
+ * Read from Trigger.keywords instead of keyword
+ * Update deps
+ * Replace more logrus use with slog
+
+v8.3.32 (2023-10-10)
+-------------------------
+ * Update to latest goflow
+ * Fix filtering by trigger optional channel
+ * Use more slog, replacing logrus
+
+v8.3.31 (2023-10-05)
+-------------------------
+ * Update test database
+
+v8.3.30 (2023-10-04)
+-------------------------
+ * Add optin to channelevent
+
+v8.3.29 (2023-10-02)
+-------------------------
+ * Fix loading of scheduled broadcast with optin
+
+v8.3.28 (2023-10-02)
+-------------------------
+ * Ensure child broadcasts are saved with parent's optin
+
+v8.3.27 (2023-10-02)
+-------------------------
+ * Update to latest goflow
+ * Fix scheduled broadcasts and optins
+
+v8.3.26 (2023-09-27)
+-------------------------
+ * Simplify where we load a single contact and ignore events rather than error where contact no longer exists
+
+v8.3.25 (2023-09-27)
+-------------------------
+ * Update to latest goflow
+ * Simplify queuing of optin requests to courier
+
+v8.3.24 (2023-09-26)
+-------------------------
+ * Update to latest goflow
+
+v8.3.23 (2023-09-25)
+-------------------------
+ * Fix loading of channel features and queuing of optin messages
+ * Use optin msg type
+ * Update to latest goflow
+ * Simplify loading org assets of different types
+ * Replace more logrus with slog
+ * Use optin on broadcast to set urn_auth when queueing to courier
+
+v8.3.22 (2023-09-22)
+-------------------------
+ * Switch to go 1.21 and start switching to slog
+
+v8.3.21 (2023-09-21)
+-------------------------
+ * Switch to using optin ids instead of UUIDs
+ * Update to latest goflow
+ * Handle optin_requested events
+
+v8.3.20 (2023-09-19)
+-------------------------
+ * Add NOOP handler for optin_created events and queue messages to courier with type
+ * Cleanup functions use to load org assets
+ * Tweak waiting for locks for contacts
+ * Create optin flow triggers for optin channel events
+ * Implement loading optin assets
+
+v8.3.19 (2023-09-14)
+-------------------------
+ * Fix stop contact task name
+
+v8.3.18 (2023-09-14)
+-------------------------
+ * Add support for optin/optout triggers and channel events
+
+v8.3.17 (2023-09-12)
+-------------------------
+ * Fix not supporting channel events with extra with non-string values
+ * Update test database based on https://github.com/nyaruka/rapidpro/pull/4819
+
+v8.3.16 (2023-09-12)
+-------------------------
+ * Stop reading ContactURN.auth and remove from model
+
+v8.3.15 (2023-09-11)
+-------------------------
+ * Start reading and writing ContactURN.auth_tokens
+
+v8.3.14 (2023-09-11)
+-------------------------
+ * Remove support for delegate channels
+
+v8.3.13 (2023-09-11)
+-------------------------
+ * Just noop if trying to sync an Android channel that doesn't have an FM ID
+
+v8.3.12 (2023-09-11)
+-------------------------
+ * Remove encoding URN priority in URN strings as it's not used
+ * Remove having auth as a URN param
+ * Rework message sending so that URNs are loaded before queueing
+ * Update to latest null library and use Map[string] for channel events extra
+
+v8.3.11 (2023-09-05)
+-------------------------
+ * Update to latest goflow
+
+v8.3.10 (2023-09-04)
+-------------------------
+ * Update Twilio's list of supported language codes for IVR and do a better job of picking one
+ * Update to latest goflow
+ * More simplification of db/tx params
+
+v8.3.9 (2023-08-30)
+-------------------------
+ * Make it easier to create messages in tests
+ * Add contact task to delete a message
+
+v8.3.8 (2023-08-29)
+-------------------------
+ * Use less sqlx and tidy up use of interfaces where functions can take a DB or Tx
+
+v8.3.7 (2023-08-23)
+-------------------------
+ * Use input_collation when matching msg triggers
+
+v8.3.6 (2023-08-23)
+-------------------------
+ * Use input_collation set on org
+
+v8.3.5 (2023-08-21)
+-------------------------
+ * Use low priority tasks for batches of big blasts
+
+v8.3.4 (2023-08-21)
+-------------------------
+ * Update to latest goflow that replaces input_cleaners with input_collation
+ * Test on Postgres 15
+
+v8.3.3 (2023-08-17)
+-------------------------
+ * Read input cleaners from org
+ * Update to latest goflow which changes some stuff about environments
+
+v8.3.2 (2023-08-11)
+-------------------------
+ * Update to latest goflow
+
+v8.3.1 (2023-08-10)
+-------------------------
+ * Always use main db to load contacts for msg events from new contacts
+
+v8.3.0 (2023-08-09)
+-------------------------
+ * Update to latest goflow
+ * Update to go 1.20
+
 v8.2.0 (2023-07-31)
 -------------------------
  * Add dockerfile for dev

@@ -23,17 +23,19 @@ type Task struct {
 type Priority int
 
 const (
-	queuePattern  = "%s:%d"
-	activePattern = "%s:active"
+	// HighPriority is the highest priority for tasks
+	HighPriority = Priority(-10000000)
 
 	// DefaultPriority is the default priority for tasks
 	DefaultPriority = Priority(0)
 
-	// HighPriority is the highest priority for tasks
-	HighPriority = Priority(-10000000)
-
 	// LowPriority is the lowest priority for tasks
 	LowPriority = Priority(+10000000)
+)
+
+const (
+	queuePattern  = "%s:%d"
+	activePattern = "%s:active"
 
 	// BatchQueue is our queue for batch tasks, most things that operate on more than one cotact at a time
 	BatchQueue = "batch"
@@ -64,7 +66,7 @@ func Size(rc redis.Conn, queue string) (int, error) {
 }
 
 // AddTask adds the passed in task to our queue for execution
-func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task interface{}, priority Priority) error {
+func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task any, priority Priority) error {
 	score := strconv.FormatFloat(float64(time.Now().UnixNano()/int64(time.Microsecond))/float64(1000000)+float64(priority), 'f', 6, 64)
 
 	taskBody, err := json.Marshal(task)

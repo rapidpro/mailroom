@@ -217,7 +217,7 @@ func TestStartFlowTask(t *testing.T) {
 		testsuite.ReindexElastic(ctx)
 
 		// handle our start task
-		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID).
+		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, tc.flowID).
 			WithGroupIDs(tc.groupIDs).
 			WithExcludeGroupIDs(tc.excludeGroupIDs).
 			WithContactIDs(tc.contactIDs).

@@ -2,10 +2,11 @@ package starts
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/search"
@@ -13,7 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -70,7 +70,7 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 
 	if start.CreateContact {
 		// if we are meant to create a new contact, do so
-		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", i18n.NilLanguage, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}
@@ -112,37 +112,44 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, start *mod
 		return nil
 	}
 
+	// split the contact ids into batches to become batch tasks
+	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
+
 	// by default we start in the batch queue unless we have two or fewer contacts
 	q := queue.BatchQueue
 	if len(contactIDs) <= 2 {
 		q = queue.HandlerQueue
 	}
 
+	// if this is a big multi batch blast, give it low priority
+	priority := queue.DefaultPriority
+	if len(idBatches) > 1 {
+		priority = queue.LowPriority
+	}
+
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	// create tasks for batches of contacts
-	idBatches := models.ChunkSlice(contactIDs, startBatchSize)
 	for i, idBatch := range idBatches {
 		isLast := (i == len(idBatches)-1)
 
-		batch := start.CreateBatch(idBatch, isLast, len(contactIDs))
+		batch := start.CreateBatch(idBatch, flow.FlowType(), isLast, len(contactIDs))
 
 		// task is different if we are an IVR flow
 		var batchTask tasks.Task
-		if start.FlowType == models.FlowTypeVoice {
+		if flow.FlowType() == models.FlowTypeVoice {
 			batchTask = &ivr.StartIVRFlowBatchTask{FlowStartBatch: batch}
 		} else {
 			batchTask = &StartFlowBatchTask{FlowStartBatch: batch}
 		}
 
-		err = tasks.Queue(rc, q, start.OrgID, batchTask, queue.DefaultPriority)
+		err = tasks.Queue(rc, q, start.OrgID, batchTask, priority)
 		if err != nil {
 			if i == 0 {
 				return errors.Wrap(err, "error queuing flow start batch")
 			}
 			// if we've already queued other batches.. we don't want to error and have the task be retried
-			logrus.WithError(err).Error("error queuing flow start batch")
+			slog.Error("error queuing flow start batch", "error", err)
 		}
 	}
 

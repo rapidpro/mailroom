@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"log/slog"
+	"os"
+
 	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/goflow/utils/smtpx"
-
-	"github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -31,15 +33,16 @@ func main() {
 
 	client, err := smtpx.NewClientFromURL(options.URL)
 	if err != nil {
-		logrus.WithError(err).Fatalf("unable to parse smtp config: %s", options.URL)
+		slog.Error(fmt.Sprintf("unable to parse smtp config: %s", options.URL), "error", err)
+		os.Exit(1)
 	}
 
 	m := smtpx.NewMessage([]string{options.To}, options.Subject, options.Body, "")
 
 	err = smtpx.Send(client, m, nil)
 	if err != nil {
-		logrus.WithError(err).Fatal("error sending email")
+		slog.Error("error sending email", "error", err)
 	}
 
-	logrus.Info("email sent")
+	slog.Info("email sent")
 }

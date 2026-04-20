@@ -72,7 +72,8 @@ func TestInterruptChannel(t *testing.T) {
 	testdata.InsertErroredOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
 	// just to create courier queues
-	err := msgs.RetryErroredMessages(ctx, rt)
+	cron := &msgs.RetryMessagesCron{}
+	_, err := cron.Run(ctx, rt)
 	require.NoError(t, err)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{

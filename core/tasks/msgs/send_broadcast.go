@@ -2,6 +2,7 @@ package msgs
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/goflow/contactql"
@@ -11,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -105,7 +105,7 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 				return errors.Wrap(err, "error queuing broadcast batch")
 			}
 			// if we've already queued other batches.. we don't want to error and have the task be retried
-			logrus.WithError(err).Error("error queuing broadcast batch")
+			slog.Error("error queuing broadcast batch", "error", err)
 		}
 	}
 

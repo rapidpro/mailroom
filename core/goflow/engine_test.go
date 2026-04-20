@@ -8,10 +8,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,24 +54,6 @@ func TestSimulatorAirtime(t *testing.T) {
 		DesiredAmount: decimal.RequireFromString(`1.50`),
 		ActualAmount:  decimal.RequireFromString(`1.50`),
 	}, transfer)
-}
-
-func TestSimulatorTicket(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-
-	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
-	require.NoError(t, err)
-
-	svc, err := goflow.Simulator(rt.Config).Services().Ticket(flows.NewTicketer(ticketer))
-	assert.NoError(t, err)
-
-	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	require.NoError(t, err)
-
-	ticket, err := svc.Open(nil, nil, oa.SessionAssets().Topics().FindByName("General"), "Where are my cookies?", nil, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer().UUID())
-	assert.Equal(t, "Where are my cookies?", ticket.Body())
 }
 
 func TestSimulatorWebhook(t *testing.T) {

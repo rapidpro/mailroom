@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -14,8 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/edganiukov/fcm"
 )
 
 type MockFCMEndpoint struct {
@@ -42,7 +41,7 @@ func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{}`))
 	} else {
-		w.WriteHeader(200)
+		w.WriteHeader(401)
 		w.Write([]byte(`{"error": "bad_token"}`))
 	}
 }
@@ -62,7 +61,7 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 	return mock
 }
 
-func TestSyncAndroidChannels(t *testing.T) {
+func TestSyncAndroidChannel(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
@@ -71,9 +70,9 @@ func TestSyncAndroidChannels(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Android channels
-	testChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
-	testChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
-	testChannel3 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
+	testChannel1 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 1", "123", []string{"tel"}, "SR", map[string]any{"FCM_ID": ""})       // no FCM ID
+	testChannel2 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 2", "234", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID2"}) // invalid FCM ID
+	testChannel3 := testdata.InsertChannel(rt, testdata.Org1, "A", "Android 3", "456", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID3"}) // valid FCM ID
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -82,7 +81,14 @@ func TestSyncAndroidChannels(t *testing.T) {
 	channel2 := oa.ChannelByID(testChannel2.ID)
 	channel3 := oa.ChannelByID(testChannel3.ID)
 
-	msgio.SyncAndroidChannels(fc, []*models.Channel{channel1, channel2, channel3})
+	err = msgio.SyncAndroidChannel(nil, channel1)
+	assert.EqualError(t, err, "instance has no FCM configuration")
+	err = msgio.SyncAndroidChannel(fc, channel1)
+	assert.NoError(t, err)
+	err = msgio.SyncAndroidChannel(fc, channel2)
+	assert.EqualError(t, err, "error syncing channel: 401 error: 401 Unauthorized")
+	err = msgio.SyncAndroidChannel(fc, channel3)
+	assert.NoError(t, err)
 
 	// check that we try to sync the 2 channels with FCM IDs, even tho one fails
 	assert.Equal(t, 2, len(mockFCM.Messages))
@@ -91,7 +97,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 
 	assert.Equal(t, "high", mockFCM.Messages[0].Priority)
 	assert.Equal(t, "sync", mockFCM.Messages[0].CollapseKey)
-	assert.Equal(t, map[string]interface{}{"msg": "sync"}, mockFCM.Messages[0].Data)
+	assert.Equal(t, map[string]any{"msg": "sync"}, mockFCM.Messages[0].Data)
 }
 
 func TestCreateFCMClient(t *testing.T) {

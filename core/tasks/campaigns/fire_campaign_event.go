@@ -3,6 +3,8 @@ package campaigns
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -16,11 +18,8 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 )
 
 // TypeFireCampaignEvent is the type of the fire event task
@@ -60,7 +59,7 @@ func (t *FireCampaignEventTask) Timeout() time.Duration {
 func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	db := rt.DB
 	rp := rt.RP
-	log := logrus.WithField("comp", "campaign_worker").WithField("event_id", t.EventID)
+	log := slog.With("comp", "campaign_worker", "event_id", t.EventID)
 
 	// grab all the fires for this event
 	fires, err := models.LoadEventFires(ctx, db, t.FireIDs)
@@ -68,9 +67,9 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
 		for _, id := range t.FireIDs {
-			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", id))
+			rerr := campaignsMarker.Rem(rc, fmt.Sprintf("%d", id))
 			if rerr != nil {
-				log.WithError(rerr).WithField("fire_id", id).Error("error unmarking campaign fire")
+				log.Error("error unmarking campaign fire", "error", rerr, "fire_id", id)
 			}
 		}
 		rc.Close()
@@ -100,9 +99,9 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 
 	for _, f := range fires {
 		if !handledSet[f] {
-			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", f.FireID))
+			rerr := campaignsMarker.Rem(rc, fmt.Sprintf("%d", f.FireID))
 			if rerr != nil {
-				log.WithError(rerr).WithField("fire_id", f.FireID).Error("error unmarking campaign fire")
+				log.Error("error unmarking campaign fire", "error", rerr, "fire_id", f.FireID)
 			}
 		}
 	}
@@ -232,7 +231,7 @@ func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime, orgID models.O
 
 	_, err = runner.StartFlow(ctx, rt, oa, dbFlow, maps.Keys(firesToFire), options)
 	if err != nil {
-		logrus.WithError(err).Errorf("error starting flow for campaign event: %s", eventUUID)
+		slog.Error("error starting flow for campaign event", "error", err, "event", eventUUID)
 	}
 
 	// log both our total and average

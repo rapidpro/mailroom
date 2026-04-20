@@ -30,7 +30,7 @@ func TestRetries(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID})
 
 	err := tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
@@ -48,8 +48,10 @@ func TestRetries(t *testing.T) {
 	rt.DB.MustExec(`UPDATE ivr_call SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
 
 	// fire our retries
-	err = ivrtasks.RetryCalls(ctx, rt)
+	cron := &ivrtasks.RetryCron{}
+	res, err := cron.Run(ctx, rt)
 	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"retried": 1}, res)
 
 	// should now be in wired state
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
@@ -60,7 +62,7 @@ func TestRetries(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	models.FlushCache()
-	err = ivrtasks.RetryCalls(ctx, rt)
+	_, err = cron.Run(ctx, rt)
 	assert.NoError(t, err)
 
 	// this time should be failed

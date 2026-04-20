@@ -3,35 +3,44 @@ package expirations
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	expireBatchSize = 500
 )
 
-var expirationsMarker = redisx.NewIntervalSet("run_expirations", time.Hour*24, 2)
-
 func init() {
-	mailroom.RegisterCron("run_expirations", time.Minute, false, HandleWaitExpirations)
-	mailroom.RegisterCron("expire_ivr_calls", time.Minute, false, ExpireVoiceSessions)
+	tasks.RegisterCron("run_expirations", false, NewExpirationsCron())
+	tasks.RegisterCron("expire_ivr_calls", false, &VoiceExpirationsCron{})
 }
 
-// HandleWaitExpirations handles waiting messaging sessions whose waits have expired, resuming those that can be resumed,
-// and expiring those that can't
-func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "expirer")
-	start := time.Now()
+type ExpirationsCron struct {
+	marker *redisx.IntervalSet
+}
 
+func NewExpirationsCron() *ExpirationsCron {
+	return &ExpirationsCron{
+		marker: redisx.NewIntervalSet("run_expirations", time.Hour*24, 2),
+	}
+}
+
+func (c *ExpirationsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
+}
+
+// handles waiting messaging sessions whose waits have expired, resuming those that can be resumed,
+// and expiring those that can't
+func (c *ExpirationsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
@@ -41,7 +50,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	// select messaging sessions with expired waits
 	rows, err := rt.DB.QueryxContext(ctx, sqlSelectExpiredWaits)
 	if err != nil {
-		return errors.Wrapf(err, "error querying for expired waits")
+		return nil, errors.Wrapf(err, "error querying for expired waits")
 	}
 	defer rows.Close()
 
@@ -51,7 +60,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		expiredWait := &ExpiredWait{}
 		err := rows.StructScan(expiredWait)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning expired wait")
+			return nil, errors.Wrapf(err, "error scanning expired wait")
 		}
 
 		// if it can't be resumed, add to batch to be expired
@@ -62,7 +71,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 			if len(expiredSessions) == expireBatchSize {
 				err = models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 				if err != nil {
-					return errors.Wrapf(err, "error expiring batch of sessions")
+					return nil, errors.Wrapf(err, "error expiring batch of sessions")
 				}
 				expiredSessions = expiredSessions[:0]
 			}
@@ -73,9 +82,9 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 
 		// create a contact task to resume this session
 		taskID := fmt.Sprintf("%d:%s", expiredWait.SessionID, expiredWait.WaitExpiresOn.Format(time.RFC3339))
-		queued, err := expirationsMarker.Contains(rc, taskID)
+		queued, err := c.marker.IsMember(rc, taskID)
 		if err != nil {
-			return errors.Wrapf(err, "error checking whether expiration is queued")
+			return nil, errors.Wrapf(err, "error checking whether expiration is queued")
 		}
 
 		// already queued? move on
@@ -88,13 +97,13 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		task := handler.NewExpirationTask(expiredWait.OrgID, expiredWait.ContactID, expiredWait.SessionID, expiredWait.WaitExpiresOn)
 		err = handler.QueueHandleTask(rc, expiredWait.ContactID, task)
 		if err != nil {
-			return errors.Wrapf(err, "error adding new expiration task")
+			return nil, errors.Wrapf(err, "error adding new expiration task")
 		}
 
 		// and mark it as queued
-		err = expirationsMarker.Add(rc, taskID)
+		err = c.marker.Add(rc, taskID)
 		if err != nil {
-			return errors.Wrapf(err, "error marking expiration task as queued")
+			return nil, errors.Wrapf(err, "error marking expiration task as queued")
 		}
 
 		numQueued++
@@ -104,12 +113,11 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	if len(expiredSessions) > 0 {
 		err = models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 		if err != nil {
-			return errors.Wrapf(err, "error expiring runs and sessions")
+			return nil, errors.Wrapf(err, "error expiring runs and sessions")
 		}
 	}
 
-	log.WithField("expired", numExpired).WithField("dupes", numDupes).WithField("queued", numQueued).WithField("elapsed", time.Since(start)).Info("session expirations queued")
-	return nil
+	return map[string]any{"expired": numExpired, "dupes": numDupes, "queued": numQueued}, nil
 }
 
 const sqlSelectExpiredWaits = `
@@ -127,10 +135,15 @@ type ExpiredWait struct {
 	ContactID     models.ContactID `db:"contact_id"`
 }
 
-// ExpireVoiceSessions looks for voice sessions that should be expired and ends them
-func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "ivr_cron_expirer")
-	start := time.Now()
+type VoiceExpirationsCron struct{}
+
+func (c *VoiceExpirationsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
+}
+
+// looks for voice sessions that should be expired and ends them
+func (c *VoiceExpirationsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
+	log := slog.With("comp", "ivr_cron_expirer")
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
@@ -138,7 +151,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	// select voice sessions with expired waits
 	rows, err := rt.DB.QueryxContext(ctx, sqlSelectExpiredVoiceWaits)
 	if err != nil {
-		return errors.Wrapf(err, "error querying for expired waits")
+		return nil, errors.Wrapf(err, "error querying for expired waits")
 	}
 	defer rows.Close()
 
@@ -149,7 +162,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		expiredWait := &ExpiredVoiceWait{}
 		err := rows.StructScan(expiredWait)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning expired wait")
+			return nil, errors.Wrapf(err, "error scanning expired wait")
 		}
 
 		// add the session to those we need to expire
@@ -158,7 +171,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		// load our call
 		conn, err := models.GetCallByID(ctx, rt.DB, expiredWait.OrgID, expiredWait.CallID)
 		if err != nil {
-			log.WithError(err).WithField("call_id", expiredWait.CallID).Error("unable to load call")
+			log.Error("unable to load call", "error", err, "call_id", expiredWait.CallID)
 			continue
 		}
 
@@ -166,7 +179,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		clog, err := ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
 			// log error but carry on with other calls
-			log.WithError(err).WithField("call_id", conn.ID()).Error("error hanging up call")
+			log.Error("error hanging up call", "error", err, "call_id", conn.ID())
 		}
 
 		if clog != nil {
@@ -178,16 +191,15 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	if len(expiredSessions) > 0 {
 		err := models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 		if err != nil {
-			log.WithError(err).Error("error expiring sessions for expired calls")
+			log.Error("error expiring sessions for expired calls", "error", err)
 		}
-		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on call")
 	}
 
 	if err := models.InsertChannelLogs(ctx, rt, clogs); err != nil {
-		return errors.Wrap(err, "error inserting channel logs")
+		return nil, errors.Wrap(err, "error inserting channel logs")
 	}
 
-	return nil
+	return map[string]any{"expired": len(expiredSessions)}, nil
 }
 
 const sqlSelectExpiredVoiceWaits = `

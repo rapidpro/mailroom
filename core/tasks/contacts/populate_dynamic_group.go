@@ -3,6 +3,7 @@ package contacts
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
@@ -11,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // TypePopulateDynamicGroup is the type of the populate group task
@@ -48,13 +48,8 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 	defer locker.Release(rt.RP, lock)
 
 	start := time.Now()
-	log := logrus.WithFields(logrus.Fields{
-		"group_id": t.GroupID,
-		"org_id":   orgID,
-		"query":    t.Query,
-	})
 
-	log.Info("starting population of smart group")
+	slog.Info("starting population of smart group", "group_id", t.GroupID, "org_id", orgID, "query", t.Query)
 
 	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
@@ -65,7 +60,7 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 	if err != nil {
 		return errors.Wrapf(err, "error populating smart group: %d", t.GroupID)
 	}
-	logrus.WithField("elapsed", time.Since(start)).WithField("count", count).Info("completed populating smart group")
+	slog.Info("completed populating smart group", "elapsed", time.Since(start), "count", count)
 
 	return nil
 }

@@ -1,15 +1,14 @@
 package web
 
 import (
-	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/middleware"
-	log "github.com/sirupsen/logrus"
 )
 
 func requestLogger(next http.Handler) http.Handler {
@@ -29,14 +28,8 @@ func requestLogger(next http.Handler) http.Handler {
 		ww.Header().Set("X-Elapsed-NS", strconv.FormatInt(int64(elapsed), 10))
 
 		if r.RequestURI != "/" {
-			log.WithFields(log.Fields{
-				"method":     r.Method,
-				"status":     ww.Status(),
-				"elapsed":    elapsed,
-				"length":     ww.BytesWritten(),
-				"url":        uri,
-				"user_agent": r.UserAgent(),
-			}).Info("request completed")
+			slog.Info("request completed", "method", r.Method, "status", ww.Status(), "elapsed", elapsed, "length", ww.BytesWritten(), "url", uri, "user_agent", r.UserAgent())
+
 		}
 	})
 }
@@ -47,7 +40,7 @@ func panicRecovery(next http.Handler) http.Handler {
 		defer func() {
 			if rvr := recover(); rvr != nil {
 				debug.PrintStack()
-				log.WithError(errors.New(fmt.Sprint(rvr))).Error("recovered from panic in web handling")
+				slog.Error("recovered from panic in web handling", "error", fmt.Sprint(rvr))
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()

@@ -1,7 +1,7 @@
 name: CI
 on: [push, pull_request]
 env:
-  go-version: "1.19.x"
+  go-version: "1.21.x"
 jobs:
   test:
     name: Test
@@ -13,7 +13,7 @@ jobs:
         ports:
           - 6379:6379
       postgres:
-        image: postgis/postgis:14-3.3-alpine
+        image: postgis/postgis:15-3.3-alpine
         env:
           POSTGRES_PASSWORD: temba
         ports:

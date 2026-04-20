@@ -4,12 +4,10 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/shopspring/decimal"
 )
 
@@ -18,7 +16,6 @@ var engInit, simulatorInit sync.Once
 
 var emailFactory func(*runtime.Config) engine.EmailServiceFactory
 var classificationFactory func(*runtime.Config) engine.ClassificationServiceFactory
-var ticketFactory func(*runtime.Config) engine.TicketServiceFactory
 var airtimeFactory func(*runtime.Config) engine.AirtimeServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
@@ -31,12 +28,6 @@ func RegisterEmailServiceFactory(f func(*runtime.Config) engine.EmailServiceFact
 // for use by the engine
 func RegisterClassificationServiceFactory(f func(*runtime.Config) engine.ClassificationServiceFactory) {
 	classificationFactory = f
-}
-
-// RegisterTicketServiceFactory can be used by outside callers to register a ticket service factory
-// for use by the engine
-func RegisterTicketServiceFactory(f func(*runtime.Config) engine.TicketServiceFactory) {
-	ticketFactory = f
 }
 
 // RegisterAirtimeServiceFactory can be used by outside callers to register a airtime factory
@@ -59,10 +50,11 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory(c)).
 			WithEmailServiceFactory(emailFactory(c)).
-			WithTicketServiceFactory(ticketFactory(c)).
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
+			WithMaxFieldChars(c.MaxValueLength).
+			WithMaxResultChars(c.MaxValueLength).
 			Build()
 	})
 
@@ -83,10 +75,11 @@ func Simulator(c *runtime.Config) flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory(c)). // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).      // but faked emails
-			WithTicketServiceFactory(simulatorTicketServiceFactory).    // and faked tickets
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).  // and faked airtime transfers
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
+			WithMaxFieldChars(c.MaxValueLength).
+			WithMaxResultChars(c.MaxValueLength).
 			Build()
 	})
 
@@ -101,18 +94,6 @@ type simulatorEmailService struct{}
 
 func (s *simulatorEmailService) Send(addresses []string, subject, body string) error {
 	return nil
-}
-
-func simulatorTicketServiceFactory(ticketer *flows.Ticketer) (flows.TicketService, error) {
-	return &simulatorTicketService{ticketer: ticketer}, nil
-}
-
-type simulatorTicketService struct {
-	ticketer *flows.Ticketer
-}
-
-func (s *simulatorTicketService) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
 func simulatorAirtimeServiceFactory(flows.SessionAssets) (flows.AirtimeService, error) {

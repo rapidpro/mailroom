@@ -2,17 +2,15 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/services/tickets"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -23,10 +21,7 @@ func init() {
 func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.TicketOpenedEvent)
 
-	ticketer := oa.TicketerByUUID(event.Ticket.Ticketer.UUID)
-	if ticketer == nil {
-		return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticket.Ticketer.UUID)
-	}
+	slog.Debug("ticket opened", "contact", scene.ContactUUID(), "session", scene.SessionID(), "ticket", event.Ticket.UUID)
 
 	var topicID models.TopicID
 	if event.Ticket.Topic != nil {
@@ -61,26 +56,12 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		scene.UserID(),
 		openedInID,
 		scene.ContactID(),
-		ticketer.ID(),
-		event.Ticket.ExternalID,
 		topicID,
 		event.Ticket.Body,
 		assigneeID,
-		map[string]interface{}{
-			"contact-uuid":    scene.Contact().UUID(),
-			"contact-display": tickets.GetContactDisplay(oa.Env(), scene.Contact()),
-		},
 	)
 
 	scene.AppendToEventPreCommitHook(hooks.InsertTicketsHook, ticket)
-
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid":  scene.ContactUUID(),
-		"session_id":    scene.SessionID(),
-		"ticket_uuid":   event.Ticket.UUID,
-		"ticketer_uuid": ticketer.UUID(),
-		"ticketer_name": ticketer.Name(),
-	}).Debug("ticket opened")
 
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -23,7 +23,7 @@ func init() {
 //	  "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
 //	}
 type changeLanguageRequest struct {
-	Language envs.Language   `json:"language" validate:"required"`
+	Language i18n.Language   `json:"language" validate:"required"`
 	Flow     json.RawMessage `json:"flow"     validate:"required"`
 }
 

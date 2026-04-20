@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -35,8 +35,10 @@ func TestQueueEventFires(t *testing.T) {
 	org2CampaignEvent := testdata.InsertCampaignFlowEvent(rt, org2Campaign, testdata.Org2Favorites, testdata.AgeField, 1, "D")
 
 	// try with zero fires
-	err := campaigns.QueueEventFires(ctx, rt)
+	cron := &campaigns.QueueEventsCron{}
+	res, err := cron.Run(ctx, rt)
 	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"fires": 0, "dupes": 0, "tasks": 0}, res)
 
 	assertFireTasks(t, rt, testdata.Org1, [][]models.FireID{})
 	assertFireTasks(t, rt, testdata.Org2, [][]models.FireID{})
@@ -49,15 +51,17 @@ func TestQueueEventFires(t *testing.T) {
 	testdata.InsertEventFire(rt, testdata.Alexandria, testdata.RemindersEvent1, time.Now().Add(time.Hour*24)) // in future
 
 	// schedule our campaign to be started
-	err = campaigns.QueueEventFires(ctx, rt)
+	res, err = cron.Run(ctx, rt)
 	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"fires": 4, "dupes": 0, "tasks": 3}, res)
 
 	assertFireTasks(t, rt, testdata.Org1, [][]models.FireID{{fire1ID, fire2ID}, {fire4ID}})
 	assertFireTasks(t, rt, testdata.Org2, [][]models.FireID{{fire3ID}})
 
 	// running again won't double add those fires
-	err = campaigns.QueueEventFires(ctx, rt)
+	res, err = cron.Run(ctx, rt)
 	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"fires": 4, "dupes": 4, "tasks": 0}, res)
 
 	assertFireTasks(t, rt, testdata.Org1, [][]models.FireID{{fire1ID, fire2ID}, {fire4ID}})
 	assertFireTasks(t, rt, testdata.Org2, [][]models.FireID{{fire3ID}})
@@ -68,12 +72,13 @@ func TestQueueEventFires(t *testing.T) {
 
 	// add 110 scheduled event fires to test batch limits
 	for i := 0; i < 110; i++ {
-		contact := testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), envs.NilLanguage, models.ContactStatusActive)
+		contact := testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), i18n.NilLanguage, models.ContactStatusActive)
 		testdata.InsertEventFire(rt, contact, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 	}
 
-	err = campaigns.QueueEventFires(ctx, rt)
+	res, err = cron.Run(ctx, rt)
 	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"fires": 114, "dupes": 4, "tasks": 2}, res)
 
 	queuedTasks := testsuite.CurrentTasks(t, rt)
 	org1Tasks := queuedTasks[testdata.Org1.ID]
@@ -104,7 +109,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	f2ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 
 	// queue the event task
-	err := campaigns.QueueEventFires(ctx, rt)
+	cron := &campaigns.QueueEventsCron{}
+	_, err := cron.Run(ctx, rt)
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -124,15 +130,15 @@ func TestQueueAndFireEvent(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
 
 	// the event fires should be marked as fired
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f1ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f1ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
 
 	// create due fires for George and Bob for a different event that skips
 	f3ID := testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
 	f4ID := testdata.InsertEventFire(rt, testdata.Bob, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
 
 	// queue the event task
-	err = campaigns.QueueEventFires(ctx, rt)
+	_, err = cron.Run(ctx, rt)
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -151,8 +157,8 @@ func TestQueueAndFireEvent(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.Bob.ID, testdata.PickANumber.ID).Returns(1)
 
 	// the event fires should be marked as fired
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f3ID).Columns(map[string]interface{}{"fired": true, "fired_result": "S"})
-	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f4ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f3ID).Columns(map[string]any{"fired": true, "fired_result": "S"})
+	assertdb.Query(t, rt.DB, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f4ID).Columns(map[string]any{"fired": true, "fired_result": "F"})
 }
 
 func TestIVRCampaigns(t *testing.T) {
@@ -169,7 +175,8 @@ func TestIVRCampaigns(t *testing.T) {
 	testdata.InsertEventFire(rt, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 
 	// schedule our campaign to be started
-	err := campaigns.QueueEventFires(ctx, rt)
+	cron := &campaigns.QueueEventsCron{}
+	_, err := cron.Run(ctx, rt)
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -208,7 +215,7 @@ func assertFireTasks(t *testing.T, rt *runtime.Runtime, org *testdata.Org, expec
 		payload, err := jsonx.DecodeGeneric(task.Task)
 		require.NoError(t, err)
 
-		taskFireInts := payload.(map[string]interface{})["fire_ids"].([]interface{})
+		taskFireInts := payload.(map[string]any)["fire_ids"].([]any)
 		taskFireIDs := make([]models.FireID, len(taskFireInts))
 		for i := range taskFireInts {
 			id, _ := strconv.Atoi(string(taskFireInts[i].(json.Number)))

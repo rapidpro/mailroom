@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -25,9 +26,8 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type CallID string
@@ -67,7 +67,7 @@ type Service interface {
 
 	HangupCall(externalID string) (*httpx.Trace, error)
 
-	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
+	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 	WriteRejectResponse(w http.ResponseWriter) error
 	WriteErrorResponse(w http.ResponseWriter, err error) error
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
@@ -132,7 +132,7 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, call *models.Call) (*m
 	}
 
 	if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
-		logrus.WithError(err).Error("error attaching ivr channel log")
+		slog.Error("error attaching ivr channel log", "error", err)
 	}
 
 	return clog, err
@@ -199,7 +199,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 	// log any error inserting our channel log, but continue
 	if clog != nil {
 		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
-			logrus.WithError(err).Error("error inserting channel log")
+			slog.Error("error inserting channel log", "error", err)
 		}
 	}
 
@@ -224,7 +224,7 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 
 			// we are at max calls, do not move on
 			if count >= maxCalls {
-				logrus.WithField("channel_id", channel.ID()).Info("call being queued, max concurrent reached")
+				slog.Info("call being queued, max concurrent reached", "channel_id", channel.ID())
 				err := call.MarkThrottled(ctx, rt.DB, time.Now())
 				if err != nil {
 					return nil, errors.Wrapf(err, "error marking call as throttled")
@@ -275,7 +275,7 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 		return clog, errors.Wrapf(err, "error updating session external id")
 	}
 	if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
-		logrus.WithError(err).Error("error attaching ivr channel log")
+		slog.Error("error attaching ivr channel log", "error", err)
 	}
 
 	return clog, nil
@@ -285,7 +285,7 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 func HandleAsFailure(ctx context.Context, db *sqlx.DB, svc Service, call *models.Call, w http.ResponseWriter, rootErr error) error {
 	err := call.MarkFailed(ctx, db, time.Now())
 	if err != nil {
-		logrus.WithError(err).Error("error marking call as failed")
+		slog.Error("error marking call as failed", "error", err)
 	}
 	return svc.WriteErrorResponse(w, rootErr)
 }
@@ -355,12 +355,12 @@ func StartIVRFlow(
 	if !start.ParentSummary.IsNull() {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			FlowAction(history, json.RawMessage(start.ParentSummary)).
-			WithCall(channel.ChannelReference(), urn).
+			WithCall(channel.Reference(), urn).
 			Build()
 	} else {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			Manual().
-			WithCall(channel.ChannelReference(), urn).
+			WithCall(channel.Reference(), urn).
 			WithParams(params).
 			Build()
 	}
@@ -390,7 +390,7 @@ func StartIVRFlow(
 	}
 
 	// have our service output our session status
-	err = svc.WriteSessionResponse(ctx, rt, channel, call, sessions[0], urn, resumeURL, r, w)
+	err = svc.WriteSessionResponse(ctx, rt, oa, channel, call, sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -430,7 +430,7 @@ func ResumeIVRFlow(
 	if call.Status() == models.CallStatusErrored || call.Status() == models.CallStatusFailed {
 		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusInterrupted)
 		if err != nil {
-			logrus.WithError(err).Error("error interrupting session")
+			slog.Error("error interrupting session", "error", err)
 		}
 
 		return svc.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
@@ -506,14 +506,14 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.CallStatusInProgress {
-		err = svc.WriteSessionResponse(ctx, rt, channel, call, session, urn, resumeURL, r, w)
+		err = svc.WriteSessionResponse(ctx, rt, oa, channel, call, session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
 	} else {
 		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusCompleted)
 		if err != nil {
-			logrus.WithError(err).Error("error closing session")
+			slog.Error("error closing session", "error", err)
 		}
 
 		return svc.WriteErrorResponse(w, fmt.Errorf("call completed"))
@@ -545,9 +545,9 @@ func buildMsgResume(
 			time.Sleep(time.Second)
 
 			if resp != nil {
-				logrus.WithField("retry", retry).WithField("status", resp.StatusCode).WithField("url", resume.Attachment.URL()).Info("retrying download of attachment")
+				slog.Info("retrying download of attachment", "retry", retry, "status", resp.StatusCode, "url", resume.Attachment.URL())
 			} else {
-				logrus.WithError(err).WithField("retry", retry).WithField("url", resume.Attachment.URL()).Info("retrying download of attachment")
+				slog.Info("retrying download of attachment", "error", err, "retry", retry, "url", resume.Attachment.URL())
 			}
 		}
 
@@ -573,7 +573,7 @@ func buildMsgResume(
 		attachments = []utils.Attachment{resume.Attachment}
 	}
 
-	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), resume.Input, attachments)
+	msgIn := flows.NewMsgIn(msgUUID, urn, channel.Reference(), resume.Input, attachments)
 
 	// create an incoming message
 	msg := models.NewIncomingIVR(rt.Config, oa.OrgID(), call, msgIn, time.Now())

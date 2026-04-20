@@ -1,9 +1,0 @@
-PUT /api/v2/tickets/update_many.json?ids=12,14 HTTP/1.1
-Host: nyaruka.zendesk.com
-User-Agent: Go-http-client/1.1
-Content-Length: 30
-Authorization: Bearer ****************
-Content-Type: application/json
-Accept-Encoding: gzip
-
-{"ticket":{"status":"closed"}}

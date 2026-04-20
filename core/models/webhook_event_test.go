@@ -15,6 +15,11 @@ import (
 func TestWebhookEvents(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
+	defer func() {
+		rt.DB.MustExec(`DELETE FROM api_webhookevent`)
+		rt.DB.MustExec(`DELETE FROM api_resthook`)
+	}()
+
 	// create a resthook to insert against
 	var resthookID models.ResthookID
 	rt.DB.Get(&resthookID, `INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'foo', 1, NOW(), NOW(), 1, 1) RETURNING id;`)

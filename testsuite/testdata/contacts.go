@@ -3,13 +3,14 @@ package testdata
 import (
 	"context"
 
+	"github.com/nyaruka/gocommon/i18n"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 )
 
 type Contact struct {
@@ -19,14 +20,23 @@ type Contact struct {
 	URNID models.URNID
 }
 
-func (c *Contact) Load(rt *runtime.Runtime, oa *models.OrgAssets) (*models.Contact, *flows.Contact) {
-	contacts, err := models.LoadContacts(context.Background(), rt.DB, oa, []models.ContactID{c.ID})
-	must(err, len(contacts) == 1)
+func (c *Contact) Load(rt *runtime.Runtime, oa *models.OrgAssets) (*models.Contact, *flows.Contact, []*models.ContactURN) {
+	ctx := context.Background()
 
-	flowContact, err := contacts[0].FlowContact(oa)
+	contact, err := models.LoadContact(ctx, rt.DB, oa, c.ID)
 	must(err)
 
-	return contacts[0], flowContact
+	flowContact, err := contact.FlowContact(oa)
+	must(err)
+
+	var urnIDs []models.URNID
+	err = rt.DB.SelectContext(ctx, &urnIDs, `SELECT id FROM contacts_contacturn WHERE contact_id = $1`, c.ID)
+	must(err)
+
+	urns, err := models.LoadContactURNs(ctx, rt.DB, urnIDs)
+	must(err)
+
+	return contact, flowContact, urns
 }
 
 type Group struct {
@@ -46,7 +56,7 @@ type Field struct {
 }
 
 // InsertContact inserts a contact
-func InsertContact(rt *runtime.Runtime, org *Org, uuid flows.ContactUUID, name string, language envs.Language, status models.ContactStatus) *Contact {
+func InsertContact(rt *runtime.Runtime, org *Org, uuid flows.ContactUUID, name string, language i18n.Language, status models.ContactStatus) *Contact {
 	var id models.ContactID
 	must(rt.DB.Get(&id,
 		`INSERT INTO contacts_contact (org_id, is_active, ticket_count, uuid, name, language, status, created_on, modified_on, created_by_id, modified_by_id) 
@@ -77,7 +87,7 @@ func InsertContactGroup(rt *runtime.Runtime, org *Org, uuid assets.GroupUUID, na
 }
 
 // InsertContactURN inserts a contact URN
-func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.URN, priority int) models.URNID {
+func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.URN, priority int, authTokens map[string]string) models.URNID {
 	scheme, path, _, display := urn.ToParts()
 
 	contactID := models.NilContactID
@@ -87,8 +97,8 @@ func InsertContactURN(rt *runtime.Runtime, org *Org, contact *Contact, urn urns.
 
 	var id models.URNID
 	must(rt.DB.Get(&id,
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, display, identity, priority) 
-		 VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id`, org.ID, contactID, scheme, path, display, urn.Identity(), priority,
+		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, display, identity, priority, auth_tokens) 
+		 VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`, org.ID, contactID, scheme, path, display, urn.Identity(), priority, jsonx.MustMarshal(authTokens),
 	))
 	return id
 }

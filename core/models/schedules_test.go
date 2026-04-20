@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -16,55 +16,24 @@ func TestGetExpired(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	// add a schedule and tie a broadcast to it
-	var s1 models.ScheduleID
-	err := rt.DB.Get(
-		&s1,
-		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
-			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '1 DAY', 1, 1, $1) RETURNING id`,
-		testdata.Org1.ID,
-	)
-	assert.NoError(t, err)
+	optIn := testdata.InsertOptIn(rt, testdata.Org1, "Polls")
 
-	testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+	// add a schedule and tie a broadcast to it
+	s1 := testdata.InsertSchedule(rt, testdata.Org1, models.RepeatPeriodNever, time.Now().Add(-24*time.Hour))
+
+	testdata.InsertBroadcast(rt, testdata.Org1, "eng", map[i18n.Language]string{"eng": "Test message", "fra": "Un Message"}, optIn, s1,
 		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
 
 	// add another and tie a trigger to it
-	var s2 models.ScheduleID
-	err = rt.DB.Get(
-		&s2,
-		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
-			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
-		testdata.Org1.ID,
-	)
-	assert.NoError(t, err)
-	var t1 models.TriggerID
-	err = rt.DB.Get(
-		&t1,
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
-			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
-		testdata.Org1.ID, testdata.Favorites.ID, s2,
-	)
-	assert.NoError(t, err)
+	s2 := testdata.InsertSchedule(rt, testdata.Org1, models.RepeatPeriodNever, time.Now().Add(-48*time.Hour))
 
-	// add a few contacts to the trigger
-	rt.DB.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
+	testdata.InsertScheduledTrigger(rt, testdata.Org1, testdata.Favorites, s2, []*testdata.Group{testdata.DoctorsGroup}, nil, []*testdata.Contact{testdata.Cathy, testdata.George})
 
-	// and a group
-	rt.DB.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, testdata.DoctorsGroup.ID)
-
-	var s3 models.ScheduleID
-	err = rt.DB.Get(
-		&s3,
-		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
-			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '3 DAY', 1, 1, $1) RETURNING id`,
-		testdata.Org1.ID,
-	)
-	assert.NoError(t, err)
+	s3 := testdata.InsertSchedule(rt, testdata.Org1, models.RepeatPeriodNever, time.Now().Add(-72*time.Hour))
 
 	// get expired schedules
-	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB)
+	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB.DB)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(schedules))
 
@@ -76,21 +45,22 @@ func TestGetExpired(t *testing.T) {
 
 	assert.Equal(t, s2, schedules[1].ID())
 	assert.Nil(t, schedules[1].Broadcast())
-	start := schedules[1].FlowStart()
-	assert.NotNil(t, start)
-	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
-	assert.Equal(t, testdata.Favorites.ID, start.FlowID)
-	assert.Equal(t, testdata.Org1.ID, start.OrgID)
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs)
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs)
+
+	trigger := schedules[1].Trigger()
+	assert.NotNil(t, trigger)
+	assert.Equal(t, testdata.Favorites.ID, trigger.FlowID())
+	assert.Equal(t, testdata.Org1.ID, trigger.OrgID())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, trigger.ContactIDs())
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, trigger.IncludeGroupIDs())
 
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()
 	assert.NotNil(t, bcast)
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, i18n.Language("eng"), bcast.BaseLanguage)
 	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
 	assert.Equal(t, "Test message", bcast.Translations["eng"].Text)
 	assert.Equal(t, "Un Message", bcast.Translations["fra"].Text)
+	assert.Equal(t, optIn.ID, bcast.OptInID)
 	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)

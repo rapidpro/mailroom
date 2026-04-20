@@ -18,7 +18,7 @@ var InsertStartHook models.EventCommitHook = &insertStartHook{}
 type insertStartHook struct{}
 
 // Apply inserts our starts
-func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
@@ -57,7 +57,7 @@ func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 			}
 
 			// create our start
-			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID()).
+			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.ID()).
 				WithGroupIDs(groupIDs).
 				WithContactIDs(contactIDs).
 				WithURNs(event.URNs).

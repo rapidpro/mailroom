@@ -48,42 +48,42 @@ func TestContactFieldChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Female"}'::jsonb`,
-					Args:  []interface{}{testdata.Cathy.ID, testdata.GenderField.UUID},
+					Args:  []any{testdata.Cathy.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
-					Args:  []interface{}{testdata.Cathy.ID, testdata.AgeField.UUID},
+					Args:  []any{testdata.Cathy.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
-					Args:  []interface{}{testdata.George.ID, testdata.GenderField.UUID},
+					Args:  []any{testdata.George.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"40", "number": 40}'::jsonb`,
-					Args:  []interface{}{testdata.George.ID, testdata.AgeField.UUID},
+					Args:  []any{testdata.George.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Male"}'::jsonb`,
-					Args:  []interface{}{testdata.Bob.ID, testdata.GenderField.UUID},
+					Args:  []any{testdata.Bob.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Old"}'::jsonb`,
-					Args:  []interface{}{testdata.Bob.ID, testdata.AgeField.UUID},
+					Args:  []any{testdata.Bob.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
-					Args:  []interface{}{testdata.Bob.ID, "unknown"},
+					Args:  []any{testdata.Bob.ID, "unknown"},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields = '{}'`,
-					Args:  []interface{}{testdata.Alexandria.ID},
+					Args:  []any{testdata.Alexandria.ID},
 					Count: 1,
 				},
 			},

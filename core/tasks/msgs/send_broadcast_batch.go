@@ -2,6 +2,7 @@ package msgs
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
@@ -9,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const TypeSendBroadcastBatch = "send_broadcast_batch"
@@ -38,7 +38,7 @@ func (t *SendBroadcastBatchTask) Perform(ctx context.Context, rt *runtime.Runtim
 		if t.BroadcastBatch.IsLast && t.BroadcastBatch.BroadcastID != models.NilBroadcastID {
 			err := models.MarkBroadcastSent(ctx, rt.DB, t.BroadcastBatch.BroadcastID)
 			if err != nil {
-				logrus.WithError(err).Error("error marking broadcast as sent")
+				slog.Error("error marking broadcast as sent", "error", err)
 			}
 		}
 	}()
@@ -54,6 +54,6 @@ func (t *SendBroadcastBatchTask) Perform(ctx context.Context, rt *runtime.Runtim
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	msgio.QueueMessages(ctx, rt, rt.DB, nil, msgs)
 	return nil
 }

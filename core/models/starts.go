@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 )
 
@@ -81,7 +81,6 @@ type FlowStart struct {
 	OrgID       OrgID      `json:"org_id"        db:"org_id"`
 	CreatedByID UserID     `json:"created_by_id" db:"created_by_id"`
 	FlowID      FlowID     `json:"flow_id"       db:"flow_id"`
-	FlowType    FlowType   `json:"flow_type"`
 
 	URNs            []urns.URN  `json:"urns,omitempty"`
 	ContactIDs      []ContactID `json:"contact_ids,omitempty"`
@@ -97,14 +96,8 @@ type FlowStart struct {
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID) *FlowStart {
-	return &FlowStart{
-		UUID:      uuids.New(),
-		OrgID:     orgID,
-		StartType: startType,
-		FlowType:  flowType,
-		FlowID:    flowID,
-	}
+func NewFlowStart(orgID OrgID, startType StartType, flowID FlowID) *FlowStart {
+	return &FlowStart{UUID: uuids.New(), OrgID: orgID, StartType: startType, FlowID: flowID}
 }
 
 func (s *FlowStart) WithGroupIDs(groupIDs []GroupID) *FlowStart {
@@ -163,25 +156,25 @@ func (s *FlowStart) WithParams(params json.RawMessage) *FlowStart {
 }
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int) error {
+func MarkStartStarted(ctx context.Context, db DBorTx, startID StartID, contactCount int) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	return errors.Wrapf(err, "error setting start as started")
 }
 
 // MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+func MarkStartComplete(ctx context.Context, db DBorTx, startID StartID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	return errors.Wrapf(err, "error marking flow start as complete")
 }
 
 // MarkStartFailed sets the status for the passed in flow start to F
-func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
+func MarkStartFailed(ctx context.Context, db DBorTx, startID StartID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
 	return errors.Wrapf(err, "error setting flow start as failed")
 }
 
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and params
-func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
+func GetFlowStartAttributes(ctx context.Context, db DBorTx, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
 	err := db.GetContext(ctx, start, `SELECT id, uuid, flow_id, params, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
@@ -201,7 +194,7 @@ type startGroup struct {
 }
 
 // InsertFlowStarts inserts all the passed in starts
-func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) error {
+func InsertFlowStarts(ctx context.Context, db DBorTx, starts []*FlowStart) error {
 	// insert our starts
 	err := BulkQuery(ctx, "inserting flow start", db, sqlInsertStart, starts)
 	if err != nil {
@@ -254,13 +247,13 @@ const sqlInsertStartGroup = `
 INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:flowstart_id, :contactgroup_id)`
 
 // CreateBatch creates a batch for this start using the passed in contact ids
-func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
+func (s *FlowStart) CreateBatch(contactIDs []ContactID, flowType FlowType, last bool, totalContacts int) *FlowStartBatch {
 	return &FlowStartBatch{
 		StartID:        s.ID,
 		StartType:      s.StartType,
 		OrgID:          s.OrgID,
 		FlowID:         s.FlowID,
-		FlowType:       s.FlowType,
+		FlowType:       flowType,
 		ContactIDs:     contactIDs,
 		ParentSummary:  s.ParentSummary,
 		SessionHistory: s.SessionHistory,

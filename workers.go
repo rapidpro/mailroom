@@ -2,6 +2,7 @@ package mailroom
 
 import (
 	"context"
+	"log/slog"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -9,8 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Foreman takes care of managing our set of workers and assigns msgs for each to send
@@ -55,7 +54,8 @@ func (f *Foreman) Stop() {
 		worker.Stop()
 	}
 	close(f.quit)
-	logrus.WithField("comp", "foreman").WithField("queue", f.queue).WithField("state", "stopping").Info("foreman stopping")
+
+	slog.Info("foreman stopping", "comp", "foreman", "queue", f.queue)
 }
 
 // Assign is our main loop for the Foreman, it takes care of popping the next outgoing task from our
@@ -63,13 +63,9 @@ func (f *Foreman) Stop() {
 func (f *Foreman) Assign() {
 	f.wg.Add(1)
 	defer f.wg.Done()
-	log := logrus.WithField("comp", "foreman").WithField("queue", f.queue)
+	log := slog.With("comp", "foreman", "queue", f.queue)
 
-	log.WithFields(logrus.Fields{
-		"state":   "started",
-		"workers": len(f.workers),
-		"queue":   f.queue,
-	}).Info("workers started and waiting")
+	log.Info("workers started and waiting", "workers", len(f.workers))
 
 	lastSleep := false
 
@@ -77,7 +73,7 @@ func (f *Foreman) Assign() {
 		select {
 		// return if we have been told to stop
 		case <-f.quit:
-			log.WithField("state", "stopped").Info("foreman stopped")
+			log.Info("foreman stopped")
 			return
 
 		// otherwise, grab the next task and assign it to a worker
@@ -94,7 +90,7 @@ func (f *Foreman) Assign() {
 			} else {
 				// we received an error getting the next message, log it
 				if err != nil {
-					log.WithError(err).Error("error popping task")
+					log.Error("error popping task", "error", err)
 				}
 
 				// add our worker back to our queue and sleep a bit
@@ -133,7 +129,7 @@ func (w *Worker) Start() {
 	go func() {
 		defer w.foreman.wg.Done()
 
-		log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id)
+		log := slog.With("queue", w.foreman.queue, "worker_id", w.id)
 		log.Debug("started")
 
 		for {
@@ -160,38 +156,38 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) handleTask(task *queue.Task) {
-	log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
+	log := slog.With("queue", w.foreman.queue, "worker_id", w.id, "task_type", task.Type, "org_id", task.OrgID)
 
 	defer func() {
 		// catch any panics and recover
 		panicLog := recover()
 		if panicLog != nil {
 			debug.PrintStack()
-			log.WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
+			log.Error("panic handling task", "panic", panicLog, "task", string(task.Task))
 		}
 
 		// mark our task as complete
 		rc := w.foreman.rt.RP.Get()
 		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
-			log.WithError(err)
+			log.Error("unable to mark task as complete", "error", err)
 		}
 		rc.Close()
 	}()
 
-	log.Info("starting handling of task")
+	log.Debug("starting handling of task")
 	start := time.Now()
 
 	if err := PerformTask(w.foreman.rt, task); err != nil {
-		log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
+		log.Error("error running task", "task", string(task.Task), "error", err)
 	}
 
 	elapsed := time.Since(start)
-	log.WithField("elapsed", elapsed).Info("task complete")
+	log.Info("task complete", "elapsed", elapsed)
 
 	// additionally if any task took longer than 1 minute, log as warning
 	if elapsed > time.Minute {
-		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
+		log.Warn("long running task", "task", string(task.Task), "elapsed", elapsed)
 	}
 }
 

@@ -1,6 +1,7 @@
 package contact
 
 import (
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -12,7 +13,7 @@ import (
 // Creation a validated contact creation task
 type Creation struct {
 	Name     string
-	Language envs.Language
+	Language i18n.Language
 	URNs     []urns.URN
 	Mods     []flows.Modifier
 }
@@ -28,7 +29,7 @@ func SpecToCreation(s *models.ContactSpec, env envs.Environment, sa flows.Sessio
 	}
 
 	if s.Language != nil && *s.Language != "" {
-		validated.Language, err = envs.ParseLanguage(*s.Language)
+		validated.Language, err = i18n.ParseLanguage(*s.Language)
 		if err != nil {
 			return nil, errors.Wrap(err, "invalid language")
 		}

@@ -34,7 +34,7 @@ func TestRecordFlowStatistics(t *testing.T) {
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session1, session2, session3}, []flows.Sprint{session1Sprint1, session2Sprint1, session3Sprint1})
 	require.NoError(t, err)
 
-	assertredis.Keys(t, rt.RP, []string{
+	assertredis.Keys(t, rt.RP, "*", []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 	})
 
@@ -57,7 +57,7 @@ func TestRecordFlowStatistics(t *testing.T) {
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session3}, []flows.Sprint{session3Sprint3})
 	require.NoError(t, err)
 
-	assertredis.Keys(t, rt.RP, []string{
+	assertredis.Keys(t, rt.RP, "*", []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 		"recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", // color split :: Blue exit -> next node
 		"recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", // color split :: Other exit -> next node

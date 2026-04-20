@@ -2,8 +2,10 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +18,31 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
+)
+
+// Refresh is our type for the pieces of org assets we want fresh (not cached)
+type Refresh int
+
+// refresh bit masks
+const (
+	RefreshNone        = Refresh(0)
+	RefreshAll         = Refresh(^0)
+	RefreshOrg         = Refresh(1 << 1)
+	RefreshCampaigns   = Refresh(1 << 2)
+	RefreshChannels    = Refresh(1 << 3)
+	RefreshClassifiers = Refresh(1 << 4)
+	RefreshFields      = Refresh(1 << 5)
+	RefreshFlows       = Refresh(1 << 6)
+	RefreshGlobals     = Refresh(1 << 7)
+	RefreshGroups      = Refresh(1 << 8)
+	RefreshLabels      = Refresh(1 << 9)
+	RefreshLocations   = Refresh(1 << 10)
+	RefreshOptIns      = Refresh(1 << 11)
+	RefreshResthooks   = Refresh(1 << 12)
+	RefreshTemplates   = Refresh(1 << 13)
+	RefreshTopics      = Refresh(1 << 14)
+	RefreshTriggers    = Refresh(1 << 15)
+	RefreshUsers       = Refresh(1 << 16)
 )
 
 // OrgAssets is our top level cache of all things contained in an org. It is used to build
@@ -57,16 +84,18 @@ type OrgAssets struct {
 	labels       []assets.Label
 	labelsByUUID map[assets.LabelUUID]*Label
 
-	ticketers       []assets.Ticketer
-	ticketersByID   map[TicketerID]*Ticketer
-	ticketersByUUID map[assets.TicketerUUID]*Ticketer
+	optIns       []assets.OptIn
+	optInsByID   map[OptInID]*OptIn
+	optInsByUUID map[assets.OptInUUID]*OptIn
+
+	templates       []assets.Template
+	templatesByUUID map[assets.TemplateUUID]*Template
 
 	topics       []assets.Topic
 	topicsByID   map[TopicID]*Topic
 	topicsByUUID map[assets.TopicUUID]*Topic
 
 	resthooks []assets.Resthook
-	templates []assets.Template
 	triggers  []*Trigger
 	globals   []assets.Global
 
@@ -146,7 +175,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshChannels > 0 {
-		oa.channels, err = loadChannels(ctx, db, orgID)
+		oa.channels, err = loadAssetType(ctx, db, orgID, "channels", loadChannels)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading channel assets for org %d", orgID)
 		}
@@ -164,22 +193,21 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshFields > 0 {
-		userFields, systemFields, err := loadFields(ctx, db, orgID)
+		fields, err := loadAssetType(ctx, db, orgID, "fields", loadFields)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading field assets for org %d", orgID)
 		}
-		oa.fields = userFields
-		oa.fieldsByUUID = make(map[assets.FieldUUID]*Field, len(userFields)+len(systemFields))
-		oa.fieldsByKey = make(map[string]*Field, len(userFields)+len(systemFields))
-		for _, f := range userFields {
+		oa.fields = make([]assets.Field, 0, len(fields))
+		oa.fieldsByUUID = make(map[assets.FieldUUID]*Field, len(fields))
+		oa.fieldsByKey = make(map[string]*Field, len(fields))
+		for _, f := range fields {
 			field := f.(*Field)
 			oa.fieldsByUUID[field.UUID()] = field
 			oa.fieldsByKey[field.Key()] = field
-		}
-		for _, f := range systemFields {
-			field := f.(*Field)
-			oa.fieldsByUUID[field.UUID()] = field
-			oa.fieldsByKey[field.Key()] = field
+
+			if !field.System() {
+				oa.fields = append(oa.fields, f)
+			}
 		}
 	} else {
 		oa.fields = prev.fields
@@ -188,7 +216,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshGroups > 0 {
-		oa.groups, err = LoadGroups(ctx, db, orgID)
+		oa.groups, err = loadAssetType(ctx, db, orgID, "groups", loadGroups)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group assets for org %d", orgID)
 		}
@@ -206,7 +234,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshClassifiers > 0 {
-		oa.classifiers, err = loadClassifiers(ctx, db, orgID)
+		oa.classifiers, err = loadAssetType(ctx, db, orgID, "classifiers", loadClassifiers)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading classifier assets for org %d", orgID)
 		}
@@ -220,7 +248,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshLabels > 0 {
-		oa.labels, err = loadLabels(ctx, db, orgID)
+		oa.labels, err = loadAssetType(ctx, db, orgID, "labels", loadLabels)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group labels for org %d", orgID)
 		}
@@ -233,8 +261,25 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.labelsByUUID = prev.labelsByUUID
 	}
 
+	if prev == nil || refresh&RefreshOptIns > 0 {
+		oa.optIns, err = loadAssetType(ctx, db, orgID, "optins", loadOptIns)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading optins for org %d", orgID)
+		}
+		oa.optInsByID = make(map[OptInID]*OptIn)
+		oa.optInsByUUID = make(map[assets.OptInUUID]*OptIn)
+		for _, o := range oa.optIns {
+			optIn := o.(*OptIn)
+			oa.optInsByID[optIn.ID()] = optIn
+			oa.optInsByUUID[optIn.UUID()] = optIn
+		}
+	} else {
+		oa.optIns = prev.optIns
+		oa.optInsByUUID = prev.optInsByUUID
+	}
+
 	if prev == nil || refresh&RefreshResthooks > 0 {
-		oa.resthooks, err = loadResthooks(ctx, db, orgID)
+		oa.resthooks, err = loadAssetType(ctx, db, orgID, "resthooks", loadResthooks)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading resthooks for org %d", orgID)
 		}
@@ -243,7 +288,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshCampaigns > 0 {
-		oa.campaigns, err = loadCampaigns(ctx, db, orgID)
+		oa.campaigns, err = loadAssetType(ctx, db, orgID, "campaigns", loadCampaigns)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading campaigns for org %d", orgID)
 		}
@@ -265,7 +310,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshTriggers > 0 {
-		oa.triggers, err = loadTriggers(ctx, db, orgID)
+		oa.triggers, err = loadAssetType(ctx, db, orgID, "triggers", loadTriggers)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading triggers for org %d", orgID)
 		}
@@ -274,16 +319,21 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshTemplates > 0 {
-		oa.templates, err = loadTemplates(ctx, db, orgID)
+		oa.templates, err = loadAssetType(ctx, db, orgID, "templates", loadTemplates)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading templates for org %d", orgID)
 		}
+		oa.templatesByUUID = make(map[assets.TemplateUUID]*Template)
+		for _, t := range oa.templates {
+			oa.templatesByUUID[t.UUID()] = t.(*Template)
+		}
 	} else {
 		oa.templates = prev.templates
+		oa.templatesByUUID = prev.templatesByUUID
 	}
 
 	if prev == nil || refresh&RefreshGlobals > 0 {
-		oa.globals, err = loadGlobals(ctx, db, orgID)
+		oa.globals, err = loadAssetType(ctx, db, orgID, "globals", loadGlobals)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading globals for org %d", orgID)
 		}
@@ -292,7 +342,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshLocations > 0 {
-		oa.locations, err = loadLocations(ctx, db, orgID)
+		oa.locations, err = loadLocations(ctx, db, oa)
 		oa.locationsBuiltAt = time.Now()
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group locations for org %d", orgID)
@@ -310,25 +360,8 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.flowByID = prev.flowByID
 	}
 
-	if prev == nil || refresh&RefreshTicketers > 0 {
-		oa.ticketers, err = loadTicketers(ctx, db, orgID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error loading ticketer assets for org %d", orgID)
-		}
-		oa.ticketersByID = make(map[TicketerID]*Ticketer)
-		oa.ticketersByUUID = make(map[assets.TicketerUUID]*Ticketer)
-		for _, t := range oa.ticketers {
-			oa.ticketersByID[t.(*Ticketer).ID()] = t.(*Ticketer)
-			oa.ticketersByUUID[t.UUID()] = t.(*Ticketer)
-		}
-	} else {
-		oa.ticketers = prev.ticketers
-		oa.ticketersByID = prev.ticketersByID
-		oa.ticketersByUUID = prev.ticketersByUUID
-	}
-
 	if prev == nil || refresh&RefreshTopics > 0 {
-		oa.topics, err = loadTopics(ctx, db, orgID)
+		oa.topics, err = loadAssetType(ctx, db, orgID, "topics", loadTopics)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading topic assets for org %d", orgID)
 		}
@@ -345,7 +378,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshUsers > 0 {
-		oa.users, err = loadUsers(ctx, db, orgID)
+		oa.users, err = loadAssetType(ctx, db, orgID, "users", loadUsers)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading user assets for org %d", orgID)
 		}
@@ -369,31 +402,6 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 
 	return oa, nil
 }
-
-// Refresh is our type for the pieces of org assets we want fresh (not cached)
-type Refresh int
-
-// refresh bit masks
-const (
-	RefreshNone        = Refresh(0)
-	RefreshAll         = Refresh(^0)
-	RefreshOrg         = Refresh(1 << 1)
-	RefreshChannels    = Refresh(1 << 2)
-	RefreshFields      = Refresh(1 << 3)
-	RefreshGroups      = Refresh(1 << 4)
-	RefreshLocations   = Refresh(1 << 5)
-	RefreshGlobals     = Refresh(1 << 6)
-	RefreshTemplates   = Refresh(1 << 7)
-	RefreshTriggers    = Refresh(1 << 8)
-	RefreshCampaigns   = Refresh(1 << 9)
-	RefreshResthooks   = Refresh(1 << 10)
-	RefreshClassifiers = Refresh(1 << 11)
-	RefreshLabels      = Refresh(1 << 12)
-	RefreshFlows       = Refresh(1 << 13)
-	RefreshTicketers   = Refresh(1 << 14)
-	RefreshTopics      = Refresh(1 << 15)
-	RefreshUsers       = Refresh(1 << 16)
-)
 
 // GetOrgAssets creates or gets org assets for the passed in org
 func GetOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID) (*OrgAssets, error) {
@@ -441,7 +449,7 @@ func GetOrgAssetsWithRefresh(ctx context.Context, rt *runtime.Runtime, orgID Org
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
-func (a *OrgAssets) Env() envs.Environment { return a.org }
+func (a *OrgAssets) Env() envs.Environment { return a.org.env }
 
 func (a *OrgAssets) Org() *Org { return a.org }
 
@@ -631,6 +639,18 @@ func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 	return a.locations, nil
 }
 
+func (a *OrgAssets) OptIns() ([]assets.OptIn, error) {
+	return a.optIns, nil
+}
+
+func (a *OrgAssets) OptInByID(id OptInID) *OptIn {
+	return a.optInsByID[id]
+}
+
+func (a *OrgAssets) OptInByUUID(uuid assets.OptInUUID) *OptIn {
+	return a.optInsByUUID[uuid]
+}
+
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
 	return a.resthooks, nil
 }
@@ -648,20 +668,12 @@ func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
 }
 
+func (a *OrgAssets) TemplateByUUID(uuid assets.TemplateUUID) *Template {
+	return a.templatesByUUID[uuid]
+}
+
 func (a *OrgAssets) Globals() ([]assets.Global, error) {
 	return a.globals, nil
-}
-
-func (a *OrgAssets) Ticketers() ([]assets.Ticketer, error) {
-	return a.ticketers, nil
-}
-
-func (a *OrgAssets) TicketerByID(id TicketerID) *Ticketer {
-	return a.ticketersByID[id]
-}
-
-func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
-	return a.ticketersByUUID[uuid]
 }
 
 func (a *OrgAssets) Topics() ([]assets.Topic, error) {
@@ -686,4 +698,14 @@ func (a *OrgAssets) UserByID(id UserID) *User {
 
 func (a *OrgAssets) UserByEmail(email string) *User {
 	return a.usersByEmail[email]
+}
+
+func loadAssetType[A any](ctx context.Context, db *sql.DB, orgID OrgID, name string, f func(ctx context.Context, db *sql.DB, orgID OrgID) ([]A, error)) ([]A, error) {
+	start := time.Now()
+
+	as, err := f(ctx, db, orgID)
+
+	slog.Debug(fmt.Sprintf("loaded %s", name), "elapsed", time.Since(start), "org_id", orgID, "count", len(as))
+
+	return as, err
 }

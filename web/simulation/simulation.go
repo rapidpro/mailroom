@@ -97,7 +97,7 @@ type startRequest struct {
 }
 
 // handleSimulationEvents takes care of updating our db with any events needed during simulation
-func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.OrgAssets, es []flows.Event) error {
+func handleSimulationEvents(ctx context.Context, db models.DBorTx, oa *models.OrgAssets, es []flows.Event) error {
 	// nicpottier: this could be refactored into something more similar to how we handle normal events (ie hooks) if
 	// we see ourselves taking actions for more than just webhook events
 	wes := make([]*models.WebhookEvent, 0)
@@ -199,7 +199,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *resumeRequest) (a
 	// if this is a msg resume we want to check whether it might be caught by a trigger
 	if resume.Type() == resumes.TypeMsg {
 		msgResume := resume.(*resumes.MsgResume)
-		trigger := models.FindMatchingMsgTrigger(oa, msgResume.Contact(), msgResume.Msg().Text())
+		trigger, keyword := models.FindMatchingMsgTrigger(oa, nil, msgResume.Contact(), msgResume.Msg().Text())
 		if trigger != nil {
 			var flow *models.Flow
 			for _, r := range session.Runs() {
@@ -228,7 +228,11 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *resumeRequest) (a
 						// non-simulation IVR triggers to use that so that this is consistent.
 						sessionTrigger = tb.Manual().WithCall(testChannel, testURN).Build()
 					} else {
-						sessionTrigger = tb.Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
+						mtb := tb.Msg(msgResume.Msg())
+						if keyword != "" {
+							mtb = mtb.WithMatch(&triggers.KeywordMatch{Type: trigger.KeywordMatchType(), Keyword: keyword})
+						}
+						sessionTrigger = mtb.Build()
 					}
 
 					return triggerFlow(ctx, rt, oa, sessionTrigger)

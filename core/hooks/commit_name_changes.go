@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 )
 
 // CommitNameChangesHook is our hook for name changes
@@ -17,7 +17,7 @@ var CommitNameChangesHook models.EventCommitHook = &commitNameChangesHook{}
 type commitNameChangesHook struct{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of scene
-func (h *commitNameChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitNameChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]*nameUpdate, 0, len(scenes))
 	for s, e := range scenes {

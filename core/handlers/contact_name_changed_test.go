@@ -35,7 +35,7 @@ func TestContactNameChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
@@ -44,17 +44,17 @@ func TestContactNameChanged(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where name IS NULL and id = $1",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where name = 'Geoff Newman' and id = $1",
-					Args:  []interface{}{testdata.George.ID},
+					Args:  []any{testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where name = '😃2345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678' and id = $1",
-					Args:  []interface{}{testdata.Alexandria.ID},
+					Args:  []any{testdata.Alexandria.ID},
 					Count: 1,
 				},
 			},

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 	"time"
@@ -21,9 +22,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type SessionID int64
@@ -373,7 +373,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, []*Session{s})
 		if err != nil {
-			logrus.WithError(err).Error("error writing session to s3")
+			slog.Error("error writing session to s3", "error", err)
 		}
 
 		// don't write output in our SQL
@@ -397,8 +397,8 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// figure out which runs are new and which are updated
-	updatedRuns := make([]interface{}, 0, 1)
-	newRuns := make([]interface{}, 0)
+	updatedRuns := make([]any, 0, 1)
+	newRuns := make([]any, 0)
 	for _, r := range s.Runs() {
 		modified, found := s.seenRuns[r.UUID()]
 		if !found {
@@ -423,7 +423,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	// update all modified runs at once
 	err = BulkQuery(ctx, "update runs", tx, sqlUpdateRun, updatedRuns)
 	if err != nil {
-		logrus.WithError(err).WithField("session", string(output)).Error("error while updating runs for session")
+		slog.Error("error while updating runs for session", "error", err, "session", string(output))
 		return errors.Wrapf(err, "error updating runs")
 	}
 
@@ -596,8 +596,8 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 
 	// create all our session objects
 	sessions := make([]*Session, 0, len(ss))
-	waitingSessionsI := make([]interface{}, 0, len(ss))
-	endedSessionsI := make([]interface{}, 0, len(ss))
+	waitingSessionsI := make([]any, 0, len(ss))
+	endedSessionsI := make([]any, 0, len(ss))
 	completedCallIDs := make([]CallID, 0, 1)
 
 	for i, s := range ss {
@@ -669,7 +669,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 	}
 
 	// for each session associate our run with each
-	runs := make([]interface{}, 0, len(sessions))
+	runs := make([]any, 0, len(sessions))
 	for _, s := range sessions {
 		for _, r := range s.runs {
 			runs = append(runs, &r.r)
@@ -787,7 +787,7 @@ func FindWaitingSessionForContact(ctx context.Context, db *sqlx.DB, st storage.S
 			return nil, errors.Wrapf(err, "error reading session from storage: %s", session.OutputURL())
 		}
 
-		logrus.WithField("elapsed", time.Since(start)).WithField("output_url", session.OutputURL()).Debug("loaded session from storage")
+		slog.Debug("loaded session from storage", "elapsed", time.Since(start), "output_url", session.OutputURL())
 		session.s.Output = null.String(output)
 	}
 
@@ -817,7 +817,7 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 		s.s.OutputURL = null.String(uploads[i].URL)
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(sessions)).Debug("wrote sessions to s3")
+	slog.Debug("wrote sessions to s3", "elapsed", time.Since(start), "count", len(sessions))
 	return nil
 }
 
@@ -896,7 +896,7 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 		return errors.Wrapf(err, "error exiting sessions")
 	}
 
-	logrus.WithField("count", len(contactIDs)).WithField("elapsed", time.Since(start)).Debug("exited session batch")
+	slog.Debug("exited session batch", "count", len(contactIDs), "elapsed", time.Since(start))
 
 	// then the runs that belong to these sessions
 	start = time.Now()
@@ -907,7 +907,7 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	}
 
 	rows, _ := res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session batch runs")
+	slog.Debug("exited session batch runs", "count", rows, "elapsed", time.Since(start))
 
 	// and finally the contacts from each session
 	start = time.Now()
@@ -918,12 +918,12 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	}
 
 	rows, _ = res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session batch contacts")
+	slog.Debug("exited session batch contacts", "count", rows, "elapsed", time.Since(start))
 
 	return nil
 }
 
-func getWaitingSessionsForContacts(ctx context.Context, db Queryer, contactIDs []ContactID) ([]SessionID, error) {
+func getWaitingSessionsForContacts(ctx context.Context, db DBorTx, contactIDs []ContactID) ([]SessionID, error) {
 	sessionIDs := make([]SessionID, 0, len(contactIDs))
 
 	err := db.SelectContext(ctx, &sessionIDs, `SELECT id FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`, pq.Array(contactIDs))

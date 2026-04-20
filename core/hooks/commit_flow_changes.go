@@ -14,7 +14,7 @@ var CommitFlowChangesHook models.EventCommitHook = &commitFlowChangesHook{}
 type commitFlowChangesHook struct{}
 
 // Apply commits our contact current_flow changes as a bulk update for the passed in map of scene
-func (h *commitFlowChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitFlowChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// build up our list of pairs of contact id and current flow id
 	updates := make([]*currentFlowUpdate, 0, len(scenes))
 	for s, evts := range scenes {

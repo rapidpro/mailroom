@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -20,9 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +49,7 @@ type Assertion func(t *testing.T, rt *runtime.Runtime) error
 
 type SQLAssertion struct {
 	SQL   string
-	Args  []interface{}
+	Args  []any
 	Count int
 }
 
@@ -141,7 +140,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		envs.Language("eng"),
+		"eng",
 		flowType,
 		1,
 		300,
@@ -161,7 +160,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
-	svcs := goflow.Engine(rt.Config).Services()
+	eng := goflow.Engine(rt.Config)
 
 	// reuse id from one of our real flows
 	flowUUID := testdata.Favorites.UUID
@@ -213,10 +212,9 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 		// create scenes for our contacts
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
 		for contact, mods := range tc.Modifiers {
-			contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{contact.ID})
+			contact, err := models.LoadContact(ctx, rt.DB, oa, contact.ID)
 			assert.NoError(t, err)
 
-			contact := contacts[0]
 			flowContact, err := contact.FlowContact(oa)
 			assert.NoError(t, err)
 
@@ -229,7 +227,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 
 			// apply our modifiers
 			for _, mod := range mods {
-				modifiers.Apply(oa.Env(), svcs, oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
+				modifiers.Apply(eng, oa.Env(), oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
 			}
 
 			results[contact.ID()] = result

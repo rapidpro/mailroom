@@ -2,16 +2,15 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -25,11 +24,8 @@ func handleInputLabelsAdded(ctx context.Context, rt *runtime.Runtime, tx *sqlx.T
 	}
 
 	event := e.(*events.InputLabelsAddedEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"labels":       event.Labels,
-	}).Debug("input labels added")
+
+	slog.Debug("input labels added", "contact", scene.ContactUUID(), "session", scene.SessionID(), "labels", event.Labels)
 
 	// if the sprint had input, then it was started by a msg event and we should have the message ID saved on the session
 	inputMsgID := scene.Session().IncomingMsgID()

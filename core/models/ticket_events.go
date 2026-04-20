@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 )
 
 type TicketEventID int
@@ -103,9 +103,9 @@ RETURNING
 	id
 `
 
-func InsertTicketEvents(ctx context.Context, db Queryer, evts []*TicketEvent) error {
+func InsertTicketEvents(ctx context.Context, db DBorTx, evts []*TicketEvent) error {
 	// convert to interface arrray
-	is := make([]interface{}, len(evts))
+	is := make([]any, len(evts))
 	for i := range evts {
 		is[i] = &evts[i].e
 	}

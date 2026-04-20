@@ -16,7 +16,7 @@ var CommitIVRHook models.EventCommitHook = &commitIVRHook{}
 type commitIVRHook struct{}
 
 // Apply takes care of inserting all the messages in the passed in scene.
-func (h *commitIVRHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitIVRHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {

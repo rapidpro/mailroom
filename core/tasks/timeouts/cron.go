@@ -5,31 +5,39 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
-
 func init() {
-	mailroom.RegisterCron("sessions_timeouts", time.Second*60, false, timeoutSessions)
+	tasks.RegisterCron("sessions_timeouts", false, newTimeoutsCron())
+}
+
+type timeoutsCron struct {
+	marker *redisx.IntervalSet
+}
+
+func newTimeoutsCron() tasks.Cron {
+	return &timeoutsCron{
+		marker: redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2),
+	}
+}
+
+func (c *timeoutsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
 }
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
 // TODO: extend lock
-func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "timeout")
-	start := time.Now()
-
+func (c *timeoutsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	// find all sessions that need to be expired (we exclude IVR runs)
 	rows, err := rt.DB.QueryxContext(ctx, timedoutSessionsSQL)
 	if err != nil {
-		return errors.Wrapf(err, "error selecting timed out sessions")
+		return nil, errors.Wrapf(err, "error selecting timed out sessions")
 	}
 	defer rows.Close()
 
@@ -43,14 +51,14 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 	for rows.Next() {
 		err := rows.StructScan(timeout)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning timeout")
+			return nil, errors.Wrapf(err, "error scanning timeout")
 		}
 
 		// check whether we've already queued this
 		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
-		queued, err := marker.Contains(rc, taskID)
+		queued, err := c.marker.IsMember(rc, taskID)
 		if err != nil {
-			return errors.Wrapf(err, "error checking whether task is queued")
+			return nil, errors.Wrapf(err, "error checking whether task is queued")
 		}
 
 		// already queued? move on
@@ -63,20 +71,19 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 		task := handler.NewTimeoutTask(timeout.OrgID, timeout.ContactID, timeout.SessionID, timeout.TimeoutOn)
 		err = handler.QueueHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
-			return errors.Wrapf(err, "error adding new handle task")
+			return nil, errors.Wrapf(err, "error adding new handle task")
 		}
 
 		// and mark it as queued
-		err = marker.Add(rc, taskID)
+		err = c.marker.Add(rc, taskID)
 		if err != nil {
-			return errors.Wrapf(err, "error marking timeout task as queued")
+			return nil, errors.Wrapf(err, "error marking timeout task as queued")
 		}
 
 		numQueued++
 	}
 
-	log.WithField("dupes", numDupes).WithField("queued", numQueued).WithField("elapsed", time.Since(start)).Info("session timeouts queued")
-	return nil
+	return map[string]any{"dupes": numDupes, "queued": numQueued}, nil
 }
 
 const timedoutSessionsSQL = `
