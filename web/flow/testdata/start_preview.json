@@ -2,28 +2,29 @@
     {
         "label": "illegal method",
         "method": "GET",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "status": 405,
         "response": {
             "error": "illegal method: GET"
         }
     },
     {
-        "label": "missing org id",
+        "label": "missing org or flow id",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {},
         "status": 400,
         "response": {
-            "error": "request failed validation: field 'org_id' is required"
+            "error": "request failed validation: field 'org_id' is required, field 'flow_id' is required"
         }
     },
     {
         "label": "no inclusions or exclusions",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {}
         },
         "status": 200,
@@ -35,9 +36,10 @@
     {
         "label": "manual inclusions, no exclusions",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
                 "group_uuids": [
                     "c153e265-f7c9-4539-9dbc-9b358714b638",
@@ -59,12 +61,13 @@
     {
         "label": "query inclusion, no exclusions",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
-                "group_uuids": [],
-                "contact_uuids": [],
+                "group_ids": [],
+                "contact_ids": [],
                 "query": "gender = M"
             }
         },
@@ -77,9 +80,10 @@
     {
         "label": "manual inclusions, all exclusions",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
                 "group_uuids": [
                     "c153e265-f7c9-4539-9dbc-9b358714b638",
@@ -89,51 +93,51 @@
                     "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
                     "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
                 ],
-                "urns": [
-                    "tel:+1234567890",
-                    "facebook:9876543210"
-                ],
                 "query": ""
             },
             "exclude": {
                 "non_active": true,
                 "in_a_flow": true,
+                "started_previously": true,
                 "not_seen_since_days": 90
             }
         },
         "status": 200,
         "response": {
-            "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\") AND status = \"active\" AND flow = \"\" AND last_seen_on > \"07-04-2018\"",
+            "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\") AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
             "total": 0
         }
     },
     {
         "label": "query inclusion, all exclusions",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
                 "query": "gender = M"
             },
             "exclude": {
                 "non_active": true,
                 "in_a_flow": true,
+                "started_previously": true,
                 "not_seen_since_days": 90
             }
         },
         "status": 200,
         "response": {
-            "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND last_seen_on > \"07-04-2018\"",
+            "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
             "total": 0
         }
     },
     {
         "label": "invalid query inclusion (bad syntax)",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
                 "query": "gender ="
             },
@@ -151,9 +155,10 @@
     {
         "label": "invalid query inclusion (missing field)",
         "method": "POST",
-        "path": "/mr/msg/preview_broadcast",
+        "path": "/mr/flow/start_preview",
         "body": {
             "org_id": 1,
+            "flow_id": 10001,
             "include": {
                 "query": "goats > 10"
             },

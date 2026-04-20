@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -21,15 +20,10 @@ func init() {
 func handleMsgReceived(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgReceivedEvent)
 
+	slog.Debug("msg received", "contact", scene.ContactUUID(), "session", scene.SessionID(), "text", event.Msg.Text(), "urn", event.Msg.URN())
+
 	// for surveyor sessions we need to actually create the message
 	if scene.Session() != nil && scene.Session().SessionType() == models.FlowTypeSurveyor {
-		logrus.WithFields(logrus.Fields{
-			"contact_uuid": scene.ContactUUID(),
-			"session_id":   scene.SessionID(),
-			"text":         event.Msg.Text(),
-			"urn":          event.Msg.URN(),
-		}).Debug("msg received event")
-
 		msg := models.NewIncomingSurveyorMsg(rt.Config, oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
 
 		// we'll commit this message with all the others

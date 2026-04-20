@@ -19,9 +19,6 @@ func TestChannels(t *testing.T) {
 	// add some tel specific config to channel 2
 	rt.DB.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, testdata.VonageChannel.ID)
 
-	// make twitter channel have a parent of twilio channel
-	rt.DB.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, testdata.TwilioChannel.ID, testdata.TwitterChannel.ID)
-
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, 1, models.RefreshChannels)
 	require.NoError(t, err)
 
@@ -35,9 +32,9 @@ func TestChannels(t *testing.T) {
 		Address            string
 		Schemes            []string
 		Roles              []assets.ChannelRole
+		Features           []assets.ChannelFeature
 		Prefixes           []string
 		AllowInternational bool
-		Parent             *assets.ChannelReference
 	}{
 		{
 			testdata.TwilioChannel.ID,
@@ -46,9 +43,9 @@ func TestChannels(t *testing.T) {
 			"+13605551212",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive", "call", "answer"},
+			[]assets.ChannelFeature{},
 			nil,
 			false,
-			nil,
 		},
 		{
 			testdata.VonageChannel.ID,
@@ -57,20 +54,20 @@ func TestChannels(t *testing.T) {
 			"5789",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive"},
+			[]assets.ChannelFeature{},
 			[]string{"250", "251"},
 			true,
-			nil,
 		},
 		{
-			testdata.TwitterChannel.ID,
-			testdata.TwitterChannel.UUID,
-			"Twitter",
-			"ureport",
-			[]string{"twitter"},
+			testdata.FacebookChannel.ID,
+			testdata.FacebookChannel.UUID,
+			"Facebook",
+			"12345",
+			[]string{"facebook"},
 			[]assets.ChannelRole{"send", "receive"},
+			[]assets.ChannelFeature{"optins"},
 			nil,
 			false,
-			assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"),
 		},
 	}
 
@@ -82,9 +79,9 @@ func TestChannels(t *testing.T) {
 		assert.Equal(t, tc.Name, channel.Name())
 		assert.Equal(t, tc.Address, channel.Address())
 		assert.Equal(t, tc.Roles, channel.Roles())
+		assert.Equal(t, tc.Features, channel.Features())
 		assert.Equal(t, tc.Schemes, channel.Schemes())
 		assert.Equal(t, tc.Prefixes, channel.MatchPrefixes())
 		assert.Equal(t, tc.AllowInternational, channel.AllowInternational())
-		assert.Equal(t, tc.Parent, channel.Parent())
 	}
 }

@@ -60,7 +60,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *resolveRequest) 
 
 	return map[string]any{
 		"contact": contact,
-		"urn": map[string]interface{}{
+		"urn": map[string]any{
 			"id":       models.GetURNInt(urn, "id"),
 			"identity": urn.Identity(),
 		},

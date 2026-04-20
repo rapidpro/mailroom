@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +33,7 @@ func TestBroadcastCreated(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND status = 'C'",
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},

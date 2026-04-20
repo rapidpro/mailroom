@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -73,18 +73,18 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 		call, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
 		if call != nil {
 			if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
-				logrus.WithError(err).WithField("http_request", r).Error("error attaching ivr channel log")
+				slog.Error("error attaching ivr channel log", "error", err, "http_request", r)
 			}
 		}
 
 		if err := recorder.End(); err != nil {
-			logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
+			slog.Error("error recording IVR request", "error", err, "http_request", r)
 		}
 
 		clog.End()
 
 		if err := models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog}); err != nil {
-			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
+			slog.Error("error writing ivr channel log", "error", err, "http_request", r)
 		}
 
 		return rerr
@@ -116,7 +116,7 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), ch.ID(), contact.ID(), urnID, nil, false)
+	event := models.NewChannelEvent(models.EventTypeIncomingCall, oa.OrgID(), ch.ID(), contact.ID(), urnID, models.NilOptInID, nil, false)
 
 	externalID, err := svc.CallIDForRequest(r)
 	if err != nil {
@@ -130,10 +130,9 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, rt, models.MOCallEventType, event, call)
+	session, err := handler.HandleChannelEvent(ctx, rt, models.EventTypeIncomingCall, event, call)
 	if err != nil {
-		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
-
+		slog.Error("error handling incoming call", "error", err, "http_request", r)
 		return call, svc.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
 	}
 
@@ -148,7 +147,7 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 		resumeURL := buildResumeURL(rt.Config, ch, call, urn)
 
 		// have our client output our session status
-		err = svc.WriteSessionResponse(ctx, rt, ch, call, session, urn, resumeURL, r, w)
+		err = svc.WriteSessionResponse(ctx, rt, oa, ch, call, session, urn, resumeURL, r, w)
 		if err != nil {
 			return call, errors.Wrapf(err, "error writing ivr response for start")
 		}
@@ -205,14 +204,11 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{conn.ContactID()})
+	contact, err := models.LoadContact(ctx, rt.ReadonlyDB, oa, conn.ContactID())
 	if err != nil {
 		return conn, svc.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}
-	if len(contacts) == 0 {
-		return conn, svc.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
-	}
-	if contacts[0].Status() != models.ContactStatusActive {
+	if contact.Status() != models.ContactStatusActive {
 		return conn, svc.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
 	}
 
@@ -224,7 +220,7 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 
 	// make sure our URN is indeed present on our contact, no funny business
 	found := false
-	for _, u := range contacts[0].URNs() {
+	for _, u := range contact.URNs() {
 		if u.Identity() == urn.Identity() {
 			found = true
 		}
@@ -238,9 +234,9 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	// if this a start, start our contact
 	switch request.Action {
 	case actionStart:
-		err = ivr.StartIVRFlow(ctx, rt, svc, resumeURL, oa, ch, conn, contacts[0], urn, conn.StartID(), r, w)
+		err = ivr.StartIVRFlow(ctx, rt, svc, resumeURL, oa, ch, conn, contact, urn, conn.StartID(), r, w)
 	case actionResume:
-		err = ivr.ResumeIVRFlow(ctx, rt, resumeURL, svc, oa, ch, conn, contacts[0], urn, r, w)
+		err = ivr.ResumeIVRFlow(ctx, rt, resumeURL, svc, oa, ch, conn, contact, urn, r, w)
 	case actionStatus:
 		err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w)
 
@@ -250,7 +246,7 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 
 	// had an error? mark our call as errored and log it
 	if err != nil {
-		logrus.WithError(err).WithField("http_request", r).Error("error while handling IVR")
+		slog.Error("error while handling IVR", "error", err, "http_request", r)
 		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
 	}
 
@@ -293,7 +289,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets
 
 	// had an error? mark our call as errored and log it
 	if err != nil {
-		logrus.WithError(err).WithField("http_request", r).Error("error while handling status")
+		slog.Error("error while handling status", "error", err, "http_request", r)
 		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
 	}
 

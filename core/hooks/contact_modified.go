@@ -16,7 +16,7 @@ var ContactModifiedHook models.EventCommitHook = &contactModifiedHook{}
 type contactModifiedHook struct{}
 
 // Apply squashes and updates modified_on on all the contacts passed in
-func (h *contactModifiedHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *contactModifiedHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// our lists of contact ids
 	contactIDs := make([]models.ContactID, 0, len(scenes))
 

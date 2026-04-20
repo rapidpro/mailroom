@@ -103,7 +103,7 @@ func TestCloneForSimulation(t *testing.T) {
 	// original assets still has original flow definition
 	flow, err = oa.FlowByUUID(testdata.Favorites.UUID)
 	require.NoError(t, err)
-	assert.Equal(t, "{\"_ui\": {\"nodes\": {\"10c9c241-777f-4010-a841-6e87abed8520\": {\"typ", string(flow.Definition())[:64])
+	assert.Equal(t, "{\"_ui\": {\"nodes\": {\"1b828e78-e478-4357-9472-47a30ec1f60b\": {\"typ", string(flow.Definition())[:64])
 
 	// and doesn't have the test channels
 	testChannel1 = oa.SessionAssets().Channels().Get("d7be3965-4c76-4abd-af78-ebc0b84ab621")

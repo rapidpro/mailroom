@@ -6,47 +6,39 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-// Queryer contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
+// Queryer lets us pass anything that supports QueryContext to a function (sql.DB, sql.Tx, sqlx.DB, sqlx.Tx)
 type Queryer interface {
-	dbutil.Queryer
-
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
-	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
-	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-// QueryerWithTx adds support for beginning transactions
-type QueryerWithTx interface {
+// DBorTx contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
+type DBorTx interface {
 	Queryer
+	dbutil.BulkQueryer
+
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
+	GetContext(ctx context.Context, value any, query string, args ...any) error
+}
+
+// DB is most of the functionality of sqlx.DB but lets us mock it in tests.
+type DB interface {
+	DBorTx
 
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
 }
 
-// Exec calls ExecContext on the passed in Queryer, logging time taken if any rows were affected
-func Exec(ctx context.Context, label string, tx Queryer, sql string, args ...interface{}) error {
-	start := time.Now()
-	res, err := tx.ExecContext(ctx, sql, args...)
-	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("error %s", label))
-	}
-	rows, _ := res.RowsAffected()
-	if rows > 0 {
-		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug(label)
-	}
-	return nil
-}
-
 // BulkQuery runs the given query as a bulk operation
-func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string, structs []T) error {
+func BulkQuery[T any](ctx context.Context, label string, tx DBorTx, sql string, structs []T) error {
 	// no values, nothing to do
 	if len(structs) == 0 {
 		return nil
@@ -59,13 +51,13 @@ func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string,
 		return errors.Wrap(err, "error making bulk query")
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(structs)).Infof("%s bulk sql complete", label)
+	slog.Info(fmt.Sprintf("%s bulk sql complete", label), "elapsed", time.Since(start), "rows", len(structs))
 
 	return nil
 }
 
 // BulkQueryBatches runs the given query as a bulk operation, in batches of the given size
-func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string, batchSize int, structs []interface{}) error {
+func BulkQueryBatches(ctx context.Context, label string, tx DBorTx, sql string, batchSize int, structs []any) error {
 	start := time.Now()
 
 	batches := ChunkSlice(structs, batchSize)
@@ -75,7 +67,7 @@ func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string,
 			return errors.Wrap(err, "error making bulk batch query")
 		}
 
-		logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(batch)).WithField("batch", i+1).Infof("%s bulk sql batch complete", label)
+		slog.Info(fmt.Sprintf("%s bulk sql batch complete", label), "elapsed", time.Since(start), "rows", len(batch), "batch", i+1)
 	}
 
 	return nil
@@ -92,6 +84,22 @@ func ChunkSlice[T any](slice []T, size int) [][]T {
 		chunks = append(chunks, slice[i:end])
 	}
 	return chunks
+}
+
+func ScanJSONRows[T any](rows *sql.Rows, f func() T) ([]T, error) {
+	defer rows.Close()
+
+	as := make([]T, 0, 10)
+	for rows.Next() {
+		a := f()
+		err := dbutil.ScanJSON(rows, &a)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning into %T", a)
+		}
+		as = append(as, a)
+	}
+
+	return as, nil
 }
 
 // Map is a generic map which is written to the database as JSON. For nullable fields use null.Map.

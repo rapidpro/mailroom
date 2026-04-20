@@ -214,13 +214,13 @@ func TestServer(t *testing.T) {
 	var session json.RawMessage
 
 	// add a trigger for our campaign flow with 'trigger'
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.CampaignFlow, []string{"trigger"}, models.MatchOnly, nil, nil, nil)
 
 	// and a trigger which will trigger an IVR flow
-	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(rt, testdata.Org1, testdata.IVRFlow, []string{"ivr"}, models.MatchOnly, nil, nil, nil)
 
 	// also add a catch all
-	testdata.InsertCatchallTrigger(rt, testdata.Org1, testdata.CampaignFlow, nil, nil)
+	testdata.InsertCatchallTrigger(rt, testdata.Org1, testdata.CampaignFlow, nil, nil, nil)
 
 	tcs := []struct {
 		URL              string
@@ -272,7 +272,7 @@ func TestServer(t *testing.T) {
 		// if this was a success, save our session
 		if resp.StatusCode == 200 {
 			// save the session for use in a resume
-			parsed := make(map[string]interface{})
+			parsed := make(map[string]any)
 			jsonx.MustUnmarshal(content, &parsed)
 			session = jsonx.MustMarshal(parsed["session"])
 

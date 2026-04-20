@@ -115,23 +115,23 @@ func TestLoadFlows(t *testing.T) {
 
 	for _, tc := range tcs {
 		// test loading by UUID
-		dbFlow, err := models.LoadFlowByUUID(ctx, rt.DB, tc.org.ID, tc.uuid)
+		dbFlow, err := models.LoadFlowByUUID(ctx, rt.DB.DB, tc.org.ID, tc.uuid)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 
 		// test loading by name
-		dbFlow, err = models.LoadFlowByName(ctx, rt.DB, tc.org.ID, tc.name)
+		dbFlow, err = models.LoadFlowByName(ctx, rt.DB.DB, tc.org.ID, tc.name)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 
 		// test loading by ID
-		dbFlow, err = models.LoadFlowByID(ctx, rt.DB, tc.org.ID, tc.id)
+		dbFlow, err = models.LoadFlowByID(ctx, rt.DB.DB, tc.org.ID, tc.id)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 	}
 
 	// test loading flow with wrong org
-	dbFlow, err := models.LoadFlowByID(ctx, rt.DB, testdata.Org2.ID, testdata.Favorites.ID)
+	dbFlow, err := models.LoadFlowByID(ctx, rt.DB.DB, testdata.Org2.ID, testdata.Favorites.ID)
 	assert.NoError(t, err)
 	assert.Nil(t, dbFlow)
 }

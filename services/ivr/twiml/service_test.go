@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
@@ -27,6 +28,7 @@ func TestResponseForSprint(t *testing.T) {
 	urn := urns.URN("tel:+12067799294")
 	expiresOn := time.Now().Add(time.Hour)
 	channelRef := assets.NewChannelReference(assets.ChannelUUID(uuids.New()), "Twilio Channel")
+	env := envs.NewBuilder().WithAllowedLanguages("eng", "spa").WithDefaultCountry("US").Build()
 
 	resumeURL := "http://temba.io/resume?session=1"
 
@@ -43,21 +45,21 @@ func TestResponseForSprint(t *testing.T) {
 			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "", "")),
 			},
-			expected: `<Response><Say>Hi there</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say language="en-US">Hi there</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg, supported text language specified
 			events: []flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "", "eng-US")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "", "eng-GB")),
 			},
-			expected: `<Response><Say language="en-US">Hi there</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say language="en-GB">Hi there</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg, unsupported text language specified
 			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Amakuru", "", "kin")),
 			},
-			expected: `<Response><Say>Amakuru</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say language="en-US">Amakuru</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg with audio attachment, text language ignored
@@ -72,7 +74,7 @@ func TestResponseForSprint(t *testing.T) {
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "")),
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "goodbye", "", "")),
 			},
-			expected: `<Response><Say>hello world</Say><Say>goodbye</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say language="en-US">hello world</Say><Say language="en-US">goodbye</Say><Hangup></Hangup></Response>`,
 		},
 		{
 			// ivr msg followed by wait for digits
@@ -80,7 +82,7 @@ func TestResponseForSprint(t *testing.T) {
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "enter a number", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewFixedDigitsHint(1)),
 			},
-			expected: `<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
+			expected: `<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say language="en-US">enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
 			// ivr msg followed by wait for terminated digits
@@ -88,7 +90,7 @@ func TestResponseForSprint(t *testing.T) {
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "enter a number, then press #", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewTerminatedDigitsHint("#")),
 			},
-			expected: `<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
+			expected: `<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say language="en-US">enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
 			// ivr msg followed by wait for recording
@@ -96,7 +98,7 @@ func TestResponseForSprint(t *testing.T) {
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "say something", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewAudioHint()),
 			},
-			expected: `<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
+			expected: `<Response><Say language="en-US">say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
 		},
 		{
 			// dial wait
@@ -108,7 +110,7 @@ func TestResponseForSprint(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		response, err := twiml.ResponseForSprint(rt.Config, urn, resumeURL, tc.events, false)
+		response, err := twiml.ResponseForSprint(rt, env, urn, resumeURL, tc.events, false)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, xml.Header+tc.expected, response, "%d: unexpected response", i)
 	}

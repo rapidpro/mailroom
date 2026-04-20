@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -33,7 +34,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // IgnoreSignatures sets whether we ignore signatures (for unit tests)
@@ -206,7 +206,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	redisKey := fmt.Sprintf("dial_%s", legUUID)
 	dialContinue, err := redis.String(rc.Do("get", redisKey))
 
-	logrus.WithField("redisKey", redisKey).WithField("redisValue", dialContinue).WithError(err).WithField("status", nxStatus).Debug("looking up dial continue")
+	slog.Debug("looking up dial continue", "error", err, "status", nxStatus, "redisKey", redisKey, "redisValue", dialContinue)
 
 	// no associated call, move on
 	if err == redis.ErrNil {
@@ -224,7 +224,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	// we found an associated call, if the status is complete, have it continue, we call out to
 	// redis and hand it our flow to resume on to get the next NCCO
 	if nxStatus == "completed" {
-		logrus.Debug("found completed call, trying to finish with call ID: ", callUUID)
+		slog.Debug("found completed call, trying to finish with call", "call_uuid", callUUID)
 		statusKey := fmt.Sprintf("dial_status_%s", callUUID)
 		status, err := redis.String(rc.Do("get", statusKey))
 		if err == redis.ErrNil {
@@ -241,9 +241,9 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 		resumeURL += "&dial_duration=" + duration
 		resumeURL += "&sig=" + s.calculateSignature(resumeURL)
 
-		nxBody := map[string]interface{}{
+		nxBody := map[string]any{
 			"action": "transfer",
-			"destination": map[string]interface{}{
+			"destination": map[string]any{
 				"type": "ncco",
 				"url":  []string{resumeURL},
 			},
@@ -273,7 +273,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 			return nil, errors.Wrapf(err, "error inserting recording URL into redis")
 		}
 
-		logrus.WithField("redisKey", redisKey).WithField("status", status).WithField("callUUID", callUUID).Debug("saved intermediary dial status for call")
+		slog.Debug("saved intermediary dial status for call", "callUUID", callUUID, "status", status, "redisKey", redisKey)
 		return s.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
 	}
 
@@ -303,7 +303,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 		// found a URL, stuff it in our request and move on
 		if recordingURL != "" {
 			r.URL.RawQuery = "&recording_url=" + url.QueryEscape(recordingURL)
-			logrus.WithField("recording_url", recordingURL).Info("found recording URL")
+			slog.Info("found recording URL", "recording_url", recordingURL)
 			rc.Do("del", redisKey)
 			return nil, nil
 		}
@@ -323,7 +323,7 @@ func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, cal
 			EventURL:     []string{url},
 			EventMethod:  http.MethodPost,
 		}
-		return json.MarshalIndent([]interface{}{input}, "", "  ")
+		return json.MarshalIndent([]any{input}, "", "  ")
 
 	case "recording_url":
 		// this is our async callback for our recording URL, we stuff it in redis and return an empty response
@@ -402,7 +402,7 @@ func (s *service) RequestCall(number urns.URN, resumeURL string, statusURL strin
 		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
 	}
 
-	logrus.WithField("body", string(trace.ResponseBody)).WithField("status", trace.Response.StatusCode).Debug("requested call")
+	slog.Debug("requested call", "body", string(trace.ResponseBody), "status", trace.Response.StatusCode)
 
 	return ivr.CallID(call.UUID), trace, nil
 }
@@ -469,7 +469,7 @@ func (s *service) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 			if recordingURL == "" {
 				return ivr.InputResume{}, nil
 			}
-			logrus.WithField("recording_url", recordingURL).Info("input found recording")
+			slog.Info("input found recording", "recording_url", recordingURL)
 			return ivr.InputResume{Attachment: utils.Attachment("audio:" + recordingURL)}, nil
 
 		default:
@@ -496,7 +496,7 @@ func (s *service) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 		duration = parsed
 	}
 
-	logrus.WithField("status", status).WithField("duration", duration).Info("input found dial status and duration")
+	slog.Info("input found dial status and duration", "status", status, "duration", duration)
 	return ivr.DialResume{Status: flows.DialStatus(status), Duration: duration}, nil
 }
 
@@ -515,14 +515,14 @@ func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.C
 
 	bb, err := readBody(r)
 	if err != nil {
-		logrus.WithError(err).Error("error reading status request body")
+		slog.Error("error reading status request body", "error", err)
 		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
 	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
-		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
+		slog.Error("error unmarshalling ncco status", "error", err, "body", string(bb))
 		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
@@ -553,7 +553,7 @@ func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.C
 		return models.CallStatusErrored, models.CallErrorProvider, 0
 
 	default:
-		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
+		slog.Error("unknown call status in ncco callback", "status", status.Status)
 		return models.CallStatusFailed, models.CallErrorProvider, 0
 	}
 }
@@ -589,7 +589,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -649,7 +649,7 @@ func (s *service) MakeEmptyResponseBody(msg string) []byte {
 	})
 }
 
-func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
+func (s *service) makeRequest(method string, sendURL string, body any) (*httpx.Trace, error) {
 	bb := jsonx.MustMarshal(body)
 	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
 	token, err := s.generateToken()
@@ -725,8 +725,8 @@ func (s *service) generateToken() (string, error) {
 // NCCO building utilities
 
 func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
-	actions := make([]interface{}, 0, 1)
-	waitActions := make([]interface{}, 0, 1)
+	actions := make([]any, 0, 1)
+	waitActions := make([]any, 0, 1)
 
 	var waitEvent flows.Event
 	for _, e := range es {
@@ -823,7 +823,7 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			}
 
 			trace, err := s.makeRequest(http.MethodPost, s.callURL, cr)
-			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
+			slog.Debug("initiated new call for transfer", "trace", trace)
 			if err != nil {
 				return "", errors.Wrapf(err, "error trying to start call")
 			}
@@ -849,7 +849,7 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			if err != nil {
 				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
 			}
-			logrus.WithField("transferUUID", transferUUID).WithField("callID", call.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
+			slog.Debug("saved away call", "transferUUID", transferUUID, "callID", call.ExternalID(), "redisKey", redisKey, "redisValue", redisValue)
 		}
 	}
 

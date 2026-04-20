@@ -3,6 +3,7 @@ package hooks
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
@@ -11,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // CommitFieldChangesHook is our hook for contact field changes
@@ -20,21 +20,21 @@ var CommitFieldChangesHook models.EventCommitHook = &commitFieldChangesHook{}
 type commitFieldChangesHook struct{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *commitFieldChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitFieldChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// our list of updates
-	fieldUpdates := make([]interface{}, 0, len(scenes))
-	fieldDeletes := make(map[assets.FieldUUID][]interface{})
+	fieldUpdates := make([]any, 0, len(scenes))
+	fieldDeletes := make(map[assets.FieldUUID][]any)
 	for scene, es := range scenes {
 		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
 			field := oa.FieldByKey(event.Field.Key)
 			if field == nil {
-				logrus.WithFields(logrus.Fields{
-					"field_key":  event.Field.Key,
-					"field_name": event.Field.Name,
-					"session_id": scene.SessionID(),
-				}).Debug("unable to find field with key, ignoring")
+				slog.Debug("unable to find field with key, ignoring",
+					"field_key", event.Field.Key,
+					"field_name", event.Field.Name,
+					"session_id", scene.SessionID(),
+				)
 				continue
 			}
 

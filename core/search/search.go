@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // AssetMapper maps resolved assets in queries to how we identify them in ES which in the case
@@ -146,7 +146,13 @@ func GetContactIDsForQueryPage(ctx context.Context, rt *runtime.Runtime, oa *mod
 		return nil, nil, 0, err
 	}
 
-	logrus.WithFields(logrus.Fields{"org_id": oa.OrgID(), "query": query, "elapsed": time.Since(start), "page_count": len(ids), "total_count": results.Hits.TotalHits.Value}).Debug("paged contact query complete")
+	slog.Debug("paged contact query complete",
+		"org_id", oa.OrgID(),
+		"query", query,
+		"elapsed", time.Since(start),
+		"page_count", len(ids),
+		"total_count", results.Hits.TotalHits.Value,
+	)
 
 	return parsed, ids, results.Hits.TotalHits.Value, nil
 }
@@ -186,12 +192,12 @@ func GetContactIDsForQuery(ctx context.Context, rt *runtime.Runtime, oa *models.
 	for {
 		results, err := scroll.Do(ctx)
 		if err == io.EOF {
-			logrus.WithFields(logrus.Fields{
-				"org_id":      oa.OrgID(),
-				"query":       query,
-				"elapsed":     time.Since(start),
-				"match_count": len(ids),
-			}).Debug("contact query complete")
+			slog.Debug("contact query complete",
+				"org_id", oa.OrgID(),
+				"query", query,
+				"elapsed", time.Since(start),
+				"match_count", len(ids),
+			)
 
 			return ids, nil
 		}

@@ -2,17 +2,16 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -22,6 +21,8 @@ func init() {
 // handleAirtimeTransferred is called for each airtime transferred event
 func handleAirtimeTransferred(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.AirtimeTransferredEvent)
+
+	slog.Debug("airtime transferred", "contact", scene.ContactUUID(), "session", scene.SessionID(), "sender", event.Sender, "recipient", event.Recipient, "currency", event.Currency, "desired_amount", event.DesiredAmount.String(), "actual_amount", event.ActualAmount.String())
 
 	status := models.AirtimeTransferStatusSuccess
 	if event.ActualAmount == decimal.Zero {
@@ -39,16 +40,6 @@ func handleAirtimeTransferred(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 		event.ActualAmount,
 		event.CreatedOn(),
 	)
-
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid":   scene.ContactUUID(),
-		"session_id":     scene.SessionID(),
-		"sender":         string(event.Sender),
-		"recipient":      string(event.Recipient),
-		"currency":       event.Currency,
-		"desired_amount": event.DesiredAmount.String(),
-		"actual_amount":  event.ActualAmount.String(),
-	}).Debug("airtime transferred")
 
 	// add a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {

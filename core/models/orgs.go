@@ -2,15 +2,16 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"path/filepath"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -23,9 +24,8 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // Register a airtime service factory with the engine
@@ -67,9 +67,9 @@ const (
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	o struct {
-		ID        OrgID    `json:"id"`
-		Suspended bool     `json:"is_suspended"`
-		Config    null.Map `json:"config"`
+		ID        OrgID         `json:"id"`
+		Suspended bool          `json:"is_suspended"`
+		Config    null.Map[any] `json:"config"`
 	}
 	env envs.Environment
 }
@@ -80,44 +80,8 @@ func (o *Org) ID() OrgID { return o.o.ID }
 // Suspended returns whether the org has been suspended
 func (o *Org) Suspended() bool { return o.o.Suspended }
 
-// DateFormat returns the date format for this org
-func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
-
-// NumberFormat returns the date format for this org
-func (o *Org) NumberFormat() *envs.NumberFormat { return envs.DefaultNumberFormat }
-
-// TimeFormat returns the time format for this org
-func (o *Org) TimeFormat() envs.TimeFormat { return o.env.TimeFormat() }
-
-// Timezone returns the timezone for this org
-func (o *Org) Timezone() *time.Location { return o.env.Timezone() }
-
-// DefaultLanguage returns the primary language for this org
-func (o *Org) DefaultLanguage() envs.Language { return o.env.DefaultLanguage() }
-
-// AllowedLanguages returns the list of supported languages for this org
-func (o *Org) AllowedLanguages() []envs.Language { return o.env.AllowedLanguages() }
-
-// RedactionPolicy returns the redaction policy (are we anonymous) for this org
-func (o *Org) RedactionPolicy() envs.RedactionPolicy { return o.env.RedactionPolicy() }
-
-// DefaultCountry returns the default country for this organization (mostly used for number parsing)
-func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
-
-// Now returns the current time in the current timezone for this org
-func (o *Org) Now() time.Time { return o.env.Now() }
-
-// MaxValueLength returns our max value length for contact fields and run results
-func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
-
-// DefaultLocale combines the default languages and countries into a locale
-func (o *Org) DefaultLocale() envs.Locale { return o.env.DefaultLocale() }
-
-// LocationResolver returns a resolver for locations
-func (o *Org) LocationResolver() envs.LocationResolver { return o.env.LocationResolver() }
-
-// Equal return whether we are equal to the passed in environment
-func (o *Org) Equal(env envs.Environment) bool { return o.env.Equal(env) }
+// Environment returns this org as an engine environment
+func (o *Org) Environment() envs.Environment { return o.env }
 
 // MarshalJSON is our custom marshaller so that our inner env get output
 func (o *Org) MarshalJSON() ([]byte, error) {
@@ -217,11 +181,11 @@ func orgFromAssets(sa flows.SessionAssets) *Org {
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+func LoadOrg(ctx context.Context, cfg *runtime.Config, db *sql.DB, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}
-	rows, err := db.Queryx(selectOrgByID, orgID, cfg.MaxValueLength)
+	rows, err := db.QueryContext(ctx, selectOrgByID, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
@@ -235,7 +199,7 @@ func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID Or
 		return nil, errors.Wrapf(err, "error unmarshalling org")
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded org environment")
+	slog.Debug("loaded org environment", "elapsed", time.Since(start), "org_id", orgID)
 
 	return org, nil
 }
@@ -249,27 +213,15 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	'tt:mm' AS time_format,
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
-	$2::int AS max_value_length,
 	flow_languages AS allowed_languages,
+	input_collation,
 	COALESCE(
 		(
-			SELECT
-				country
-			FROM
-				channels_channel c
-			WHERE
-				c.org_id = o.id AND
-				c.is_active = TRUE AND
-				c.country IS NOT NULL
-			GROUP BY
-				c.country
-			ORDER BY
-				count(c.country) desc,
-				country
-			LIMIT 1
-	), '') AS default_country
-	FROM 
-		orgs_org o
-	WHERE
-		o.id = $1
+			SELECT country FROM channels_channel c
+			WHERE c.org_id = o.id AND c.is_active = TRUE AND c.country IS NOT NULL
+			GROUP BY c.country ORDER BY count(c.country) desc, country LIMIT 1
+	    ), ''
+	) AS default_country
+	FROM orgs_org o
+	WHERE o.id = $1
 ) o`

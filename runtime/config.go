@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
 )
@@ -153,24 +154,5 @@ func (c *Config) ParseDisallowedNetworks() ([]net.IP, []*net.IPNet, error) {
 		return nil, nil, err
 	}
 
-	ips := make([]net.IP, 0, len(addrs))
-	ipNets := make([]*net.IPNet, 0, len(addrs))
-
-	for _, addr := range addrs {
-		if strings.Contains(addr, "/") {
-			_, ipNet, err := net.ParseCIDR(addr)
-			if err != nil {
-				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP network", addr)
-			}
-			ipNets = append(ipNets, ipNet)
-		} else {
-			ip := net.ParseIP(addr)
-			if ip == nil {
-				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP address", addr)
-			}
-			ips = append(ips, ip)
-		}
-	}
-
-	return ips, ipNets, nil
+	return httpx.ParseNetworks(addrs...)
 }

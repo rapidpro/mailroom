@@ -2,6 +2,8 @@ package ivr
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/mailroom/core/ivr"
@@ -9,7 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const TypeStartIVRFlowBatch = "start_ivr_flow_batch"
@@ -58,24 +59,21 @@ func handleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 		session, err := ivr.RequestCall(ctx, rt, oa, batch, contact)
 		cancel()
 		if err != nil {
-			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID)
+			slog.Error(fmt.Sprintf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID), "error", err)
 			continue
 		}
 		if session == nil {
-			logrus.WithFields(logrus.Fields{
-				"elapsed":    time.Since(start),
-				"contact_id": contact.ID(),
-				"start_id":   batch.StartID,
-			}).Info("call start skipped, no suitable channel")
+
+			slog.Info("call start skipped, no suitable channel", "elapsed", time.Since(start), "contact_id", contact.ID(), "start_id", batch.StartID)
 			continue
 		}
-		logrus.WithFields(logrus.Fields{
-			"elapsed":     time.Since(start),
-			"contact_id":  contact.ID(),
-			"status":      session.Status(),
-			"start_id":    batch.StartID,
-			"external_id": session.ExternalID(),
-		}).Info("requested call for contact")
+		slog.Info("requested call for contact",
+			"elapsed", time.Since(start),
+			"contact_id", contact.ID(),
+			"status", session.Status(),
+			"start_id", batch.StartID,
+			"external_id", session.ExternalID(),
+		)
 	}
 
 	// if this is a last batch, mark our start as started

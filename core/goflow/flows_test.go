@@ -3,15 +3,14 @@ package goflow_test
 import (
 	"testing"
 
+	"github.com/Masterminds/semver"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/testsuite"
-
-	"github.com/Masterminds/semver"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,7 +31,7 @@ func TestReadFlow(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, assets.FlowUUID("502c3ee4-3249-4dee-8e71-c62070667d52"), flow.UUID())
 	assert.Equal(t, "Legacy", flow.Name())
-	assert.Equal(t, envs.Language("eng"), flow.Language())
+	assert.Equal(t, i18n.Language("eng"), flow.Language())
 	assert.Equal(t, flows.FlowTypeMessaging, flow.Type())
 
 	// read new definition
@@ -40,7 +39,7 @@ func TestReadFlow(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, assets.FlowUUID("502c3ee4-3249-4dee-8e71-c62070667d52"), flow.UUID())
 	assert.Equal(t, "New", flow.Name())
-	assert.Equal(t, envs.Language("eng"), flow.Language())
+	assert.Equal(t, i18n.Language("eng"), flow.Language())
 }
 
 func TestCloneDefinition(t *testing.T) {

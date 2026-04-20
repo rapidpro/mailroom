@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/shopspring/decimal"
 )
 
@@ -75,12 +75,12 @@ RETURNING id
 `
 
 // InsertAirtimeTransfers inserts the passed in airtime transfers returning any errors encountered
-func InsertAirtimeTransfers(ctx context.Context, db Queryer, transfers []*AirtimeTransfer) error {
+func InsertAirtimeTransfers(ctx context.Context, db DBorTx, transfers []*AirtimeTransfer) error {
 	if len(transfers) == 0 {
 		return nil
 	}
 
-	ts := make([]interface{}, len(transfers))
+	ts := make([]any, len(transfers))
 	for i := range transfers {
 		ts[i] = &transfers[i].t
 	}

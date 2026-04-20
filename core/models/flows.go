@@ -2,19 +2,20 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // FlowID is the type for flow IDs
@@ -57,7 +58,7 @@ type Flow struct {
 		OrgID          OrgID           `json:"org_id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
-		Config         null.Map        `json:"config"`
+		Config         null.Map[any]   `json:"config"`
 		Version        string          `json:"version"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
@@ -132,24 +133,24 @@ func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 	return flowID, err
 }
 
-func LoadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+func LoadFlowByUUID(ctx context.Context, db *sql.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByUUID, orgID, flowUUID)
 }
 
-func LoadFlowByName(ctx context.Context, db Queryer, orgID OrgID, name string) (*Flow, error) {
+func LoadFlowByName(ctx context.Context, db *sql.DB, orgID OrgID, name string) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByName, orgID, name)
 }
 
-func LoadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
+func LoadFlowByID(ctx context.Context, db *sql.DB, orgID OrgID, flowID FlowID) (*Flow, error) {
 	return loadFlow(ctx, db, sqlSelectFlowByID, orgID, flowID)
 }
 
 // loads the flow with the passed in UUID
-func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+func loadFlow(ctx context.Context, db *sql.DB, sql string, orgID OrgID, arg any) (*Flow, error) {
 	start := time.Now()
 	flow := &Flow{}
 
-	rows, err := db.QueryxContext(ctx, sql, orgID, arg)
+	rows, err := db.QueryContext(ctx, sql, orgID, arg)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying flow by: %v", arg)
 	}
@@ -165,7 +166,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("flow", arg).Debug("loaded flow")
+	slog.Debug("loaded flow", "elapsed", time.Since(start), "org_id", orgID, "flow", arg)
 
 	return flow, nil
 }
@@ -203,14 +204,10 @@ SELECT ROW_TO_JSON(r) FROM (
 	FROM
 		flows_flow f
 	INNER JOIN LATERAL (
-		SELECT 
-			flow_id, spec_version, definition, revision
-		FROM 
-			flows_flowrevision
-		WHERE
-			flow_id = f.id AND is_active = TRUE
-		ORDER BY 
-			revision DESC
+		SELECT flow_id, spec_version, definition, revision
+		FROM flows_flowrevision
+		WHERE flow_id = f.id
+		ORDER BY revision DESC
 		LIMIT 1
 	) fr ON fr.flow_id = f.id
 	%s

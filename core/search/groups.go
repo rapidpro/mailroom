@@ -2,13 +2,13 @@ package search
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // PopulateSmartGroup calculates which members should be part of a group and populates the contacts
@@ -34,7 +34,7 @@ func PopulateSmartGroup(ctx context.Context, rt *runtime.Runtime, es *elastic.Cl
 		// if it was more recent than 10 seconds ago, sleep until it has been 10 seconds
 		if n.Add(time.Second * 10).After(start) {
 			sleep := n.Add(time.Second * 10).Sub(start)
-			logrus.WithField("sleep", sleep).Info("sleeping before evaluating dynamic group")
+			slog.Info("sleeping before evaluating dynamic group", "sleep", sleep)
 			time.Sleep(sleep)
 		}
 	}

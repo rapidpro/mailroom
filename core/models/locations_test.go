@@ -28,7 +28,7 @@ func TestLocations(t *testing.T) {
 	root, err := oa.Locations()
 	require.NoError(t, err)
 
-	locations := root[0].FindByName("Nigeria", 0, nil)
+	locations := root[0].FindByName(oa.Env(), "Nigeria", 0, nil)
 
 	assert.Equal(t, 1, len(locations))
 	assert.Equal(t, "Nigeria", locations[0].Name())
@@ -47,7 +47,7 @@ func TestLocations(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		locations = root[0].FindByName(tc.Name, tc.Level, nigeria)
+		locations = root[0].FindByName(oa.Env(), tc.Name, tc.Level, nigeria)
 		assert.Equal(t, 1, len(locations))
 		state := locations[0]
 

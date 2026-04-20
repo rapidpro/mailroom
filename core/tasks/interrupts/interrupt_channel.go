@@ -33,7 +33,7 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	channels, err := models.GetChannelsByID(ctx, db, []models.ChannelID{t.ChannelID})
+	channels, err := models.GetChannelsByID(ctx, db.DB, []models.ChannelID{t.ChannelID})
 	if err != nil {
 		return errors.Wrapf(err, "error getting channels")
 	}
@@ -49,7 +49,7 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 		return errors.Wrapf(err, "error clearing courier queues")
 	}
 
-	err = models.FailChannelMessages(ctx, db, orgID, t.ChannelID, models.MsgFailedChannelRemoved)
+	err = models.FailChannelMessages(ctx, rt.DB.DB, orgID, t.ChannelID, models.MsgFailedChannelRemoved)
 	if err != nil {
 		return errors.Wrapf(err, "error failing channel messages")
 	}

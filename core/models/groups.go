@@ -2,16 +2,14 @@ package models
 
 import (
 	"context"
-	"time"
-
-	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // GroupID is our type for group ids
@@ -36,70 +34,52 @@ const (
 
 // Group is our mailroom type for contact groups
 type Group struct {
-	g struct {
-		ID     GroupID          `json:"id"`
-		UUID   assets.GroupUUID `json:"uuid"`
-		Name   string           `json:"name"`
-		Query  string           `json:"query"`
-		Status GroupStatus      `json:"status"`
-		Type   GroupType        `json:"group_type"`
-	}
+	ID_     GroupID          `json:"id"`
+	UUID_   assets.GroupUUID `json:"uuid"`
+	Name_   string           `json:"name"`
+	Query_  string           `json:"query"`
+	Status_ GroupStatus      `json:"status"`
+	Type_   GroupType        `json:"group_type"`
 }
 
 // ID returns the ID for this group
-func (g *Group) ID() GroupID { return g.g.ID }
+func (g *Group) ID() GroupID { return g.ID_ }
 
 // UUID returns the uuid for this group
-func (g *Group) UUID() assets.GroupUUID { return g.g.UUID }
+func (g *Group) UUID() assets.GroupUUID { return g.UUID_ }
 
 // Name returns the name for this group
-func (g *Group) Name() string { return g.g.Name }
+func (g *Group) Name() string { return g.Name_ }
 
 // Query returns the query string (if any) for this group
-func (g *Group) Query() string { return g.g.Query }
+func (g *Group) Query() string { return g.Query_ }
 
 // Status returns the status of this group
-func (g *Group) Status() GroupStatus { return g.g.Status }
+func (g *Group) Status() GroupStatus { return g.Status_ }
 
 // Type returns the type of this group
-func (g *Group) Type() GroupType { return g.g.Type }
+func (g *Group) Type() GroupType { return g.Type_ }
 
-// LoadGroups loads the groups for the passed in org
-func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, error) {
-	start := time.Now()
-
-	rows, err := db.QueryxContext(ctx, selectGroupsSQL, orgID)
+// loads the groups for the passed in org
+func loadGroups(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Group, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectGroupsByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying groups for org: %d", orgID)
 	}
-	defer rows.Close()
 
-	groups := make([]assets.Group, 0, 10)
-	for rows.Next() {
-		group := &Group{}
-		err = dbutil.ScanJSON(rows, &group.g)
-		if err != nil {
-			return nil, errors.Wrap(err, "error reading group row")
-		}
-
-		groups = append(groups, group)
-	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(groups)).Debug("loaded groups")
-
-	return groups, nil
+	return ScanJSONRows(rows, func() assets.Group { return &Group{} })
 }
 
-const selectGroupsSQL = `
+const sqlSelectGroupsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (
-    SELECT id, uuid, name, query, status, group_type
-      FROM contacts_contactgroup 
-     WHERE org_id = $1 AND is_active = TRUE
-  ORDER BY name ASC
+      SELECT id, uuid, name, query, status, group_type
+        FROM contacts_contactgroup 
+       WHERE org_id = $1 AND is_active = TRUE
+    ORDER BY name ASC
 ) r;`
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
+func RemoveContactsFromGroups(ctx context.Context, tx DBorTx, removals []*GroupRemove) error {
 	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removals)
 }
 
@@ -126,8 +106,8 @@ IN (
 `
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
-	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
+func AddContactsToGroups(ctx context.Context, tx DBorTx, adds []*GroupAdd) error {
+	return BulkQuery(ctx, "adding contacts to groups", tx, sqlAddContactsToGroups, adds)
 }
 
 // GroupAdd is our struct to track a final group additions
@@ -136,41 +116,32 @@ type GroupAdd struct {
 	GroupID   GroupID   `db:"group_id"`
 }
 
-const addContactsToGroupsSQL = `
-INSERT INTO 
-	contacts_contactgroup_contacts
-	(contact_id, contactgroup_id)
-VALUES(:contact_id, :group_id)
-ON CONFLICT
-	DO NOTHING
-`
+const sqlAddContactsToGroups = `
+INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id)
+                                    VALUES(:contact_id, :group_id)
+ON CONFLICT DO NOTHING`
 
 // ContactIDsForGroupIDs returns the unique contacts that are in the passed in groups
-func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) ([]ContactID, error) {
+func ContactIDsForGroupIDs(ctx context.Context, tx DBorTx, groupIDs []GroupID) ([]ContactID, error) {
 	// now add all the ids for our groups
-	rows, err := tx.QueryxContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contacts for groups")
 	}
-	defer rows.Close()
 
 	contactIDs := make([]ContactID, 0, 10)
-	var contactID ContactID
-	for rows.Next() {
-		err := rows.Scan(&contactID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error scanning contact id")
-		}
-		contactIDs = append(contactIDs, contactID)
-	}
 
+	contactIDs, err = dbutil.ScanAllSlice(rows, contactIDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error scanning contact ids")
+	}
 	return contactIDs, nil
 }
 
 const updateGroupStatusSQL = `UPDATE contacts_contactgroup SET status = $2 WHERE id = $1`
 
 // UpdateGroupStatus updates the group status for the passed in group
-func UpdateGroupStatus(ctx context.Context, db Queryer, groupID GroupID, status GroupStatus) error {
+func UpdateGroupStatus(ctx context.Context, db DBorTx, groupID GroupID, status GroupStatus) error {
 	_, err := db.ExecContext(ctx, updateGroupStatusSQL, groupID, status)
 	if err != nil {
 		return errors.Wrapf(err, "error updating group status for group: %d", groupID)

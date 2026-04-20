@@ -4,31 +4,42 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-var retriedMsgs = redisx.NewIntervalSet("retried_msgs", time.Hour*24, 2)
-
 func init() {
-	mailroom.RegisterCron("retry_msgs", time.Minute*5, false, RetryPendingMsgs)
+	tasks.RegisterCron("retry_msgs", false, NewRetryPendingCron())
 }
 
-// RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
+type RetryPendingCron struct {
+	marker *redisx.IntervalSet
+}
+
+func NewRetryPendingCron() *RetryPendingCron {
+	return &RetryPendingCron{
+		marker: redisx.NewIntervalSet("retried_msgs", time.Hour*24, 2),
+	}
+}
+
+func (c *RetryPendingCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute*5)
+}
+
+// looks for any pending msgs older than five minutes and queues them to be handled again
+func (c *RetryPendingCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	if !rt.Config.RetryPendingMessages {
-		return nil
+		return nil, nil
 	}
 
-	log := logrus.WithField("comp", "handler_retrier")
-	start := time.Now()
+	log := slog.With("comp", "handler_retrier")
 
 	rc := rt.RP.Get()
 	defer rc.Close()
@@ -36,19 +47,19 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 	// check the size of our handle queue
 	handlerSize, err := queue.Size(rc, queue.HandlerQueue)
 	if err != nil {
-		return errors.Wrapf(err, "error finding size of handler queue")
+		return nil, errors.Wrapf(err, "error finding size of handler queue")
 	}
 
 	// if our queue has items in it, don't queue anything else in there, wait for it to be empty
 	if handlerSize > 0 {
 		log.Info("not retrying any messages, have messages in handler queue")
-		return nil
+		return nil, nil
 	}
 
 	// get all incoming messages that are still empty
 	rows, err := rt.DB.Queryx(unhandledMsgsQuery)
 	if err != nil {
-		return errors.Wrapf(err, "error querying for unhandled messages")
+		return nil, errors.Wrapf(err, "error querying for unhandled messages")
 	}
 	defer rows.Close()
 
@@ -61,15 +72,15 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 
 		err = rows.Scan(&orgID, &contactID, &msgID, &eventJSON)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning msg row")
+			return nil, errors.Wrapf(err, "error scanning msg row")
 		}
 
 		// our key is built such that we will only retry once an hour
 		key := fmt.Sprintf("%d_%d", msgID, time.Now().Hour())
 
-		dupe, err := retriedMsgs.Contains(rc, key)
+		dupe, err := c.marker.IsMember(rc, key)
 		if err != nil {
-			return errors.Wrapf(err, "error checking for dupe retry")
+			return nil, errors.Wrapf(err, "error checking for dupe retry")
 		}
 
 		// we already retried this, skip
@@ -87,20 +98,19 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 		// queue this event up for handling
 		err = QueueHandleTask(rc, contactID, task)
 		if err != nil {
-			return errors.Wrapf(err, "error queuing retry for task")
+			return nil, errors.Wrapf(err, "error queuing retry for task")
 		}
 
 		// mark it as queued
-		err = retriedMsgs.Add(rc, key)
+		err = c.marker.Add(rc, key)
 		if err != nil {
-			return errors.Wrapf(err, "error marking task for retry")
+			return nil, errors.Wrapf(err, "error marking task for retry")
 		}
 
 		retried++
 	}
 
-	log.WithField("retried", retried).WithField("elapsed", time.Since(start)).Info("queued pending messages to be retried")
-	return nil
+	return map[string]any{"retried": retried}, nil
 }
 
 const unhandledMsgsQuery = `

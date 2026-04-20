@@ -13,9 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/stretchr/testify/assert"
+	"github.com/nyaruka/redisx/assertredis"
 )
 
 func TestMsgCreated(t *testing.T) {
@@ -27,13 +25,13 @@ func TestMsgCreated(t *testing.T) {
 	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10, nil)
 
 	// delete all URNs for bob
 	rt.DB.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
 
-	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
-	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	// change alexandrias URN to a facebook URN and set her language to eng so that a template gets used for her
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'facebook:12345', path='12345', scheme='facebook' WHERE contact_id = $1`, testdata.Alexandria.ID)
 	rt.DB.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
 
 	msg1 := testdata.InsertIncomingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
@@ -62,31 +60,30 @@ func TestMsgCreated(t *testing.T) {
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy: msg1,
+				testdata.Cathy: msg1.FlowMsg,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND quick_replies[1] = 'yes' AND quick_replies[2] = 'no' AND high_priority = TRUE`,
-					Args:  []interface{}{testdata.Cathy.ID},
+					Args:  []any{testdata.Cathy.ID},
 					Count: 2,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello Attachments' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
-					Args:  []interface{}{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
+					Args:  []any{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
-					Args:  []interface{}{testdata.Bob.ID},
+					Args:  []any{testdata.Bob.ID},
 					Count: 1,
 				},
 				{
-					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND metadata = $3 AND direction = 'O' AND status = 'Q' AND channel_id = $4",
-					Args: []interface{}{
+					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND direction = 'O' AND status = 'Q' AND channel_id = $3 AND metadata::jsonb->'templating'->'template'->>'name' = 'revive_issue'",
+					Args: []any{
 						testdata.Alexandria.ID,
 						`Hi Alexandia, are you still experiencing problems with tooth?`,
-						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
-						testdata.TwitterChannel.ID,
+						testdata.FacebookChannel.ID,
 					},
 					Count: 1,
 				},
@@ -96,18 +93,11 @@ func TestMsgCreated(t *testing.T) {
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
 
-	rc := rt.RP.Get()
-	defer rc.Close()
-
 	// Cathy should have 1 batch of queued messages at high priority
-	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
-	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assertredis.ZCard(t, rt.RP, fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID), 1)
 
 	// One bulk for George
-	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
-	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assertredis.ZCard(t, rt.RP, fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID), 1)
 }
 
 func TestNewURN(t *testing.T) {
@@ -116,15 +106,15 @@ func TestNewURN(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// switch our twitter channel to telegram
-	telegramUUID := testdata.TwitterChannel.UUID
-	telegramID := testdata.TwitterChannel.ID
+	telegramUUID := testdata.FacebookChannel.UUID
+	telegramID := testdata.FacebookChannel.ID
 	rt.DB.MustExec(
 		`UPDATE channels_channel SET channel_type = 'TG', name = 'Telegram', schemes = ARRAY['telegram'] WHERE uuid = $1`,
 		telegramUUID,
 	)
 
 	// give George a URN that Bob will steal
-	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1)
+	testdata.InsertContactURN(rt, testdata.Org1, testdata.George, urns.URN("telegram:67890"), 1, nil)
 
 	tcs := []handlers.TestCase{
 		{
@@ -158,7 +148,7 @@ func TestNewURN(t *testing.T) {
 					  u.identity = $2 AND
 					  m.channel_id = $3 AND
 					  u.channel_id IS NULL`,
-					Args:  []interface{}{testdata.Cathy.ID, "telegram:12345", telegramID},
+					Args:  []any{testdata.Cathy.ID, "telegram:12345", telegramID},
 					Count: 1,
 				},
 				{
@@ -175,7 +165,7 @@ func TestNewURN(t *testing.T) {
 					  u.identity = $2 AND
 					  m.channel_id = $3 AND
 					  u.channel_id IS NULL`,
-					Args:  []interface{}{testdata.Bob.ID, "telegram:67890", telegramID},
+					Args:  []any{testdata.Bob.ID, "telegram:67890", telegramID},
 					Count: 1,
 				},
 			},

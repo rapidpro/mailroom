@@ -2,17 +2,18 @@ package models
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // TriggerType is the type of a trigger
@@ -34,6 +35,8 @@ const (
 	IncomingCallTriggerType    = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
 	TicketClosedTriggerType    = TriggerType("T")
+	OptInTriggerType           = TriggerType("I")
+	OptOutTriggerType          = TriggerType("O")
 )
 
 // match type constants
@@ -48,25 +51,26 @@ const NilTriggerID = TriggerID(0)
 // Trigger represents a trigger in an organization
 type Trigger struct {
 	t struct {
-		ID              TriggerID   `json:"id"`
-		FlowID          FlowID      `json:"flow_id"`
-		TriggerType     TriggerType `json:"trigger_type"`
-		Keyword         string      `json:"keyword"`
-		MatchType       MatchType   `json:"match_type"`
-		ChannelID       ChannelID   `json:"channel_id"`
-		ReferrerID      string      `json:"referrer_id"`
-		IncludeGroupIDs []GroupID   `json:"include_group_ids"`
-		ExcludeGroupIDs []GroupID   `json:"exclude_group_ids"`
-		ContactIDs      []ContactID `json:"contact_ids,omitempty"`
+		ID              TriggerID      `json:"id"`
+		OrgID           OrgID          `json:"org_id"`
+		FlowID          FlowID         `json:"flow_id"`
+		TriggerType     TriggerType    `json:"trigger_type"`
+		Keywords        pq.StringArray `json:"keywords"`
+		MatchType       MatchType      `json:"match_type"`
+		ChannelID       ChannelID      `json:"channel_id"`
+		ReferrerID      string         `json:"referrer_id"`
+		IncludeGroupIDs []GroupID      `json:"include_group_ids"`
+		ExcludeGroupIDs []GroupID      `json:"exclude_group_ids"`
+		ContactIDs      []ContactID    `json:"contact_ids,omitempty"`
 	}
 }
 
 // ID returns the id of this trigger
-func (t *Trigger) ID() TriggerID { return t.t.ID }
-
+func (t *Trigger) ID() TriggerID              { return t.t.ID }
+func (t *Trigger) OrgID() OrgID               { return t.t.OrgID }
 func (t *Trigger) FlowID() FlowID             { return t.t.FlowID }
 func (t *Trigger) TriggerType() TriggerType   { return t.t.TriggerType }
-func (t *Trigger) Keyword() string            { return t.t.Keyword }
+func (t *Trigger) Keywords() []string         { return []string(t.t.Keywords) }
 func (t *Trigger) MatchType() MatchType       { return t.t.MatchType }
 func (t *Trigger) ChannelID() ChannelID       { return t.t.ChannelID }
 func (t *Trigger) ReferrerID() string         { return t.t.ReferrerID }
@@ -80,22 +84,19 @@ func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	return triggers.KeywordMatchTypeOnlyWord
 }
 
-// Match returns the match for this trigger, if any
-func (t *Trigger) Match() *triggers.KeywordMatch {
-	if t.Keyword() != "" {
-		return &triggers.KeywordMatch{
-			Type:    t.KeywordMatchType(),
-			Keyword: t.Keyword(),
-		}
-	}
-	return nil
+func (t *Trigger) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &t.t) }
+
+// CreateStart generates an insertable flow start for scheduled trigger
+func (t *Trigger) CreateStart() *FlowStart {
+	return NewFlowStart(t.t.OrgID, StartTypeTrigger, t.t.FlowID).
+		WithContactIDs(t.t.ContactIDs).
+		WithGroupIDs(t.t.IncludeGroupIDs).
+		WithExcludeGroupIDs(t.t.ExcludeGroupIDs)
 }
 
 // loadTriggers loads all non-schedule triggers for the passed in org
-func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, error) {
-	start := time.Now()
-
-	rows, err := db.QueryxContext(ctx, selectTriggersSQL, orgID)
+func loadTriggers(ctx context.Context, db *sql.DB, orgID OrgID) ([]*Trigger, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectTriggersByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
 	}
@@ -112,55 +113,77 @@ func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, err
 		triggers = append(triggers, trigger)
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(triggers)).Debug("loaded triggers")
-
 	return triggers, nil
 }
 
 // FindMatchingMsgTrigger finds the best match trigger for an incoming message from the given contact
-func FindMatchingMsgTrigger(oa *OrgAssets, contact *flows.Contact, text string) *Trigger {
+func FindMatchingMsgTrigger(oa *OrgAssets, channel *Channel, contact *flows.Contact, text string) (*Trigger, string) {
 	// determine our message keyword
 	words := utils.TokenizeString(text)
 	keyword := ""
 	only := false
 	if len(words) > 0 {
 		// our keyword is our first word
-		keyword = strings.ToLower(words[0])
+		keyword = words[0]
 		only = len(words) == 1
 	}
 
+	// for each candidate trigger, the keyword that matched
+	candidateKeywords := make(map[*Trigger]string, 10)
+
 	candidates := findTriggerCandidates(oa, KeywordTriggerType, func(t *Trigger) bool {
-		return t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only))
+		for _, k := range t.Keywords() {
+			m := envs.CollateEquals(oa.Env(), k, keyword) && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only))
+			if m {
+				candidateKeywords[t] = k
+				return true
+			}
+		}
+		return false
 	})
 
 	// if we have a matching keyword trigger return that, otherwise we move on to catchall triggers..
-	byKeyword := findBestTriggerMatch(candidates, nil, contact)
+	byKeyword := findBestTriggerMatch(candidates, channel, contact)
 	if byKeyword != nil {
-		return byKeyword
+		return byKeyword, candidateKeywords[byKeyword]
 	}
 
 	candidates = findTriggerCandidates(oa, CatchallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, contact)
+	return findBestTriggerMatch(candidates, channel, contact), ""
 }
 
 // FindMatchingIncomingCallTrigger finds the best match trigger for incoming calls
-func FindMatchingIncomingCallTrigger(oa *OrgAssets, contact *flows.Contact) *Trigger {
+func FindMatchingIncomingCallTrigger(oa *OrgAssets, channel *Channel, contact *flows.Contact) *Trigger {
 	candidates := findTriggerCandidates(oa, IncomingCallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, contact)
+	return findBestTriggerMatch(candidates, channel, contact)
 }
 
 // FindMatchingMissedCallTrigger finds the best match trigger for missed incoming calls
-func FindMatchingMissedCallTrigger(oa *OrgAssets) *Trigger {
+func FindMatchingMissedCallTrigger(oa *OrgAssets, channel *Channel) *Trigger {
 	candidates := findTriggerCandidates(oa, MissedCallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, nil)
+	return findBestTriggerMatch(candidates, channel, nil)
 }
 
 // FindMatchingNewConversationTrigger finds the best match trigger for new conversation channel events
 func FindMatchingNewConversationTrigger(oa *OrgAssets, channel *Channel) *Trigger {
 	candidates := findTriggerCandidates(oa, NewConversationTriggerType, nil)
+
+	return findBestTriggerMatch(candidates, channel, nil)
+}
+
+// FindMatchingOptInTrigger finds the best match trigger for optin channel events
+func FindMatchingOptInTrigger(oa *OrgAssets, channel *Channel) *Trigger {
+	candidates := findTriggerCandidates(oa, OptInTriggerType, nil)
+
+	return findBestTriggerMatch(candidates, channel, nil)
+}
+
+// FindMatchingOptOutTrigger finds the best match trigger for optout channel events
+func FindMatchingOptOutTrigger(oa *OrgAssets, channel *Channel) *Trigger {
+	candidates := findTriggerCandidates(oa, OptOutTriggerType, nil)
 
 	return findBestTriggerMatch(candidates, channel, nil)
 }
@@ -220,7 +243,6 @@ type triggerMatch struct {
 // include (2) + exclude (1) = 3
 // include (2) = 2
 // exclude (1) = 1
-//
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
@@ -295,67 +317,45 @@ func triggerMatchQualifiers(t *Trigger, channel *Channel, contactGroups map[Grou
 	return true, score
 }
 
-const selectTriggersSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	t.id as id, 
-	t.flow_id as flow_id,
-	t.trigger_type as trigger_type,
-	t.keyword as keyword,
-	t.match_type as match_type,
-	t.channel_id as channel_id,
-	COALESCE(t.referrer_id, '') as referrer_id,
-	ARRAY_REMOVE(ARRAY_AGG(DISTINCT ig.contactgroup_id), NULL) as include_group_ids,
-	ARRAY_REMOVE(ARRAY_AGG(DISTINCT eg.contactgroup_id), NULL) as exclude_group_ids
-FROM 
-	triggers_trigger t
-	LEFT OUTER JOIN triggers_trigger_groups ig ON t.id = ig.trigger_id
-	LEFT OUTER JOIN triggers_trigger_exclude_groups eg ON t.id = eg.trigger_id
-WHERE 
-	t.org_id = $1 AND 
-	t.is_active = TRUE AND
-	t.is_archived = FALSE AND
-	t.trigger_type != 'S'
-GROUP BY 
-	t.id
-) r;
-`
+const sqlSelectTriggersByOrg = `
+SELECT ROW_TO_JSON(r) FROM (
+             SELECT
+                    t.id,
+                    t.org_id,
+                    t.flow_id,
+                    t.trigger_type,
+                    t.keywords,
+                    t.match_type,
+                    t.channel_id,
+                    COALESCE(t.referrer_id, '') AS referrer_id,
+                    ARRAY_REMOVE(ARRAY_AGG(DISTINCT ig.contactgroup_id), NULL) AS include_group_ids,
+                    ARRAY_REMOVE(ARRAY_AGG(DISTINCT eg.contactgroup_id), NULL) AS exclude_group_ids
+               FROM triggers_trigger t
+    LEFT OUTER JOIN triggers_trigger_groups ig ON t.id = ig.trigger_id
+    LEFT OUTER JOIN triggers_trigger_exclude_groups eg ON t.id = eg.trigger_id
+              WHERE t.org_id = $1 AND t.is_active = TRUE AND t.is_archived = FALSE AND t.trigger_type != 'S'
+           GROUP BY t.id
+) r;`
 
-const selectTriggersByContactIDsSQL = `
-SELECT 
-	t.id AS id
-FROM
-	triggers_trigger t
-INNER JOIN 
-	triggers_trigger_contacts tc ON tc.trigger_id = t.id
-WHERE
-	tc.contact_id = ANY($1) AND
-	is_archived = FALSE
-`
+const sqlSelectTriggersByContactIDs = `
+    SELECT t.id AS id
+      FROM triggers_trigger t
+INNER JOIN triggers_trigger_contacts tc ON tc.trigger_id = t.id
+     WHERE tc.contact_id = ANY($1) AND is_archived = FALSE`
 
-const deleteContactTriggersForIDsSQL = `
-DELETE FROM
-	triggers_trigger_contacts
-WHERE
-	contact_id = ANY($1)
-`
-
-const archiveEmptyTriggersSQL = `
-UPDATE 
-	triggers_trigger
-SET 
-	is_archived = TRUE
-WHERE
-	id = ANY($1) AND
+const sqlArchiveEmptyTriggers = `
+UPDATE triggers_trigger
+   SET is_archived = TRUE
+ WHERE id = ANY($1) AND
 	NOT EXISTS (SELECT * FROM triggers_trigger_contacts WHERE trigger_id = triggers_trigger.id) AND
 	NOT EXISTS (SELECT * FROM triggers_trigger_groups WHERE trigger_id = triggers_trigger.id) AND
-	NOT EXISTS (SELECT * FROM triggers_trigger_exclude_groups WHERE trigger_id = triggers_trigger.id)
-`
+	NOT EXISTS (SELECT * FROM triggers_trigger_exclude_groups WHERE trigger_id = triggers_trigger.id)`
 
 // ArchiveContactTriggers removes the given contacts from any triggers and archives any triggers
 // which reference only those contacts
-func ArchiveContactTriggers(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+func ArchiveContactTriggers(ctx context.Context, tx DBorTx, contactIDs []ContactID) error {
 	// start by getting all the active triggers that reference these contacts
-	rows, err := tx.QueryxContext(ctx, selectTriggersByContactIDsSQL, pq.Array(contactIDs))
+	rows, err := tx.QueryxContext(ctx, sqlSelectTriggersByContactIDs, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error finding triggers for contacts")
 	}
@@ -372,13 +372,13 @@ func ArchiveContactTriggers(ctx context.Context, tx Queryer, contactIDs []Contac
 	}
 
 	// remove any references to these contacts in triggers
-	_, err = tx.ExecContext(ctx, deleteContactTriggersForIDsSQL, pq.Array(contactIDs))
+	_, err = tx.ExecContext(ctx, `DELETE FROM triggers_trigger_contacts WHERE contact_id = ANY($1)`, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error removing contacts from triggers")
 	}
 
 	// archive any of the original triggers which are now not referencing any contact or group
-	_, err = tx.ExecContext(ctx, archiveEmptyTriggersSQL, pq.Array(triggerIDs))
+	_, err = tx.ExecContext(ctx, sqlArchiveEmptyTriggers, pq.Array(triggerIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error archiving empty triggers")
 	}

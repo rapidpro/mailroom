@@ -35,7 +35,7 @@ func TestSurveyor(t *testing.T) {
 	defer server.Stop()
 
 	// insert an auth token for user 1 for org 1
-	rt.DB.MustExec(`INSERT INTO api_apitoken(is_active, key, created, org_id, role_id, user_id) VALUES(TRUE, 'sesame', NOW(), 1, 5, 1)`)
+	rt.DB.MustExec(`INSERT INTO api_apitoken(is_active, key, created, org_id, role_id, user_id) VALUES(TRUE, 'sesame', NOW(), $1, $2, 1)`, testdata.Org1.ID, testdata.AuthGroupIDs["Surveyors"])
 
 	type Assertion struct {
 		Query string

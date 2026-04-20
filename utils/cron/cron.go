@@ -3,22 +3,43 @@ package cron
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/analytics"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
-	"github.com/sirupsen/logrus"
 )
 
+const (
+	statsExpires       = 60 * 60 * 48 // 2 days
+	statsKeyBase       = "cron_stats"
+	statsLastStartKey  = statsKeyBase + ":last_start"
+	statsLastTimeKey   = statsKeyBase + ":last_time"
+	statsLastResultKey = statsKeyBase + ":last_result"
+	statsCallCountKey  = statsKeyBase + ":call_count"
+	statsTotalTimeKey  = statsKeyBase + ":total_time"
+)
+
+var statsKeys = []string{
+	statsLastStartKey,
+	statsLastTimeKey,
+	statsLastResultKey,
+	statsCallCountKey,
+	statsTotalTimeKey,
+}
+
 // Function is the function that will be called on our schedule
-type Function func(context.Context, *runtime.Runtime) error
+type Function func(context.Context, *runtime.Runtime) (map[string]any, error)
 
 // Start calls the passed in function every interval, making sure it acquires a
 // lock so that only one process is running at once. Note that across processes
 // crons may be called more often than duration as there is no inter-process
 // coordination of cron fires. (this might be a worthy addition)
-func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.Duration, allInstances bool, cronFunc Function, timeout time.Duration, quit chan bool) {
+func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, allInstances bool, cronFunc Function, next func(time.Time) time.Time, timeout time.Duration, quit chan bool) {
 	wg.Add(1) // add ourselves to the wait group
 
 	lockName := fmt.Sprintf("lock:%s_lock", name) // for historical reasons...
@@ -28,12 +49,12 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 		lockName = fmt.Sprintf("%s:%s", lockName, rt.Config.InstanceName)
 	}
 
-	locker := redisx.NewLocker(lockName, time.Minute*5)
+	locker := redisx.NewLocker(lockName, timeout+time.Second*30)
 
 	wait := time.Duration(0)
 	lastFire := time.Now()
 
-	log := logrus.WithField("cron", name).WithField("lockName", lockName)
+	log := slog.With("cron", name)
 
 	go func() {
 		defer func() {
@@ -55,7 +76,6 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 				if err != nil {
 					break
 				}
-				log := log.WithField("lock", lock)
 
 				if lock == "" {
 					log.Debug("lock already present, sleeping")
@@ -63,27 +83,24 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 				}
 
 				// ok, got the lock, run our cron function
-				start := time.Now()
-				err = fireCron(rt, cronFunc, lockName, lock)
+				started := time.Now()
+				results, err := fireCron(rt, name, cronFunc, timeout)
 				if err != nil {
-					log.WithError(err).Error("error while running cron")
+					log.Error("error while running cron", "error", err)
 				}
-				elapsed := time.Since(start)
+				ended := time.Now()
+
+				recordCompletion(rt.RP, name, started, ended, results)
 
 				// release our lock
 				err = locker.Release(rt.RP, lock)
 				if err != nil {
-					log.WithError(err).Error("error releasing lock")
-				}
-
-				// if cron too longer than a minute, log
-				if elapsed > time.Minute {
-					logrus.WithField("cron", name).WithField("elapsed", elapsed).Error("cron took too long")
+					log.Error("error releasing lock", "error", err)
 				}
 			}
 
 			// calculate our next fire time
-			nextFire := NextFire(lastFire, interval)
+			nextFire := next(lastFire)
 			wait = time.Until(nextFire)
 			if wait < time.Duration(0) {
 				wait = time.Duration(0)
@@ -94,33 +111,54 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 
 // fireCron is just a wrapper around the cron function we will call for the purposes of
 // catching and logging panics
-func fireCron(rt *runtime.Runtime, cronFunc Function, lockName string, lockValue string) error {
-	log := logrus.WithField("lockValue", lockValue).WithField("func", cronFunc)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+func fireCron(rt *runtime.Runtime, name string, cronFunc Function, timeout time.Duration) (map[string]any, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	defer func() {
 		// catch any panics and recover
 		panicLog := recover()
 		if panicLog != nil {
-			log.Errorf("panic running cron: %s", panicLog)
+			slog.Error(fmt.Sprintf("panic running cron: %s", panicLog), "cron", name)
 		}
 	}()
 
 	return cronFunc(ctx, rt)
 }
 
-// NextFire returns the next time we should fire based on the passed in time and interval
-func NextFire(last time.Time, interval time.Duration) time.Time {
-	if interval >= time.Second && interval < time.Minute {
-		normalizedInterval := interval - ((time.Duration(last.Second()) * time.Second) % interval)
-		return last.Add(normalizedInterval)
-	} else if interval == time.Minute {
-		seconds := time.Duration(60-last.Second()) + 1
-		return last.Add(seconds * time.Second)
+func recordCompletion(rp *redis.Pool, name string, started, ended time.Time, results map[string]any) {
+	log := slog.With("cron", name)
+	elapsed := ended.Sub(started)
+	elapsedSeconds := elapsed.Seconds()
+
+	rc := rp.Get()
+	defer rc.Close()
+
+	rc.Send("HSET", statsLastStartKey, name, started.Format(time.RFC3339))
+	rc.Send("HSET", statsLastTimeKey, name, elapsedSeconds)
+	rc.Send("HSET", statsLastResultKey, name, jsonx.MustMarshal(results))
+	rc.Send("HINCRBY", statsCallCountKey, name, 1)
+	rc.Send("HINCRBYFLOAT", statsTotalTimeKey, name, elapsedSeconds)
+	for _, key := range statsKeys {
+		rc.Send("EXPIRE", key, statsExpires)
+	}
+
+	if err := rc.Flush(); err != nil {
+		log.Error("error writing cron results to redis")
+	}
+
+	analytics.Gauge("mr.cron_"+name, elapsedSeconds)
+
+	logResults := make([]any, 0, len(results)*2)
+	for k, v := range results {
+		logResults = append(logResults, k, v)
+	}
+	log = log.With("elapsed", elapsedSeconds, slog.Group("results", logResults...))
+
+	// if cron too longer than a minute, log as error
+	if elapsed > time.Minute {
+		log.Error("cron took too long")
 	} else {
-		// no special treatment for other things
-		return last.Add(interval)
+		log.Info("cron completed")
 	}
 }

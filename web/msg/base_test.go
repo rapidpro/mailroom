@@ -15,7 +15,7 @@ func TestSend(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
-	cathyTicket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "help", "", time.Date(2015, 1, 1, 12, 30, 45, 0, time.UTC), nil)
+	cathyTicket := testdata.InsertOpenTicket(rt, testdata.Org1, testdata.Cathy, testdata.DefaultTopic, "help", time.Date(2015, 1, 1, 12, 30, 45, 0, time.UTC), nil)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/send.json", map[string]string{
 		"cathy_ticket_id": fmt.Sprintf("%d", cathyTicket.ID),
@@ -33,18 +33,32 @@ func TestResend(t *testing.T) {
 	cathyOut := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "how can we help", nil, models.MsgStatusSent, false)
 	bobOut := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.Bob, "this failed", nil, models.MsgStatusFailed, false)
 	georgeOut := testdata.InsertOutgoingMsg(rt, testdata.Org1, testdata.VonageChannel, testdata.George, "no URN", nil, models.MsgStatusFailed, false)
-	rt.DB.MustExec(`UPDATE msgs_msg SET contact_urn_id = NULL WHERE id = $1`, georgeOut.ID())
+	rt.DB.MustExec(`UPDATE msgs_msg SET contact_urn_id = NULL WHERE id = $1`, georgeOut.ID)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/resend.json", map[string]string{
-		"cathy_msgin_id":   fmt.Sprintf("%d", cathyIn.ID()),
-		"cathy_msgout_id":  fmt.Sprintf("%d", cathyOut.ID()),
-		"bob_msgout_id":    fmt.Sprintf("%d", bobOut.ID()),
-		"george_msgout_id": fmt.Sprintf("%d", georgeOut.ID()),
+		"cathy_msgin_id":   fmt.Sprintf("%d", cathyIn.ID),
+		"cathy_msgout_id":  fmt.Sprintf("%d", cathyOut.ID),
+		"bob_msgout_id":    fmt.Sprintf("%d", bobOut.ID),
+		"george_msgout_id": fmt.Sprintf("%d", georgeOut.ID),
 	})
 }
 
-func TestPreviewBroadcast(t *testing.T) {
+func TestBroadcast(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_broadcast.json", nil)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	polls := testdata.InsertOptIn(rt, testdata.Org1, "Polls")
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/broadcast.json", map[string]string{
+		"polls_id": fmt.Sprintf("%d", polls.ID),
+	})
+
+	testsuite.AssertBatchTasks(t, testdata.Org1.ID, map[string]int{"send_broadcast": 1})
+}
+
+func TestBroadcastPreview(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/broadcast_preview.json", nil)
 }

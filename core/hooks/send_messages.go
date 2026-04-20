@@ -15,7 +15,7 @@ var SendMessagesHook models.EventCommitHook = &sendMessagesHook{}
 type sendMessagesHook struct{}
 
 // Apply sends all non-android messages to courier
-func (h *sendMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *sendMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	msgs := make([]*models.Msg, 0, 1)
 
 	// for each scene gather all our messages
@@ -32,6 +32,6 @@ func (h *sendMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *s
 		msgs = append(msgs, sceneMsgs...)
 	}
 
-	msgio.SendMessages(ctx, rt, tx, nil, msgs)
+	msgio.QueueMessages(ctx, rt, tx, nil, msgs)
 	return nil
 }

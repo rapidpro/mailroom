@@ -4,6 +4,7 @@ import (
 	"compress/flate"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -97,7 +97,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 			return
 		}
 
-		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
+		slog.Error("error handling request", "comp", "server", "request", r, "error", err)
 
 		WriteMarshalled(w, http.StatusInternalServerError, NewErrorResponse(err))
 	}
@@ -105,6 +105,8 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 // Start starts our web server, listening for new requests
 func (s *Server) Start() {
+	log := slog.With("comp", "server", "address", s.rt.Config.Address, "port", s.rt.Config.Port)
+
 	s.wg.Add(1)
 
 	// start serving HTTP
@@ -113,18 +115,22 @@ func (s *Server) Start() {
 
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			logrus.WithFields(logrus.Fields{"comp": "server", "state": "stopping", "err": err}).Error()
+			log.Error("error listening", "error", err)
 		}
 	}()
 
-	logrus.WithField("address", s.rt.Config.Address).WithField("port", s.rt.Config.Port).Info("server started")
+	log.Info("server started")
 }
 
 // Stop stops our web server
 func (s *Server) Stop() {
+	log := slog.With("comp", "server")
+
 	// shut down our HTTP server
 	if err := s.httpServer.Shutdown(context.Background()); err != nil {
-		logrus.WithField("state", "stopping").WithError(err).Error("error shutting down server")
+		log.Error("error shutting down server", "error", err)
+	} else {
+		log.Info("server stopped")
 	}
 }
 

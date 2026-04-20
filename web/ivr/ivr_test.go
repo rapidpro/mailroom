@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,7 +27,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ import (
 // mocks the Twilio API
 func mockTwilioHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
+	slog.Info("test server called", "method", r.Method, "url", r.URL.String(), "form", r.Form)
 	if strings.HasSuffix(r.URL.String(), "Calls.json") {
 		to := r.Form.Get("To")
 		if to == "+16055741111" {
@@ -85,7 +85,7 @@ func TestTwilioIVR(t *testing.T) {
 		"contact": {
 			"id": 10000, 
 			"name": "Cathy", 
-			"urns": ["tel:+16055741111?id=10000&priority=50"], 
+			"urns": ["tel:+16055741111?id=10000"], 
 			"uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", 
 			"fields": {"gender": {"text": "F"}}, 
 			"groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], 
@@ -94,7 +94,7 @@ func TestTwilioIVR(t *testing.T) {
 		}, 
 		"results": {}
 	}`)
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}).
 		WithParentSummary(parentSummary)
 
@@ -128,7 +128,7 @@ func TestTwilioIVR(t *testing.T) {
 			url:                fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=1", testdata.TwilioChannel.UUID),
 			form:               nil,
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say>Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
+			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say language="en-US">Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -140,7 +140,7 @@ func TestTwilioIVR(t *testing.T) {
 				"timeout":    []string{"true"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say>Sorry, that is not one or two, try again.</Say>`},
+			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say language="en-US">Sorry, that is not one or two, try again.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -152,7 +152,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"1"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather timeout="30"`, `<Say>Great! You said One. Ok, now enter a number 1 to 100 then press pound.</Say>`},
+			expectedContains:   []string{`<Gather timeout="30"`, `<Say language="en-US">Great! You said One. Ok, now enter a number 1 to 100 then press pound.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -164,7 +164,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"101"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Gather timeout="30"`, `<Say>Sorry, that&#39;s too big. Enter a number 1 to 100 then press pound.</Say>`},
+			expectedContains:   []string{`<Gather timeout="30"`, `<Say language="en-US">Sorry, that&#39;s too big. Enter a number 1 to 100 then press pound.</Say>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -176,7 +176,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"56"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Say>You picked the number 56, excellent choice. Ok now tell me briefly why you are happy today.</Say>`, `<Record action=`},
+			expectedContains:   []string{`<Say language="en-US">You picked the number 56, excellent choice. Ok now tell me briefly why you are happy today.</Say>`, `<Record action=`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -189,8 +189,8 @@ func TestTwilioIVR(t *testing.T) {
 			},
 			expectedStatus: 200,
 			expectedContains: []string{
-				`<Say>You said</Say>`,
-				`<Say>I hope hearing that makes you feel better. Good day and good bye.</Say>`,
+				`<Say language="en-US">You said</Say>`,
+				`<Say language="en-US">I hope hearing that makes you feel better. Good day and good bye.</Say>`,
 				`<Dial action=`,
 				`>+12065551212</Dial>`,
 			},
@@ -205,7 +205,7 @@ func TestTwilioIVR(t *testing.T) {
 				"wait_type":      []string{"dial"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{`<Say>Great, they answered.</Say>`, `<Hangup></Hangup>`},
+			expectedContains:   []string{`<Say language="en-US">Great, they answered.</Say>`, `<Hangup></Hangup>`},
 			expectedConnStatus: map[string]string{"Call1": "I", "Call2": "W", "Call3": "W"},
 		},
 		{
@@ -312,7 +312,7 @@ func TestTwilioIVR(t *testing.T) {
 
 		for connExtID, expStatus := range tc.expectedConnStatus {
 			assertdb.Query(t, rt.DB, `SELECT status FROM ivr_call WHERE external_id = $1`, connExtID).
-				Columns(map[string]interface{}{"status": expStatus}, "status mismatch for connection '%s' in test '%s'", connExtID, tc.label)
+				Columns(map[string]any{"status": expStatus}, "status mismatch for connection '%s' in test '%s'", connExtID, tc.label)
 		}
 	}
 
@@ -350,7 +350,7 @@ func mockVonageHandler(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		form := &CallForm{}
 		json.Unmarshal(body, form)
-		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).WithField("form", form).Info("test server called")
+		slog.Info("test server called", "method", r.Method, "url", r.URL.String(), "body", body, "form", form)
 
 		// end of a leg
 		if form.Action == "transfer" {
@@ -397,7 +397,7 @@ func TestVonageIVR(t *testing.T) {
 	vonage.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithParams(json.RawMessage(`{"ref_id":"123"}`))
 
@@ -441,7 +441,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=1&urn=tel%3A%2B16055741111%3Fid%3D10000%26priority%3D1000&wait_type=gather&sig=O9Lq3OdBw1EoZ1KD6XSjIaKvuRg%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=1&urn=tel%3A%2B16055741111%3Fid%3D10000&wait_type=gather&sig=0znh%2FxV9L0OD0ITKr6%2FDfpbNbXE%3D"
 					],
 					"maxDigits": 1,
 					"submitOnHash": true,
@@ -533,7 +533,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=uY7YwwGJn79IhdQUaKpQ932Fbss%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002&wait_type=gather&sig=5t5yQU0hZ8%2BWz1qNBDNT%2BRggYJM%3D"
 					],
 					"maxDigits": 1,
 					"submitOnHash": true,
@@ -556,7 +556,7 @@ func TestVonageIVR(t *testing.T) {
 					"action": "input",
 					"eventMethod": "POST",
 					"eventUrl": [
-						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=uY7YwwGJn79IhdQUaKpQ932Fbss%3D"
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002&wait_type=gather&sig=5t5yQU0hZ8%2BWz1qNBDNT%2BRggYJM%3D"
 					],
 					"maxDigits": 20,
 					"submitOnHash": true,

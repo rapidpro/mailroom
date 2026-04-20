@@ -33,22 +33,17 @@ func (k *Ticket) Load(rt *runtime.Runtime) *models.Ticket {
 	return tickets[0]
 }
 
-type Ticketer struct {
-	ID   models.TicketerID
-	UUID assets.TicketerUUID
-}
-
 // InsertOpenTicket inserts an open ticket
-func InsertOpenTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {
-	return insertTicket(rt, org, contact, ticketer, models.TicketStatusOpen, topic, body, externalID, openedOn, assignee)
+func InsertOpenTicket(rt *runtime.Runtime, org *Org, contact *Contact, topic *Topic, body string, openedOn time.Time, assignee *User) *Ticket {
+	return insertTicket(rt, org, contact, models.TicketStatusOpen, topic, body, openedOn, assignee)
 }
 
 // InsertClosedTicket inserts a closed ticket
-func InsertClosedTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, topic *Topic, body, externalID string, assignee *User) *Ticket {
-	return insertTicket(rt, org, contact, ticketer, models.TicketStatusClosed, topic, body, externalID, dates.Now(), assignee)
+func InsertClosedTicket(rt *runtime.Runtime, org *Org, contact *Contact, topic *Topic, body string, assignee *User) *Ticket {
+	return insertTicket(rt, org, contact, models.TicketStatusClosed, topic, body, dates.Now(), assignee)
 }
 
-func insertTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Ticketer, status models.TicketStatus, topic *Topic, body, externalID string, openedOn time.Time, assignee *User) *Ticket {
+func insertTicket(rt *runtime.Runtime, org *Org, contact *Contact, status models.TicketStatus, topic *Topic, body string, openedOn time.Time, assignee *User) *Ticket {
 	uuid := flows.TicketUUID(uuids.New())
 
 	lastActivityOn := openedOn
@@ -61,8 +56,8 @@ func insertTicket(rt *runtime.Runtime, org *Org, contact *Contact, ticketer *Tic
 
 	var id models.TicketID
 	must(rt.DB.Get(&id,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, topic_id, body, external_id, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11, $12) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, topic.ID, body, externalID, openedOn, closedOn, lastActivityOn, assignee.SafeID(),
+		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, status, topic_id, body, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
+		VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10) RETURNING id`, uuid, org.ID, contact.ID, status, topic.ID, body, openedOn, closedOn, lastActivityOn, assignee.SafeID(),
 	))
 	return &Ticket{id, uuid}
 }

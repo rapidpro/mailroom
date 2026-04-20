@@ -2,69 +2,49 @@ package models
 
 import (
 	"context"
-	"time"
+	"database/sql"
 
-	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type LabelID int
 
 // Label is our mailroom type for message labels
 type Label struct {
-	l struct {
-		ID   LabelID          `json:"id"`
-		UUID assets.LabelUUID `json:"uuid"`
-		Name string           `json:"name"`
-	}
+	ID_   LabelID          `json:"id"`
+	UUID_ assets.LabelUUID `json:"uuid"`
+	Name_ string           `json:"name"`
 }
 
 // ID returns the ID for this label
-func (l *Label) ID() LabelID { return l.l.ID }
+func (l *Label) ID() LabelID { return l.ID_ }
 
 // UUID returns the uuid for this label
-func (l *Label) UUID() assets.LabelUUID { return l.l.UUID }
+func (l *Label) UUID() assets.LabelUUID { return l.UUID_ }
 
 // Name returns the name for this label
-func (l *Label) Name() string { return l.l.Name }
+func (l *Label) Name() string { return l.Name_ }
 
 // loads the labels for the passed in org
-func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Label, error) {
-	start := time.Now()
-
-	rows, err := db.Queryx(sqlSelectLabels, orgID)
+func loadLabels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Label, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectLabelsByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
 	}
-	defer rows.Close()
 
-	labels := make([]assets.Label, 0, 10)
-	for rows.Next() {
-		label := &Label{}
-		err = dbutil.ScanJSON(rows, &label.l)
-		if err != nil {
-			return nil, errors.Wrap(err, "error scanning label row")
-		}
-		labels = append(labels, label)
-	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(labels)).Debug("loaded labels")
-
-	return labels, nil
+	return ScanJSONRows(rows, func() assets.Label { return &Label{} })
 }
 
-const sqlSelectLabels = `
+const sqlSelectLabelsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (
-	  SELECT id, uuid, name
+      SELECT id, uuid, name
         FROM msgs_label
        WHERE org_id = $1 AND is_active = TRUE
     ORDER BY name ASC
-) r;
-`
+) r;`
 
 // AddMsgLabels inserts the passed in msg labels to our db
 func AddMsgLabels(ctx context.Context, tx *sqlx.Tx, adds []*MsgLabelAdd) error {

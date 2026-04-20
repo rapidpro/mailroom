@@ -2,12 +2,13 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 
 	"github.com/pkg/errors"
 )
@@ -18,20 +19,26 @@ type ScheduleID int
 // NilScheduleID is our constant for a nil schedule id
 const NilScheduleID = ScheduleID(0)
 
+// RepeatPeriod is the different ways a schedule can repeat
 type RepeatPeriod string
 
-const RepeatPeriodNever = RepeatPeriod("O")
-const RepeatPeriodDaily = RepeatPeriod("D")
-const RepeatPeriodWeekly = RepeatPeriod("W")
-const RepeatPeriodMonthly = RepeatPeriod("M")
+const (
+	RepeatPeriodNever   = RepeatPeriod("O")
+	RepeatPeriodDaily   = RepeatPeriod("D")
+	RepeatPeriodWeekly  = RepeatPeriod("W")
+	RepeatPeriodMonthly = RepeatPeriod("M")
+)
 
-const Monday = 'M'
-const Tuesday = 'T'
-const Wednesday = 'W'
-const Thursday = 'R'
-const Friday = 'F'
-const Saturday = 'S'
-const Sunday = 'U'
+// day of the week constants for weekly repeating schedules
+const (
+	Monday    = 'M'
+	Tuesday   = 'T'
+	Wednesday = 'W'
+	Thursday  = 'R'
+	Friday    = 'F'
+	Saturday  = 'S'
+	Sunday    = 'U'
+)
 
 var dayStrToDayInt = map[byte]time.Weekday{
 	Sunday:    0,
@@ -59,14 +66,13 @@ type Schedule struct {
 		// Timezone of our org
 		Timezone string `json:"timezone"`
 
-		// associated broadcast if any
+		// associated broadcast or trigger
 		Broadcast *Broadcast `json:"broadcast,omitempty"`
-
-		// associated trigger in flowstart format
-		FlowStart *FlowStart `json:"start,omitempty"`
+		Trigger   *Trigger   `json:"trigger,omitempty"`
 	}
 }
 
+// NewSchedule creates a new schedule object
 func NewSchedule(period RepeatPeriod, hourOfDay, minuteOfHour, dayOfMonth *int, daysOfWeek string) *Schedule {
 	sched := &Schedule{}
 	s := &sched.s
@@ -81,7 +87,7 @@ func NewSchedule(period RepeatPeriod, hourOfDay, minuteOfHour, dayOfMonth *int, 
 func (s *Schedule) ID() ScheduleID             { return s.s.ID }
 func (s *Schedule) OrgID() OrgID               { return s.s.OrgID }
 func (s *Schedule) Broadcast() *Broadcast      { return s.s.Broadcast }
-func (s *Schedule) FlowStart() *FlowStart      { return s.s.FlowStart }
+func (s *Schedule) Trigger() *Trigger          { return s.s.Trigger }
 func (s *Schedule) RepeatPeriod() RepeatPeriod { return s.s.RepeatPeriod }
 func (s *Schedule) NextFire() *time.Time       { return s.s.NextFire }
 func (s *Schedule) LastFire() *time.Time       { return s.s.LastFire }
@@ -89,8 +95,27 @@ func (s *Schedule) Timezone() (*time.Location, error) {
 	return time.LoadLocation(s.s.Timezone)
 }
 
+// DeleteWithTarget deactivates this schedule along with its associated broadcast or flow start
+func (s *Schedule) DeleteWithTarget(ctx context.Context, tx *sql.Tx) error {
+	if s.Broadcast() != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE msgs_broadcast SET is_active = FALSE, schedule_id = NULL WHERE id = $1`, s.Broadcast().ID); err != nil {
+			return errors.Wrap(err, "error deactivating scheduled broadcast")
+		}
+	} else if s.Trigger() != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE triggers_trigger SET is_active = FALSE, schedule_id = NULL WHERE id = $1`, s.Trigger().ID()); err != nil {
+			return errors.Wrap(err, "error deactivating scheduled trigger")
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schedules_schedule WHERE id = $1`, s.s.ID); err != nil {
+		return errors.Wrap(err, "error deleting schedule")
+	}
+
+	return nil
+}
+
 // UpdateFires updates the next and last fire for a shedule on the db
-func (s *Schedule) UpdateFires(ctx context.Context, tx Queryer, last time.Time, next *time.Time) error {
+func (s *Schedule) UpdateFires(ctx context.Context, tx DBorTx, last time.Time, next *time.Time) error {
 	_, err := tx.ExecContext(ctx, `UPDATE schedules_schedule SET last_fire = $2, next_fire = $3 WHERE id = $1`,
 		s.s.ID, last, next,
 	)
@@ -194,86 +219,55 @@ func daysInMonth(t time.Time) int {
 	return lastDay.Day()
 }
 
-const selectUnfiredSchedules = `
-SELECT ROW_TO_JSON(s) FROM (SELECT
-	s.id as id,
-	s.repeat_hour_of_day as repeat_hour_of_day,
-	s.repeat_minute_of_hour as repeat_minute_of_hour,
-	s.repeat_day_of_month as repeat_day_of_month,
-	s.repeat_days_of_week as repeat_days_of_week,
-	s.repeat_period as repeat_period,
-	s.next_fire as next_fire,
-	s.last_fire as last_fire,
-	s.org_id as org_id,
-	o.timezone as timezone,
-	(SELECT ROW_TO_JSON(sb) FROM (
-		SELECT
-			b.id AS broadcast_id,
-			b.translations,
-			'unevaluated' AS template_state,
-			b.base_language,
-			s.org_id,
-			(SELECT ARRAY_AGG(bc.contact_id) FROM (SELECT bc.contact_id FROM msgs_broadcast_contacts bc WHERE bc.broadcast_id = b.id) bc) as contact_ids,
-			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT bg.contactgroup_id FROM msgs_broadcast_groups bg WHERE bg.broadcast_id = b.id) bg) as group_ids
-		FROM
-			msgs_broadcast b
-		WHERE
-			b.schedule_id = s.id
-	) sb) as broadcast,
-	(SELECT ROW_TO_JSON(st) FROM (
-		SELECT
-			t.id as id,
-			s.org_id as org_id,
-			'T' as start_type,
-			t.flow_id as flow_id,
-			f.flow_type as flow_type,
-			'{}'::jsonb AS exclusions,
-			(SELECT ARRAY_AGG(tc.contact_id) FROM (
-				SELECT
-					tc.contact_id
-				FROM
-					triggers_trigger_contacts tc
-				WHERE
-					tc.trigger_id = t.id
-			) tc) as contact_ids,
-			(SELECT ARRAY_AGG(tg.contactgroup_id) FROM (
-				SELECT
-					tg.contactgroup_id
-				FROM
-					triggers_trigger_groups tg
-				WHERE
-					tg.trigger_id = t.id
-			) tg) as group_ids,
-			(SELECT ARRAY_AGG(tg.contactgroup_id) FROM (
-				SELECT
-					tg.contactgroup_id
-				FROM
-					triggers_trigger_exclude_groups tg
-				WHERE
-					tg.trigger_id = t.id
-			) tg) as exclude_group_ids
-		FROM
-			triggers_trigger t JOIN
-			flows_flow f on t.flow_id = f.id
-		WHERE
-			t.schedule_id = s.id AND
-			t.is_active = TRUE AND
-			t.is_archived = FALSE
-	) st) as start
-FROM
-	schedules_schedule s JOIN
-	orgs_org o ON s.org_id = o.id
-WHERE
-	s.is_active = TRUE AND
-	s.next_fire < NOW()
-ORDER BY
-    s.next_fire ASC
-) s;
-`
+const sqlSelectUnfiredSchedules = `
+SELECT ROW_TO_JSON(s) FROM (
+    SELECT
+        s.id as id,
+        s.repeat_hour_of_day as repeat_hour_of_day,
+        s.repeat_minute_of_hour as repeat_minute_of_hour,
+        s.repeat_day_of_month as repeat_day_of_month,
+        s.repeat_days_of_week as repeat_days_of_week,
+        s.repeat_period as repeat_period,
+        s.next_fire as next_fire,
+        s.last_fire as last_fire,
+        s.org_id as org_id,
+        o.timezone as timezone,
+        (SELECT ROW_TO_JSON(sb) FROM (
+            SELECT
+                b.id AS broadcast_id,
+                s.org_id,
+                b.translations,
+                'unevaluated' AS template_state,
+                b.base_language,
+                b.optin_id,
+                (SELECT ARRAY_AGG(bc.contact_id) FROM (SELECT contact_id FROM msgs_broadcast_contacts WHERE broadcast_id = b.id) bc) as contact_ids,
+                (SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT contactgroup_id FROM msgs_broadcast_groups WHERE broadcast_id = b.id) bg) as group_ids
+            FROM
+                msgs_broadcast b
+            WHERE
+                b.schedule_id = s.id
+        ) sb) as broadcast,
+        (SELECT ROW_TO_JSON(r) FROM (
+            SELECT 
+                t.id,
+                t.org_id,
+                t.flow_id, 
+                'S' AS trigger_type,
+                (SELECT ARRAY_AGG(tc.contact_id) FROM (SELECT contact_id FROM triggers_trigger_contacts WHERE trigger_id = t.id) tc) as contact_ids,
+                (SELECT ARRAY_AGG(tg.contactgroup_id) FROM (SELECT contactgroup_id FROM triggers_trigger_groups WHERE trigger_id = t.id) tg) as include_group_ids,
+                (SELECT ARRAY_AGG(te.contactgroup_id) FROM (SELECT contactgroup_id FROM triggers_trigger_exclude_groups WHERE trigger_id = t.id) te) as exclude_group_ids
+            FROM triggers_trigger t 
+            WHERE t.schedule_id = s.id AND t.is_active = TRUE AND t.is_archived = FALSE
+        ) r) AS trigger
+        FROM schedules_schedule s 
+        JOIN orgs_org o ON s.org_id = o.id
+       WHERE s.next_fire < NOW() AND NOT is_paused 
+    ORDER BY s.next_fire ASC
+) s;`
 
 // GetUnfiredSchedules returns all unfired schedules
-func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
-	rows, err := db.QueryxContext(ctx, selectUnfiredSchedules)
+func GetUnfiredSchedules(ctx context.Context, db *sql.DB) ([]*Schedule, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectUnfiredSchedules)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting unfired schedules")
 	}

@@ -20,7 +20,7 @@ var MonitorWebhooks models.EventCommitHook = &monitorWebhooks{}
 
 type monitorWebhooks struct{}
 
-func (h *monitorWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *monitorWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]any) error {
 	// organize events by nodes
 	eventsByNode := make(map[flows.NodeUUID][]*events.WebhookCalledEvent)
 	for _, es := range scenes {

@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql/driver"
 
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 )
 
 const (

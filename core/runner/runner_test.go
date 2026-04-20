@@ -8,8 +8,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -29,13 +29,13 @@ func TestStartFlowBatch(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
-	start1 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, testdata.SingleMessage.ID).
+	start1 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, testdata.SingleMessage.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID})
 	err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start1})
 	require.NoError(t, err)
 
-	batch1 := start1.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 4)
-	batch2 := start1.CreateBatch([]models.ContactID{testdata.George.ID, testdata.Alexandria.ID}, true, 4)
+	batch1 := start1.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, models.FlowTypeBackground, false, 4)
+	batch2 := start1.CreateBatch([]models.ContactID{testdata.George.ID, testdata.Alexandria.ID}, models.FlowTypeBackground, true, 4)
 
 	// start the first batch...
 	sessions, err := runner.StartFlowBatch(ctx, rt, batch1)
@@ -51,7 +51,7 @@ func TestStartFlowBatch(t *testing.T) {
 		Returns(2)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = 'Hey, how are you?' AND org_id = 1 AND status = 'Q' 
-		AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T' AND channel_id = $2`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}), testdata.TwilioChannel.ID).
+		AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'T'`, pq.Array([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})).
 		Returns(2)
 
 	assertdb.Query(t, rt.DB, `SELECT status FROM flows_flowstart WHERE id = $1`, start1.ID).Returns("P")
@@ -65,10 +65,10 @@ func TestStartFlowBatch(t *testing.T) {
 
 	// create a start object with params
 	testdata.InsertFlowStart(rt, testdata.Org1, testdata.IncomingExtraFlow, nil)
-	start2 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, testdata.IncomingExtraFlow.ID).
+	start2 := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, testdata.IncomingExtraFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID}).
 		WithParams([]byte(`{"name":"Fred", "age":33}`))
-	batch3 := start2.CreateBatch([]models.ContactID{testdata.Cathy.ID}, true, 1)
+	batch3 := start2.CreateBatch([]models.ContactID{testdata.Cathy.ID}, models.FlowTypeMessaging, true, 1)
 
 	sessions, err = runner.StartFlowBatch(ctx, rt, batch3)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestResume(t *testing.T) {
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	modelContact, flowContact := testdata.Cathy.Load(rt, oa)
+	modelContact, flowContact, _ := testdata.Cathy.Load(rt, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), flowContact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, nil, true)
@@ -169,7 +169,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	// create a lot of contacts...
 	contacts := make([]*testdata.Contact, 100)
 	for i := range contacts {
-		contacts[i] = testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage, models.ContactStatusActive)
+		contacts[i] = testdata.InsertContact(rt, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", i18n.NilLanguage, models.ContactStatusActive)
 	}
 
 	options := &runner.StartOptions{

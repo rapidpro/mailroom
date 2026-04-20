@@ -2,29 +2,33 @@ package analytics
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/nyaruka/gocommon/analytics"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.RegisterCron("analytics", time.Second*60, true, reportAnalytics)
+	tasks.RegisterCron("analytics", true, &analyticsCron{})
 }
 
-var (
+// calculates a bunch of stats every minute and both logs them and sends them to librato
+type analyticsCron struct {
 	// both sqlx and redis provide wait stats which are cummulative that we need to make into increments
 	dbWaitDuration    time.Duration
 	dbWaitCount       int64
 	redisWaitDuration time.Duration
 	redisWaitCount    int64
-)
+}
 
-// calculates a bunch of stats every minute and both logs them and sends them to librato
-func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
+func (c *analyticsCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
+}
+
+func (c *analyticsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
 	// We wait 15 seconds since we fire at the top of the minute, the same as expirations.
 	// That way any metrics related to the size of our queue are a bit more accurate (all expirations can
 	// usually be handled in 15 seconds). Something more complicated would take into account the age of
@@ -37,28 +41,28 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	// calculate size of batch queue
 	batchSize, err := queue.Size(rc, queue.BatchQueue)
 	if err != nil {
-		logrus.WithError(err).Error("error calculating batch queue size")
+		slog.Error("error calculating batch queue size", "error", err)
 	}
 
 	// and size of handler queue
 	handlerSize, err := queue.Size(rc, queue.HandlerQueue)
 	if err != nil {
-		logrus.WithError(err).Error("error calculating handler queue size")
+		slog.Error("error calculating handler queue size", "error", err)
 	}
 
 	// get our DB and redis stats
 	dbStats := rt.DB.Stats()
 	redisStats := rt.RP.Stats()
 
-	dbWaitDurationInPeriod := dbStats.WaitDuration - dbWaitDuration
-	dbWaitCountInPeriod := dbStats.WaitCount - dbWaitCount
-	redisWaitDurationInPeriod := redisStats.WaitDuration - redisWaitDuration
-	redisWaitCountInPeriod := redisStats.WaitCount - redisWaitCount
+	dbWaitDurationInPeriod := dbStats.WaitDuration - c.dbWaitDuration
+	dbWaitCountInPeriod := dbStats.WaitCount - c.dbWaitCount
+	redisWaitDurationInPeriod := redisStats.WaitDuration - c.redisWaitDuration
+	redisWaitCountInPeriod := redisStats.WaitCount - c.redisWaitCount
 
-	dbWaitDuration = dbStats.WaitDuration
-	dbWaitCount = dbStats.WaitCount
-	redisWaitDuration = redisStats.WaitDuration
-	redisWaitCount = redisStats.WaitCount
+	c.dbWaitDuration = dbStats.WaitDuration
+	c.dbWaitCount = dbStats.WaitCount
+	c.redisWaitDuration = redisStats.WaitDuration
+	c.redisWaitCount = redisStats.WaitCount
 
 	analytics.Gauge("mr.db_busy", float64(dbStats.InUse))
 	analytics.Gauge("mr.db_idle", float64(dbStats.Idle))
@@ -69,7 +73,7 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	analytics.Gauge("mr.handler_queue", float64(handlerSize))
 	analytics.Gauge("mr.batch_queue", float64(batchSize))
 
-	logrus.WithFields(logrus.Fields{
+	return map[string]any{
 		"db_busy":          dbStats.InUse,
 		"db_idle":          dbStats.Idle,
 		"db_wait_time":     dbWaitDurationInPeriod,
@@ -78,7 +82,5 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 		"redis_wait_count": dbWaitCountInPeriod,
 		"handler_size":     handlerSize,
 		"batch_size":       batchSize,
-	}).Info("current analytics")
-
-	return nil
+	}, nil
 }

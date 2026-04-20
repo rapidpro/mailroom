@@ -53,14 +53,4 @@ func TestParseDisallowedNetworks(t *testing.T) {
 	cfg.DisallowedNetworks = `"127.0.0.1`
 	_, _, err = cfg.ParseDisallowedNetworks()
 	assert.EqualError(t, err, `parse error on line 1, column 11: extraneous or missing " in quoted-field`)
-
-	// test with invalid IP
-	cfg.DisallowedNetworks = `127.0.1`
-	_, _, err = cfg.ParseDisallowedNetworks()
-	assert.EqualError(t, err, `couldn't parse '127.0.1' as an IP address`)
-
-	// test with invalid network
-	cfg.DisallowedNetworks = `127.0.0.1/x`
-	_, _, err = cfg.ParseDisallowedNetworks()
-	assert.EqualError(t, err, `couldn't parse '127.0.0.1/x' as an IP network`)
 }

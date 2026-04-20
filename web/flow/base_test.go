@@ -15,8 +15,8 @@ func TestServer(t *testing.T) {
 	testsuite.RunWebTests(t, ctx, rt, "testdata/migrate.json", nil)
 }
 
-func TestPreviewStart(t *testing.T) {
+func TestStartPreview(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/start_preview.json", nil)
 }

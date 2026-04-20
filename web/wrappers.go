@@ -104,21 +104,3 @@ func RequireAuthToken(handler Handler) Handler {
 		return handler(ctx, rt, r, w)
 	}
 }
-
-// LoggingJSONHandler is a JSON web handler which logs HTTP logs
-type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (any, int, error)
-
-// WithHTTPLogs wraps a handler to create a handler which can record and save HTTP logs
-func WithHTTPLogs(handler LoggingJSONHandler) MarshaledHandler {
-	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-		logger := &models.HTTPLogger{}
-
-		response, status, err := handler(ctx, rt, r, logger)
-
-		if err := logger.Insert(ctx, rt.DB); err != nil {
-			return nil, 0, errors.Wrap(err, "error writing HTTP logs")
-		}
-
-		return response, status, err
-	}
-}

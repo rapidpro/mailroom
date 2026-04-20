@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -112,7 +112,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 			return nil, 0, errors.Wrapf(err, "unable to look up contact")
 		}
 	} else {
-		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", i18n.NilLanguage, nil)
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "unable to create contact")
 		}
@@ -125,7 +125,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (an
 
 	// run through each contact modifier, applying it to our contact
 	for _, m := range mods {
-		modifiers.Apply(oa.Env(), goflow.Engine(rt.Config).Services(), oa.SessionAssets(), flowContact, m, appender)
+		modifiers.Apply(goflow.Engine(rt.Config), oa.Env(), oa.SessionAssets(), flowContact, m, appender)
 	}
 
 	// set this updated contact on our session

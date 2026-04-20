@@ -2,18 +2,16 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/lib/pq"
-	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ChannelID is the type for channel IDs
@@ -39,74 +37,71 @@ const (
 
 // Channel is the mailroom struct that represents channels
 type Channel struct {
-	// inner struct for privacy and so we don't collide with method names
-	c struct {
-		ID                 ChannelID                `json:"id"`
-		UUID               assets.ChannelUUID       `json:"uuid"`
-		OrgID              OrgID                    `json:"org_id"`
-		Parent             *assets.ChannelReference `json:"parent"`
-		Name               string                   `json:"name"`
-		Address            string                   `json:"address"`
-		ChannelType        ChannelType              `json:"channel_type"`
-		TPS                int                      `json:"tps"`
-		Country            null.String              `json:"country"`
-		Schemes            []string                 `json:"schemes"`
-		Roles              []assets.ChannelRole     `json:"roles"`
-		MatchPrefixes      []string                 `json:"match_prefixes"`
-		AllowInternational bool                     `json:"allow_international"`
-		MachineDetection   bool                     `json:"machine_detection"`
-		Config             map[string]interface{}   `json:"config"`
-	}
+	ID_                 ChannelID               `json:"id"`
+	UUID_               assets.ChannelUUID      `json:"uuid"`
+	OrgID_              OrgID                   `json:"org_id"`
+	Name_               string                  `json:"name"`
+	Address_            string                  `json:"address"`
+	Type_               ChannelType             `json:"channel_type"`
+	TPS_                int                     `json:"tps"`
+	Country_            null.String             `json:"country"`
+	Schemes_            []string                `json:"schemes"`
+	Roles_              []assets.ChannelRole    `json:"roles"`
+	Features_           []assets.ChannelFeature `json:"features"`
+	MatchPrefixes_      []string                `json:"match_prefixes"`
+	AllowInternational_ bool                    `json:"allow_international"`
+	MachineDetection_   bool                    `json:"machine_detection"`
+	Config_             map[string]any          `json:"config"`
 }
 
 // ID returns the id of this channel
-func (c *Channel) ID() ChannelID { return c.c.ID }
+func (c *Channel) ID() ChannelID { return c.ID_ }
 
 // OrgID returns the org id of this channel
-func (c *Channel) OrgID() OrgID { return c.c.OrgID }
+func (c *Channel) OrgID() OrgID { return c.OrgID_ }
 
 // UUID returns the UUID of this channel
-func (c *Channel) UUID() assets.ChannelUUID { return c.c.UUID }
+func (c *Channel) UUID() assets.ChannelUUID { return c.UUID_ }
 
 // Name returns the name of this channel
-func (c *Channel) Name() string { return c.c.Name }
+func (c *Channel) Name() string { return c.Name_ }
 
 // Type returns the channel type for this channel
-func (c *Channel) Type() ChannelType { return c.c.ChannelType }
+func (c *Channel) Type() ChannelType { return c.Type_ }
 
 // TPS returns the max number of transactions per second this channel supports
-func (c *Channel) TPS() int { return c.c.TPS }
+func (c *Channel) TPS() int { return c.TPS_ }
 
 // Address returns the name of this channel
-func (c *Channel) Address() string { return c.c.Address }
+func (c *Channel) Address() string { return c.Address_ }
 
 // Country returns the contry code for this channel
-func (c *Channel) Country() envs.Country { return envs.Country(string(c.c.Country)) }
+func (c *Channel) Country() i18n.Country { return i18n.Country(string(c.Country_)) }
 
 // Schemes returns the schemes this channel supports
-func (c *Channel) Schemes() []string { return c.c.Schemes }
+func (c *Channel) Schemes() []string { return c.Schemes_ }
 
 // Roles returns the roles this channel supports
-func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
+func (c *Channel) Roles() []assets.ChannelRole { return c.Roles_ }
+
+// Features returns the features this channel supports
+func (c *Channel) Features() []assets.ChannelFeature { return c.Features_ }
 
 // MatchPrefixes returns the prefixes we should also match when determining channel affinity
-func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
+func (c *Channel) MatchPrefixes() []string { return c.MatchPrefixes_ }
 
 // AllowInternational returns whether this channel allows sending internationally (only applies to TEL schemes)
-func (c *Channel) AllowInternational() bool { return c.c.AllowInternational }
+func (c *Channel) AllowInternational() bool { return c.AllowInternational_ }
 
 // MachineDetection returns whether this channel should do answering machine detection (only applies to IVR)
-func (c *Channel) MachineDetection() bool { return c.c.MachineDetection }
-
-// Parent returns a reference to the parent channel of this channel (if any)
-func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
+func (c *Channel) MachineDetection() bool { return c.MachineDetection_ }
 
 // Config returns the config for this channel
-func (c *Channel) Config() map[string]interface{} { return c.c.Config }
+func (c *Channel) Config() map[string]any { return c.Config_ }
 
 // ConfigValue returns the config value for the passed in key
 func (c *Channel) ConfigValue(key string, def string) string {
-	value := c.c.Config[key]
+	value := c.Config_[key]
 	strValue, isString := value.(string)
 	if isString {
 		return strValue
@@ -122,81 +117,45 @@ func (c *Channel) ConfigValue(key string, def string) string {
 	return def
 }
 
-// ChannelReference return a channel reference for this channel
-func (c *Channel) ChannelReference() *assets.ChannelReference {
+// Reference return a channel reference for this channel
+func (c *Channel) Reference() *assets.ChannelReference {
 	return assets.NewChannelReference(c.UUID(), c.Name())
 }
 
 // GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending, and
 // that this function will return deleted channels.
-func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Channel, error) {
-	rows, err := db.QueryxContext(ctx, sqlSelectChannelsByID, pq.Array(ids))
+func GetChannelsByID(ctx context.Context, db *sql.DB, ids []ChannelID) ([]*Channel, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectChannelsByID, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels by id")
 	}
 	defer rows.Close()
 
-	channels := make([]*Channel, 0, 5)
-	for rows.Next() {
-		channel := &Channel{}
-		err := dbutil.ScanJSON(rows, &channel.c)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error unmarshalling channel")
-		}
-
-		channels = append(channels, channel)
-	}
-
-	return channels, nil
+	return ScanJSONRows(rows, func() *Channel { return &Channel{} })
 }
 
 const sqlSelectChannelsByID = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	c.id as id,
-	c.uuid as uuid,
-	c.org_id as org_id,
-	c.name as name,
-	c.channel_type as channel_type,
-	COALESCE(c.tps, 10) as tps,
-	c.config as config
-FROM 
-	channels_channel c
-WHERE 
-	c.id = ANY($1)
+SELECT ROW_TO_JSON(r) FROM (
+    SELECT c.id as id, c.uuid as uuid, c.org_id as org_id, c.name as name, c.channel_type as channel_type, COALESCE(c.tps, 10) as tps, c.config as config
+      FROM channels_channel c
+     WHERE c.id = ANY($1)
 ) r;`
 
 // loadChannels loads all the channels for the passed in org
-func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channel, error) {
-	start := time.Now()
-
-	rows, err := db.QueryxContext(ctx, sqlSelectChannels, orgID)
+func loadChannels(ctx context.Context, db *sql.DB, orgID OrgID) ([]assets.Channel, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectChannelsByOrg, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}
-	defer rows.Close()
 
-	channels := make([]assets.Channel, 0, 2)
-	for rows.Next() {
-		channel := &Channel{}
-		err := dbutil.ScanJSON(rows, &channel.c)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error unmarshalling channel")
-		}
-
-		channels = append(channels, channel)
-	}
-
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(channels)).Debug("loaded channels")
-
-	return channels, nil
+	return ScanJSONRows(rows, func() assets.Channel { return &Channel{} })
 }
 
-const sqlSelectChannels = `
+const sqlSelectChannelsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,
 	c.org_id as org_id,
-	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
 	c.name as name,
 	c.channel_type as channel_type,
 	COALESCE(c.tps, 10) as tps,
@@ -214,6 +173,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		END 
 		FROM unnest(regexp_split_to_array(c.role,'')) AS r)
 	) as roles,
+	CASE WHEN channel_type IN ('FBA') THEN '{"optins"}'::text[] ELSE '{}'::text[] END AS features,
 	jsonb_extract_path(c.config, 'matching_prefixes') AS match_prefixes,
 	jsonb_extract_path(c.config, 'allow_international') AS allow_international,
 	jsonb_extract_path(c.config, 'machine_detection') AS machine_detection
@@ -227,7 +187,7 @@ ORDER BY
 ) r;`
 
 // OrgIDForChannelUUID returns the org id for the passed in channel UUID if any
-func OrgIDForChannelUUID(ctx context.Context, db Queryer, channelUUID assets.ChannelUUID) (OrgID, error) {
+func OrgIDForChannelUUID(ctx context.Context, db DBorTx, channelUUID assets.ChannelUUID) (OrgID, error) {
 	var orgID OrgID
 	err := db.GetContext(ctx, &orgID, `SELECT org_id FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
 	if err != nil {

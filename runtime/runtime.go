@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"database/sql"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/storage"
@@ -11,7 +13,7 @@ import (
 // those services to simplify call signatures but not create a direct dependency to Mailroom or Server
 type Runtime struct {
 	DB                *sqlx.DB
-	ReadonlyDB        *sqlx.DB
+	ReadonlyDB        *sql.DB
 	RP                *redis.Pool
 	ES                *elastic.Client
 	AttachmentStorage storage.Storage

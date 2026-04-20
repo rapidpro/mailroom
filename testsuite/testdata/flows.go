@@ -45,8 +45,8 @@ func InsertFlow(rt *runtime.Runtime, org *Org, definition []byte) *Flow {
 		VALUES($1, $2, $3, 'M', '13.1.0', 'eng', 10, FALSE, FALSE, TRUE, FALSE, FALSE, $4, NOW(), $4, NOW(), NOW(), $4) RETURNING id`, org.ID, uuid, name, Admin.ID,
 	))
 
-	rt.DB.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, is_active, created_by_id, created_on, modified_by_id, modified_on) 
-	VALUES($1, $2, '13.1.0', 1, TRUE, $3, NOW(), $3, NOW())`, id, definition, Admin.ID)
+	rt.DB.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, created_by_id, created_on) 
+	VALUES($1, $2, '13.1.0', 1, $3, NOW())`, id, definition, Admin.ID)
 
 	return &Flow{ID: id, UUID: assets.FlowUUID(uuid)}
 }

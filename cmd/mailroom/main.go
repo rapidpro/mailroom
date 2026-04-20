@@ -1,16 +1,22 @@
 package main
 
 import (
+	ulog "log"
+	"log/slog"
 	"os"
 	"os/signal"
 	goruntime "runtime"
 	"syscall"
+	"time"
 
+	"github.com/getsentry/sentry-go"
+	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/runtime"
+	slogmulti "github.com/samber/slog-multi"
+	slogsentry "github.com/samber/slog-sentry"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	_ "github.com/nyaruka/mailroom/core/hooks"
@@ -28,10 +34,6 @@ import (
 	_ "github.com/nyaruka/mailroom/core/tasks/timeouts"
 	_ "github.com/nyaruka/mailroom/services/ivr/twiml"
 	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
-	_ "github.com/nyaruka/mailroom/services/tickets/intern"
-	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
-	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
-	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/web/contact"
 	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/flow"
@@ -42,9 +44,6 @@ import (
 	_ "github.com/nyaruka/mailroom/web/simulation"
 	_ "github.com/nyaruka/mailroom/web/surveyor"
 	_ "github.com/nyaruka/mailroom/web/ticket"
-
-	_ "github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -65,42 +64,56 @@ func main() {
 
 	// ensure config is valid
 	if err := config.Validate(); err != nil {
-		logrus.Fatalf("invalid config: %s", err)
+		slog.Error("invalid config", "error", err)
+		os.Exit(1)
 	}
 
-	level, err := logrus.ParseLevel(config.LogLevel)
+	var level slog.Level
+	err := level.UnmarshalText([]byte(config.LogLevel))
 	if err != nil {
-		logrus.Fatalf("invalid log level '%s'", level)
+		ulog.Fatalf("invalid log level %s", level)
+		os.Exit(1)
 	}
 
-	logrus.SetLevel(level)
-	logrus.SetOutput(os.Stdout)
-	logrus.SetFormatter(&logrus.TextFormatter{})
-	logrus.WithField("version", version).WithField("released", date).Info("starting mailroom")
+	// configure our logger
+	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(logHandler))
+
+	logger := slog.With("comp", "main")
+	logger.Info("starting mailroom", "version", version, "released", date)
 
 	// if we have a DSN entry, try to initialize it
 	if config.SentryDSN != "" {
-		hook, err := logrus_sentry.NewSentryHook(config.SentryDSN, []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel})
-		hook.Timeout = 0
-		hook.StacktraceConfiguration.Enable = true
-		hook.StacktraceConfiguration.Skip = 4
-		hook.StacktraceConfiguration.Context = 5
-		hook.StacktraceConfiguration.IncludeErrorBreadcrumb = true
+		err := sentry.Init(sentry.ClientOptions{
+			Dsn:           config.SentryDSN,
+			EnableTracing: false,
+		})
 		if err != nil {
-			logrus.Fatalf("invalid sentry DSN: '%s': %s", config.SentryDSN, err)
+			ulog.Fatalf("error initiating sentry client, error %s, dsn %s", err, config.SentryDSN)
+			os.Exit(1)
 		}
-		logrus.StandardLogger().Hooks.Add(hook)
+
+		defer sentry.Flush(2 * time.Second)
+
+		logger = slog.New(
+			slogmulti.Fanout(
+				logHandler,
+				slogsentry.Option{Level: slog.LevelError}.NewSentryHandler(),
+			),
+		)
+		logger = logger.With("release", version)
+		slog.SetDefault(logger)
 	}
 
 	if config.UUIDSeed != 0 {
 		uuids.SetGenerator(uuids.NewSeededGenerator(int64(config.UUIDSeed)))
-		logrus.WithField("uuid-seed", config.UUIDSeed).Warn("using seeded UUID generation which is only appropriate for testing environments")
+		logger.Warn("using seeded UUID generation", "uuid-seed", config.UUIDSeed)
 	}
 
 	mr := mailroom.NewMailroom(config)
 	err = mr.Start()
 	if err != nil {
-		logrus.Fatalf("error starting server: %s", err)
+		logger.Error("unable to start server", "error", err)
 	}
 
 	// handle our signals
@@ -114,14 +127,16 @@ func handleSignals(mr *mailroom.Mailroom) {
 
 	for {
 		sig := <-sigs
+		log := slog.With("comp", "main", "signal", sig)
+
 		switch sig {
 		case syscall.SIGQUIT:
 			buf := make([]byte, 1<<20)
 			stacklen := goruntime.Stack(buf, true)
-			logrus.WithField("comp", "main").WithField("signal", sig).Info("received quit signal, dumping stack")
-			logrus.Printf("\n%s", buf[:stacklen])
+			log.Info("received quit signal, dumping stack")
+			ulog.Printf("\n%s", buf[:stacklen])
 		case syscall.SIGINT, syscall.SIGTERM:
-			logrus.WithField("comp", "main").WithField("signal", sig).Info("received exit signal, exiting")
+			log.Info("received exit signal, exiting")
 			mr.Stop()
 			return
 		}

@@ -1,7 +1,6 @@
 package models_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
@@ -15,18 +14,10 @@ import (
 func TestLoadGroups(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	db := testsuite.NewMockDB(rt.DB, func(funcName string, call int) error {
-		// fail first query for groups
-		if funcName == "QueryxContext" && call == 0 {
-			return errors.New("boom")
-		}
-		return nil
-	})
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOptIns)
+	require.NoError(t, err)
 
-	_, err := models.LoadGroups(ctx, db, testdata.Org1.ID)
-	require.EqualError(t, err, "error querying groups for org: 1: boom")
-
-	groups, err := models.LoadGroups(ctx, db, 1)
+	groups, err := oa.Groups()
 	require.NoError(t, err)
 
 	tcs := []struct {

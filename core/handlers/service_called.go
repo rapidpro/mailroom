@@ -2,17 +2,16 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -22,30 +21,21 @@ func init() {
 // handleServiceCalled is called for each service called event
 func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ServiceCalledEvent)
+
+	slog.Debug("service called", "contact", scene.ContactUUID(), "session", scene.SessionID(), "service", event.Service)
+
 	var classifier *models.Classifier
-	var ticketer *models.Ticketer
 
 	if event.Service == "classifier" {
 		classifier = oa.ClassifierByUUID(event.Classifier.UUID)
 		if classifier == nil {
 			return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
 		}
-	} else if event.Service == "ticketer" {
-		ticketer = oa.TicketerByUUID(event.Ticketer.UUID)
-		if ticketer == nil {
-			return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticketer.UUID)
-		}
 	}
 
 	// create a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {
-		logrus.WithFields(logrus.Fields{
-			"contact_uuid": scene.ContactUUID(),
-			"session_id":   scene.SessionID(),
-			"url":          httpLog.URL,
-			"status":       httpLog.Status,
-			"elapsed_ms":   httpLog.ElapsedMS,
-		}).Debug("service called")
+		slog.Debug("http requested", "contact", scene.ContactUUID(), "session", scene.SessionID(), "url", httpLog.URL, "status", httpLog.Status, "elapsed_ms", httpLog.ElapsedMS)
 
 		var log *models.HTTPLog
 
@@ -62,21 +52,7 @@ func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
-		} else if event.Service == "ticketer" {
-			log = models.NewTicketerCalledLog(
-				oa.OrgID(),
-				ticketer.ID(),
-				httpLog.URL,
-				httpLog.StatusCode,
-				httpLog.Request,
-				httpLog.Response,
-				httpLog.Status != flows.CallStatusSuccess,
-				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-				httpLog.Retries,
-				httpLog.CreatedOn,
-			)
 		}
-
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, log)
 	}
 
